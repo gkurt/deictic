@@ -1,0 +1,180 @@
+/**
+ * The rrweb() renderer against a real browser: a page served here, snapshotted as the page half does it,
+ * rendered as the server half does, and compared with the page itself. Skipped where no Chromium is found.
+ */
+import { afterAll, expect, test } from 'bun:test';
+import { createRequire } from 'node:module';
+
+import type { Browser, Page } from 'playwright-core';
+import type * as Rrweb from 'rrweb-snapshot';
+
+import { browserOf, render, type Snapshot } from '#src/plugins/screenshots/playwright.ts';
+
+const browser: Browser | undefined = await browserOf({}).catch(() => undefined);
+const bundle = createRequire(import.meta.url).resolve('rrweb-snapshot');
+
+// The case the dom() renderer got wrong: monospace text that fits on one line in its box.
+const server = Bun.serve({
+  port: 0,
+  fetch: () =>
+    new Response(
+      `<!doctype html><html><head><style>
+        body { margin: 24px; font: 16px system-ui, sans-serif; }
+        code { display: inline-block; padding: 8px 12px; border: 1px solid #ddd; font: 14px ui-monospace, monospace; }
+        .tall { height: 1600px; }
+      </style></head><body>
+        <h1>Pricing</h1><code>npm install -D deictic</code>
+        <p>Signed in as <span class="rr-mask">Ada Lovelace</span></p>
+        <div class="tall"></div><p id="below">Further down</p>
+        <deictic-overlay><div style="position:fixed;inset:0;background:red"></div></deictic-overlay>
+      </body></html>`,
+      { headers: { 'content-type': 'text/html' } },
+    ),
+});
+afterAll(() => server.stop());
+
+const viewport = { width: 640, height: 480 };
+
+/** The page, open, with what the page half sends for it. */
+async function open(): Promise<{ page: Page; snapshot: (scroll?: number) => Promise<Snapshot> }> {
+  const page = await browser!.newPage({ viewport, deviceScaleFactor: 1 });
+  await page.goto(server.url.href);
+  await page.addScriptTag({ path: bundle });
+  const snapshot = async (scroll = 0) => {
+    await page.evaluate((y) => scrollTo(0, y), scroll);
+    // As the page half takes it: masked as rrweb masks, without deictic's overlay.
+    const taken = await page.evaluate(() =>
+      (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot.snapshot(document, {
+        inlineStylesheet: true,
+        maskTextClass: 'rr-mask',
+      }),
+    );
+    const strip = (node: Snapshot['snapshot']): Snapshot['snapshot'] =>
+      'childNodes' in node
+        ? {
+            ...node,
+            childNodes: node.childNodes
+              .filter((c: Snapshot['snapshot']) => !('tagName' in c && c.tagName === 'deictic-overlay'))
+              .map(strip),
+          }
+        : node;
+    return { snapshot: strip(taken!), url: server.url.href, viewport, scroll: { x: 0, y: scroll }, scale: 1 };
+  };
+  return { page, snapshot };
+}
+
+/**
+ * How many pixels differ in brightness between two PNGs of the same size, drawn in the browser. Brightness,
+ * not colour: the page's own text may be smoothed with colour fringes where text in an iframe isn't, which
+ * moves nothing, while a glyph or a box out of place changes brightness.
+ */
+async function differing(page: Page, a: Uint8Array, b: Uint8Array): Promise<number> {
+  return page.evaluate(
+    async ({ a, b }) => {
+      const pixels = async (bytes: number[]) => {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      };
+      const [x, y] = [await pixels(a), await pixels(b)];
+      if (x.length !== y.length) return -1;
+      let n = 0;
+      const luma = (d: Uint8ClampedArray, i: number) => 0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!;
+      for (let i = 0; i < x.length; i += 4) if (Math.abs(luma(x, i) - luma(y, i)) > 48) n++;
+      return n;
+    },
+    { a: [...a], b: [...b] },
+  );
+}
+
+test.skipIf(browser === undefined)(
+  'renders a snapshot as the page itself shows, scrolled where it was',
+  async () => {
+    const { page, snapshot } = await open();
+    // The masked text and the overlay differ by design: leave them out of the comparison.
+    await page.evaluate(() => {
+      for (const el of document.querySelectorAll('.rr-mask, deictic-overlay')) el.remove();
+    });
+    for (const scroll of [0, 900]) {
+      const live = new Uint8Array(await page.evaluate((y) => scrollTo(0, y), scroll).then(() => page.screenshot()));
+      const drawn = await render(await snapshot(scroll), {});
+      expect(await differing(page, live, drawn)).toBe(0);
+    }
+    await page.close();
+  },
+  30_000,
+);
+
+test.skipIf(browser === undefined)(
+  'masks as rrweb does, and leaves deictic out',
+  async () => {
+    const { page, snapshot } = await open();
+    const shot = await snapshot();
+    const text = JSON.stringify(shot.snapshot);
+    expect(text).toContain('*** ********');
+    expect(text).not.toContain('Ada Lovelace');
+    expect(text).not.toContain('deictic-overlay');
+    // Rendered, the page isn't covered by the overlay's red.
+    const png = await render(shot, {});
+    const red = await page.evaluate(
+      async (bytes) => {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+        const ctx = new OffscreenCanvas(1, 1).getContext('2d')!;
+        ctx.drawImage(bitmap, -5, -5);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        return r! > 200 && g! < 50 && b! < 50;
+      },
+      [...png],
+    );
+    expect(red).toBe(false);
+    await page.close();
+  },
+  30_000,
+);
+
+test.skipIf(browser === undefined)(
+  'renders an element alone as the part of the viewport it fills',
+  async () => {
+    const { page, snapshot } = await open();
+    const box = await page.evaluate(() => document.querySelector('code')!.getBoundingClientRect().toJSON() as Snapshot['clip']);
+    const png = await render({ ...(await snapshot()), clip: box }, {});
+    const size = await page.evaluate(
+      async (bytes) => {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+        return [bitmap.width, bitmap.height];
+      },
+      [...png],
+    );
+    expect(size).toEqual([Math.round(box!.width), Math.round(box!.height)]);
+    await page.close();
+  },
+  30_000,
+);
+
+test('refuses what is not a snapshot', async () => {
+  expect(render({ nope: true }, {})).rejects.toThrow('that is not a snapshot the rrweb() renderer took');
+});
+
+test.skipIf(browser === undefined)(
+  'draws the overlay over the page, where the viewport shows it',
+  async () => {
+    const { page, snapshot } = await open();
+    const overlay = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect x="300" y="300" width="40" height="40" fill="#0000ff"/></svg>`;
+    const png = await render({ ...(await snapshot()), overlay }, {});
+    const blue = await page.evaluate(
+      async (bytes) => {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+        const ctx = new OffscreenCanvas(1, 1).getContext('2d')!;
+        ctx.drawImage(bitmap, -320, -320);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        return r! < 30 && g! < 30 && b! > 220;
+      },
+      [...png],
+    );
+    expect(blue).toBe(true);
+    await page.close();
+  },
+  30_000,
+);

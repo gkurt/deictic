@@ -1,0 +1,298 @@
+{
+  "name": "deictic",
+  "version": "0.0.0",
+  "description": "Point at an element in your running app and edit what made it: Tailwind classes, text, props, translations. Written to your source, undoable.",
+  "keywords": [
+    "annotations",
+    "astro",
+    "bun",
+    "devtools",
+    "inspector",
+    "nextjs",
+    "react",
+    "recordings",
+    "rrweb",
+    "rspack",
+    "screenshots",
+    "tailwind",
+    "turbopack",
+    "vercel-board",
+    "visual-editing",
+    "vite",
+    "voice",
+    "webpack"
+  ],
+  "homepage": "https://github.com/gkurt/deictic",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gkurt/deictic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gkurt/deictic/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Gokhan Kurt",
+    "email": "krtgkn@gmail.com",
+    "url": "https://gkurt.com"
+  },
+  "workspaces": [
+    "examples/*",
+    "site"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "imports": {
+    "#*": "./*"
+  },
+  "exports": {
+    ".": {
+      "deictic@dev": "./src/index.ts",
+      "default": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./vite": {
+      "deictic@dev": "./src/vite.ts",
+      "default": {
+        "types": "./dist/vite.d.ts",
+        "default": "./dist/vite.js"
+      }
+    },
+    "./client": {
+      "deictic@dev": "./src/client/index.ts",
+      "default": {
+        "types": "./dist/client/index.d.ts",
+        "default": "./dist/client/index.js"
+      }
+    },
+    "./tailwind": {
+      "deictic@dev": "./src/plugins/tailwind/index.ts",
+      "default": {
+        "types": "./dist/tailwind/index.d.ts",
+        "default": "./dist/tailwind/index.js"
+      }
+    },
+    "./tailwind/client": {
+      "deictic@dev": "./src/plugins/tailwind/client.ts",
+      "default": {
+        "types": "./dist/tailwind/client.d.ts",
+        "default": "./dist/tailwind/client.js"
+      }
+    },
+    "./tasks": {
+      "deictic@dev": "./src/plugins/tasks/index.ts",
+      "default": {
+        "types": "./dist/tasks/index.d.ts",
+        "default": "./dist/tasks/index.js"
+      }
+    },
+    "./tasks/client": {
+      "deictic@dev": "./src/plugins/tasks/client.ts",
+      "default": {
+        "types": "./dist/tasks/client.d.ts",
+        "default": "./dist/tasks/client.js"
+      }
+    },
+    "./screenshots": {
+      "deictic@dev": "./src/plugins/screenshots/index.ts",
+      "default": {
+        "types": "./dist/screenshots/index.d.ts",
+        "default": "./dist/screenshots/index.js"
+      }
+    },
+    "./screenshots/client": {
+      "deictic@dev": "./src/plugins/screenshots/client.ts",
+      "default": {
+        "types": "./dist/screenshots/client.d.ts",
+        "default": "./dist/screenshots/client.js"
+      }
+    },
+    "./screenshots/dom": {
+      "deictic@dev": "./src/plugins/screenshots/dom.ts",
+      "default": {
+        "types": "./dist/screenshots/dom.d.ts",
+        "default": "./dist/screenshots/dom.js"
+      }
+    },
+    "./screenshots/rrweb": {
+      "deictic@dev": "./src/plugins/screenshots/rrweb.ts",
+      "default": {
+        "types": "./dist/screenshots/rrweb.d.ts",
+        "default": "./dist/screenshots/rrweb.js"
+      }
+    },
+    "./annotations": {
+      "deictic@dev": "./src/plugins/annotations/index.ts",
+      "default": {
+        "types": "./dist/annotations/index.d.ts",
+        "default": "./dist/annotations/index.js"
+      }
+    },
+    "./annotations/client": {
+      "deictic@dev": "./src/plugins/annotations/client.ts",
+      "default": {
+        "types": "./dist/annotations/client.d.ts",
+        "default": "./dist/annotations/client.js"
+      }
+    },
+    "./recordings": {
+      "deictic@dev": "./src/plugins/recordings/index.ts",
+      "default": {
+        "types": "./dist/recordings/index.d.ts",
+        "default": "./dist/recordings/index.js"
+      }
+    },
+    "./recordings/client": {
+      "deictic@dev": "./src/plugins/recordings/client.ts",
+      "default": {
+        "types": "./dist/recordings/client.d.ts",
+        "default": "./dist/recordings/client.js"
+      }
+    },
+    "./voice": {
+      "deictic@dev": "./src/plugins/voice/index.ts",
+      "default": {
+        "types": "./dist/voice/index.d.ts",
+        "default": "./dist/voice/index.js"
+      }
+    },
+    "./voice/client": {
+      "deictic@dev": "./src/plugins/voice/client.ts",
+      "default": {
+        "types": "./dist/voice/client.d.ts",
+        "default": "./dist/voice/client.js"
+      }
+    },
+    "./webpack": {
+      "deictic@dev": "./src/webpack.ts",
+      "default": {
+        "types": "./dist/webpack.d.ts",
+        "default": "./dist/webpack.js"
+      }
+    },
+    "./next": {
+      "deictic@dev": "./src/next.ts",
+      "default": {
+        "types": "./dist/next.d.ts",
+        "default": "./dist/next.js"
+      }
+    },
+    "./bun": {
+      "deictic@dev": "./src/bun.ts",
+      "default": {
+        "types": "./dist/bun.d.ts",
+        "default": "./dist/bun.js"
+      }
+    },
+    "./astro": {
+      "deictic@dev": "./src/astro.ts",
+      "default": {
+        "types": "./dist/astro.d.ts",
+        "default": "./dist/astro.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "dev": "tsdown && bun run --cwd site dev",
+    "lint": "oxlint && bun fmt --check",
+    "fix": "oxlint --fix && bun fmt",
+    "test": "bun test --conditions=deictic@dev",
+    "checks": "bun run lint && bun check && bun run test",
+    "build": "tsdown",
+    "prepack": "tsdown",
+    "example": "tsdown && bun run --cwd examples/vite dev",
+    "prepare": "husky",
+    "tegami": "bun scripts/tegami.mts"
+  },
+  "lint-staged": {
+    "*": [
+      "oxlint --fix --no-error-on-unmatched-pattern"
+    ]
+  },
+  "dependencies": {
+    "magic-string": "^1.4.5",
+    "oxc-parser": "^0.159.0"
+  },
+  "devDependencies": {
+    "@rspack/core": "2.3.3",
+    "@types/bun": "^1.4.5",
+    "@vercel/board": "^0.53.0",
+    "husky": "^9.1.7",
+    "launch-editor": "2.14.2",
+    "lint-staged": "^17.6.1",
+    "modern-screenshot": "^4.7.0",
+    "oxlint": "^1.94.0",
+    "oxlint-tsgolint": "^7.0.2007",
+    "playwright-core": "1.65.1",
+    "rrweb": "2.2.2",
+    "rrweb-player": "^2.2.2",
+    "rrweb-snapshot": "2.2.2",
+    "tegami": "^1.5.0",
+    "tsdown": "^0.23.7",
+    "typescript": "^7.1.0-beta",
+    "vite": "^8.3.8",
+    "webpack": "5.113.0"
+  },
+  "peerDependencies": {
+    "@rspack/core": ">=1",
+    "@vercel/board": ">=0.53.0",
+    "astro": ">=5",
+    "launch-editor": "^2.9.0",
+    "modern-screenshot": "^4.7.0",
+    "next": ">=16",
+    "playwright-core": "^1.50.0",
+    "rrweb": "^2.2.2",
+    "rrweb-player": "^2.2.2",
+    "rrweb-snapshot": "^2.2.2",
+    "vite": ">=6",
+    "webpack": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "@rspack/core": {
+      "optional": true
+    },
+    "@vercel/board": {
+      "optional": true
+    },
+    "astro": {
+      "optional": true
+    },
+    "launch-editor": {
+      "optional": true
+    },
+    "modern-screenshot": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    },
+    "playwright-core": {
+      "optional": true
+    },
+    "rrweb": {
+      "optional": true
+    },
+    "rrweb-player": {
+      "optional": true
+    },
+    "rrweb-snapshot": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "webpack": {
+      "optional": true
+    }
+  }
+}

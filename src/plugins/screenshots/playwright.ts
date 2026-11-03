@@ -1,0 +1,119 @@
+/**
+ * The `rrweb()` renderer's server half: rebuilds a page's snapshot in a browser beside the dev server and
+ * screenshots it at the page's viewport, scroll and pixel density, so text lays out as the page's does. The
+ * browser is launched on the first shot and kept for the next; Playwright closes it with the process.
+ *
+ * The snapshot is rebuilt into a sandboxed iframe filling a blank page on the page's own origin, which
+ * Playwright answers itself, so nothing asks the dev server for it: rrweb has made the snapshot's URLs
+ * whole, and its stylesheets' fonts and images load from the dev server as the page's did.
+ */
+import { createRequire } from 'node:module';
+
+import type { Browser } from 'playwright-core';
+import type * as Rrweb from 'rrweb-snapshot';
+
+import type { Box, BrowserOptions } from './index.ts';
+
+/** What the page sends: its snapshot and what's needed to show it as the page does. */
+/** A node of an rrweb snapshot, as `snapshot()` answers it. */
+export type SnapshotNode = NonNullable<ReturnType<typeof Rrweb.snapshot>>;
+
+export interface Snapshot {
+  snapshot: SnapshotNode;
+  url: string;
+  viewport: { width: number; height: number };
+  scroll: { x: number; y: number };
+  scale: number;
+  /** The part of the viewport to keep, for a shot of an element alone. */
+  clip?: Box;
+  /** An SVG the viewport's size, drawn over the page: the annotations, where there are any. */
+  overlay?: string;
+}
+
+const HOST = '<!doctype html><html><body style="margin:0"></body></html>';
+
+const browsers = new Map<string, Promise<Browser>>();
+
+/** A browser by the options, launched once: the one named, or Playwright's own Chromium, then Chrome, then Edge. */
+export function browserOf(options: BrowserOptions): Promise<Browser> {
+  const key = JSON.stringify(options);
+  const known = browsers.get(key);
+  if (known !== undefined) return known;
+  const launched = launch(options);
+  browsers.set(key, launched);
+  // A launch that failed is tried again on the next shot, after the user installs what it said to.
+  launched.catch(() => browsers.delete(key));
+  return launched;
+}
+
+async function launch({ executablePath, channel }: BrowserOptions): Promise<Browser> {
+  const { chromium } = await import('playwright-core').catch((e: unknown) => {
+    throw new Error('the rrweb() renderer needs playwright-core: add it to your devDependencies', { cause: e });
+  });
+  if (executablePath !== undefined || channel !== undefined) return chromium.launch({ executablePath, channel });
+  const tried: string[] = [];
+  for (const attempt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+    try {
+      return await chromium.launch(attempt);
+    } catch (e) {
+      tried.push(
+        `${'channel' in attempt ? attempt.channel : "Playwright's Chromium"}: ${(e instanceof Error ? e.message : String(e)).split('\n', 1)[0]}`,
+      );
+    }
+  }
+  throw new Error(
+    `the rrweb() renderer found no browser to render in (${tried.join('; ')}): run \`npx playwright install chromium\`, or pass rrweb({ executablePath })`,
+  );
+}
+
+/** The rrweb-snapshot bundle that defines `rrwebSnapshot` in a page: its CommonJS entry is that bundle. */
+const bundle = () => createRequire(import.meta.url).resolve('rrweb-snapshot');
+
+export async function render(input: unknown, options: BrowserOptions): Promise<Uint8Array> {
+  const shot = input as Snapshot;
+  if (typeof shot?.url !== 'string' || typeof shot.snapshot !== 'object' || typeof shot.viewport?.width !== 'number')
+    throw new Error('screenshots: that is not a snapshot the rrweb() renderer took');
+  const browser = await browserOf(options);
+  const context = await browser.newContext({ viewport: shot.viewport, deviceScaleFactor: shot.scale });
+  try {
+    const page = await context.newPage();
+    const host = new URL('/__deictic/plugins/screenshots/host', shot.url).href;
+    await page.route(host, (route) => route.fulfill({ contentType: 'text/html', body: HOST }));
+    await page.goto(host);
+    await page.addScriptTag({ path: bundle() });
+    await page.evaluate(async ({ snapshot, scroll, overlay }) => {
+      const { rebuildIntoSandboxedIframe, createCache, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb })
+        .rrwebSnapshot;
+      const { iframe } = rebuildIntoSandboxedIframe(snapshot, {
+        root: document.body,
+        cache: createCache(),
+        mirror: createMirror(),
+        iframeAttributes: { style: 'border:0;position:fixed;inset:0;width:100vw;height:100vh' },
+      });
+      const doc = iframe.contentDocument;
+      if (doc === null) throw new Error('screenshots: the snapshot was rebuilt where it cannot be read');
+      await doc.fonts.ready;
+      await Promise.all([...doc.images].map((img) => img.decode().catch(() => {})));
+      iframe.contentWindow?.scrollTo(scroll.x, scroll.y);
+      if (overlay === undefined) return;
+      // Over the page and its scroll: the SVG is the viewport's, already where it scrolled to.
+      const marks = document.createElement('div');
+      marks.style.cssText = 'position:fixed;inset:0;z-index:1;pointer-events:none';
+      marks.innerHTML = overlay;
+      document.body.append(marks);
+    }, shot);
+    const clip = shot.clip === undefined ? undefined : clamp(shot.clip, shot.viewport);
+    return new Uint8Array(await page.screenshot({ type: 'png', ...(clip === undefined ? {} : { clip }) }));
+  } finally {
+    await context.close();
+  }
+}
+
+/** A box kept within the viewport: an element partly scrolled out of it shows only the part that's in. */
+function clamp(box: Box, viewport: { width: number; height: number }): Box | undefined {
+  const x = Math.max(0, box.x);
+  const y = Math.max(0, box.y);
+  const width = Math.min(viewport.width, box.x + box.width) - x;
+  const height = Math.min(viewport.height, box.y + box.height) - y;
+  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
+}

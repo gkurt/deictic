@@ -1,0 +1,3 @@
+# The dev server bundles the page with this plugin: it marks every element with its place in the source.
+[serve.static]
+plugins = ["./deictic.plugin.ts"]
