@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import type { ServerPlugin } from '#src/index.ts';
 import { checkShortcuts, OWN, ownShortcut, type Shortcut } from '#src/shortcut.ts';
 
+import { ASTRO, locateAstro } from './astro.ts';
 import { keptIn } from './kept.ts';
 import { JSX, locate, type Located } from './locate.ts';
 import { checkPlugins } from './plugins.ts';
@@ -87,8 +88,19 @@ export function importOf(path: string, from: string): string {
  * in the browser). Nothing for a file that isn't JSX, is a dependency's, or is outside the project.
  */
 export function mark(code: string, path: string, root: string, append = ''): Located | undefined {
-  if (!JSX.test(path) || /[\\/]node_modules[\\/]/.test(path) || !isAbsolute(path)) return undefined;
+  const file = JSX.test(path) ? fileIn(path, root) : undefined;
+  return file === undefined ? undefined : locate(code, file, append);
+}
+
+/** An `.astro` component marked, by its absolute path, as `mark` does a module. It's no module of the browser's, so nothing is appended. */
+export function markAstro(code: string, path: string, root: string): Located | undefined {
+  const file = ASTRO.test(path) ? fileIn(path, root) : undefined;
+  return file === undefined ? undefined : locateAstro(code, file, root);
+}
+
+/** A project file's path from the root, as a mark has it; nothing for a dependency's or one outside the project. */
+function fileIn(path: string, root: string): string | undefined {
+  if (/[\\/]node_modules[\\/]/.test(path) || !isAbsolute(path)) return undefined;
   const file = relative(root, path).replaceAll('\\', '/');
-  if (file.startsWith('..') || isAbsolute(file)) return undefined;
-  return locate(code, file, append);
+  return file.startsWith('..') || isAbsolute(file) ? undefined : file;
 }

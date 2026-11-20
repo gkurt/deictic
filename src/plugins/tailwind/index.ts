@@ -110,7 +110,7 @@ export function tailwind(options: TailwindOptions = {}) {
       const others = spot.others?.flatMap((argument) => extrasOf(argument, code, program)).map(({ spot: _, ...extra }) => extra);
       return { editable: true, classes: code.slice(spot.start, spot.end), ...(others === undefined ? {} : { others }) };
     },
-    apply({ code, element, program }, _target, { classes, at }) {
+    apply({ file, code, element, program }, _target, { classes, at }) {
       const list = classes.trim().split(/\s+/).filter(Boolean).join(' ');
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') throw new Refusal('this class list is built at runtime: edit it in the editor');
@@ -121,8 +121,9 @@ export function tailwind(options: TailwindOptions = {}) {
           throw new Refusal("these classes aren't a string in this file any more: reload, or edit them in the editor");
         return [{ start: place.start, end: place.end, text: quoted(list, place.quote) }];
       }
-      if (spot.kind === 'missing')
-        return list === '' ? [] : [{ start: spot.at, end: spot.at, text: ` ${attribute}="${quoted(list, '"')}"` }];
+      // An `.astro` component writes `class`, whatever the JSX beside it does.
+      const name = file.endsWith('.astro') ? 'class' : attribute;
+      if (spot.kind === 'missing') return list === '' ? [] : [{ start: spot.at, end: spot.at, text: ` ${name}="${quoted(list, '"')}"` }];
       return [{ start: spot.start, end: spot.end, text: quoted(list, spot.quote) }];
     },
     describe({ classes, at }, before) {
@@ -139,7 +140,15 @@ function spotOf(element: JSXOpeningElement, code: string, helpers: Set<string>):
     (a): a is JSXAttribute =>
       a.type === 'JSXAttribute' && a.name.type === 'JSXIdentifier' && (a.name.name === 'className' || a.name.name === 'class'),
   );
-  if (attr === undefined) return { kind: 'missing', at: element.name.end };
+  if (attr === undefined) {
+    // Astro's `class:list` is the element's class list too: a `class` beside it would be a second one.
+    const listed = element.attributes.find(
+      (a) => a.type === 'JSXAttribute' && a.name.type === 'JSXIdentifier' && a.name.name === 'class:list',
+    );
+    return listed === undefined
+      ? { kind: 'missing', at: element.name.end }
+      : { kind: 'fixed', source: code.slice(listed.start, listed.end) };
+  }
   const { value } = attr;
   if (value?.type === 'Literal') return list(value, code);
   if (value?.type !== 'JSXExpressionContainer' || value.expression.type === 'JSXEmptyExpression')

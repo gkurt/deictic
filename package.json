@@ -237,6 +237,7 @@
     "@types/bun": "^1.4.5",
     "@vercel/board": "^0.53.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "astro": "^7.4.13",
     "babel-loader": "^10.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "husky": "^9.1.7",

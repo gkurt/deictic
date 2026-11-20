@@ -15,7 +15,7 @@ same options:
 | Next.js (`next dev`, either bundler) | `export default withDeictic(nextConfig, { plugins })`, from `deictic/next`                                             |
 | webpack 5, Rspack                    | `plugins: [new DeicticPlugin({ plugins })]`, from `deictic/webpack`; `launch-editor` to open files                     |
 | Bun (`Bun.serve` with HTML imports)  | `deictic/bun`: a plugin module named in `bunfig.toml`'s `[serve.static] plugins`, its `routes` spread into `Bun.serve` |
-| Astro                                | `integrations: [deictic({ plugins })]`, from `deictic/astro`                                                           |
+| Astro                                | `integrations: [deictic({ plugins })]`, from `deictic/astro`; `.astro` components are marked with Astro 7 or later     |
 
 React Native isn't supported. With no plugins deictic loads nothing; `.deictic/` (kept data) ignores itself in git.
 

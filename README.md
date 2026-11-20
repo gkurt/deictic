@@ -32,7 +32,7 @@ export default defineConfig({
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Next.js (`next dev`)            | `export default withDeictic(nextConfig, { plugins: recommended() })`, from `deictic/next`                                                           |
 | webpack 5, Rspack               | `plugins: [new DeicticPlugin({ plugins: recommended() })]`, from `deictic/webpack` (`launch-editor` to open files)                                  |
-| Astro                           | `integrations: [deictic({ plugins: recommended() })]`, from `deictic/astro`                                                                         |
+| Astro                           | `integrations: [deictic({ plugins: recommended() })]`, from `deictic/astro` (`.astro` components with Astro 7; JSX islands with any)                |
 | Bun (`Bun.serve`, HTML imports) | `deictic({ plugins: recommended() })` from `deictic/bun`, named in `bunfig.toml`'s `[serve.static] plugins`, its `routes` spread into `Bun.serve`'s |
 
 Screenshots render in a Chromium: Playwright's (`npx playwright install chromium`), else Chrome or Edge. React
@@ -90,8 +90,8 @@ which ignores itself in git.
 ## How it works
 
 - A transform that runs before the framework's own adds `data-deictic="src/App.tsx:12:5"` to every host element
-  (`div`, `button`), so it works for any framework that compiles JSX, server components too, and points at the
-  element's own tag rather than the component around it.
+  (`div`, `button`) in `.jsx`, `.tsx` and `.js` modules and in `.astro` components, so it works for any framework
+  that compiles JSX, server components too, and points at the element's own tag rather than the component around it.
 - Its endpoints are on the dev server's own origin, `/__deictic/*`, and take writes only as same-origin JSON, so no
   other site can make them and no token reaches the page.
 - Every change goes into one history in `.deictic/history.json`. The popup's undo and redo walk the part of it that

@@ -5,11 +5,10 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { type JSXOpeningElement, Visitor } from 'oxc-parser';
-
 import { Refusal, type Source, type Target, type TextEdit } from '#src/index.ts';
 
-import { isHost, lineStarts, offsetOf, parse } from './locate.ts';
+import { ASTRO, parseAstro, type Parsed } from './astro.ts';
+import { isHost, lineStarts, offsetOf, openingsIn, parse } from './locate.ts';
 
 /** A file from the project's root, as an absolute path; refused anywhere the page has no business writing. */
 export function resolveFile(root: string, file: string): string {
@@ -34,18 +33,24 @@ export function readSource(root: string, file: string): string {
 export function sourceAt(root: string, target: Target): Source {
   const { file, line, column } = target.loc;
   const code = readSource(root, file);
-  const { program, errors } = parse(file, code);
-  if (errors.length > 0) throw new Refusal(`${file} doesn't parse: fix it first (${errors[0]!.message})`);
   const offset = offsetOf(lineStarts(code), line, column);
-  let element: JSXOpeningElement | undefined;
-  new Visitor({
-    JSXOpeningElement(el) {
-      if (el.start === offset && isHost(el)) element = el;
-    },
-  }).visit(program);
+  const { program, elements } = ASTRO.test(file) ? astro(root, file, code) : jsx(file, code);
+  const element = elements.find((el) => el.start === offset && isHost(el));
   if (element === undefined || (element.name.type === 'JSXIdentifier' && element.name.name !== target.tag))
     throw new Refusal(`no <${target.tag}> at ${file}:${line}:${column} any more: the file changed since the page loaded, so reload it`);
   return { file, code, program, element, read: (other) => readSource(root, other) };
+}
+
+function jsx(file: string, code: string): Parsed {
+  const { program, errors } = parse(file, code);
+  if (errors.length > 0) throw new Refusal(`${file} doesn't parse: fix it first (${errors[0]!.message})`);
+  return { program, elements: openingsIn(program) };
+}
+
+function astro(root: string, file: string, code: string): Parsed {
+  const parsed = parseAstro(root, code);
+  if ('problem' in parsed) throw new Refusal(`${file} can't be read: ${parsed.problem}`);
+  return parsed;
 }
 
 /** Each file's text after its edits, which must not overlap. */

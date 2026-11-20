@@ -11,7 +11,7 @@
  * are the file's. It runs alike on the server and in the browser, so a hydrated page matches its HTML.
  */
 import MagicString from 'magic-string';
-import { type JSXOpeningElement, parseSync, Visitor } from 'oxc-parser';
+import { type JSXOpeningElement, parseSync, type Program, Visitor } from 'oxc-parser';
 
 export const ATTRIBUTE = 'data-deictic';
 /** Modules that may hold JSX: `.jsx` and `.tsx`, and plain `.js`, as many React projects write theirs. */
@@ -38,15 +38,28 @@ export function locate(code: string, file: string, append = ''): Located | undef
   if (!/<[a-z]/.test(code)) return undefined;
   const { program, errors } = parse(file, code);
   if (errors.length > 0) return undefined;
+  return marked(code, file, openingsIn(program), append);
+}
+
+/** Every opening tag in a module, in its order. */
+export function openingsIn(program: Program): JSXOpeningElement[] {
+  const elements: JSXOpeningElement[] = [];
+  new Visitor({ JSXOpeningElement: (el) => void elements.push(el) }).visit(program);
+  return elements;
+}
+
+/**
+ * `code` with a mark in each of `elements` that is a host element's and has none yet, and `append` after
+ * it; nothing with none to mark.
+ */
+export function marked(code: string, file: string, elements: JSXOpeningElement[], append = ''): Located | undefined {
   const lines = lineStarts(code);
   const s = new MagicString(code);
-  new Visitor({
-    JSXOpeningElement(el) {
-      if (!isHost(el) || el.attributes.some((a) => a.type === 'JSXAttribute' && nameOf(a.name) === ATTRIBUTE)) return;
-      const { line, column } = position(lines, el.start);
-      s.appendLeft(el.name.end, ` ${ATTRIBUTE}="${file}:${line}:${column}"`);
-    },
-  }).visit(program);
+  for (const el of elements) {
+    if (!isHost(el) || el.attributes.some((a) => a.type === 'JSXAttribute' && nameOf(a.name) === ATTRIBUTE)) continue;
+    const { line, column } = position(lines, el.start);
+    s.appendLeft(el.name.end, ` ${ATTRIBUTE}="${file}:${line}:${column}"`);
+  }
   if (!s.hasChanged()) return undefined;
   if (append !== '') s.append(append);
   // A map's source is read from the module's own folder, so it's the file's name, not its path from the root.

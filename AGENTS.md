@@ -50,8 +50,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `data-deictic="file:line:column"`, where the opening tag's `<` is, in UTF-16 columns from 1, in `.jsx`, `.tsx`
   and plain `.js` modules (`JSX`; `parse` reads JSX in `.js`, and a module with no `<tag` in it isn't parsed).
   Must see the source as written, so integrations run it first. `lineStarts`, `position`, `offsetOf`.
-- `src/tools/source.ts`: `sourceAt`, a target's file parsed and its opening tag found by offset and
-  tag (a `Refusal` saying to reload when the file moved on); `resolveFile`, which refuses anything
+- `src/tools/source.ts`: `sourceAt`, a target's file parsed (a JSX module, or an `.astro` component, whose `program`
+  is its frontmatter's) and its opening tag found by offset and tag (a `Refusal` saying to reload when the file moved on); `resolveFile`, which refuses anything
   outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text.
 - `src/tools/kept.ts`: `keptIn(root, …parts)`, a path under the project's `.deictic/`, made with a
   `.gitignore` of `*` the first time. Every default data path goes through it.
@@ -90,7 +90,13 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   config with `require`, so the package's exports use `default`, not `import`.
 - `src/bun.ts`: a `[serve.static]` plugin (`onLoad`, skipped in `Bun.build`) whose `routes` the server spreads
   into `Bun.serve`'s; `open` is `Bun.openInEditor`.
-- `src/astro.ts`: the Vite plugin, and `injectScript('page', …)` of its client, in dev.
+- `src/astro.ts`: the Vite plugin, and `injectScript('page', …)` of its client, in dev. `src/vite.ts` marks an
+  `.astro` component too (`markAstro`, the file itself, not what Astro loads from it by a query), before Astro compiles it.
+- `src/tools/astro.ts`: `.astro` components. `parseAstro(root, code)` reads one with the project's own Astro's parser
+  (`@astrojs/compiler-rs`, Astro 7, required through `astro`: its tree is oxc's, a template as JSX, UTF-16 offsets) and
+  answers a `Parsed` (the frontmatter's `program`, the template's opening tags) or the `problem`; `locateAstro` marks
+  with it. No mark on `script`, `style` (an attribute makes Astro leave them unprocessed) or `slot`; none at all with an
+  older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/lightbox.ts`: `openLightbox(root, items, { at, from })`, offered to panels as `context.lightbox`: an
   `image`, a `page` (an iframe) or an `audio` item (a player: play, the clip's waveform lit as it plays, seek by
   clicking or dragging it, the time), big over everything, ← → between items, each item's `actions` beside its
@@ -124,7 +130,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
   `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a
   page (its own shadow root, `.panel.pinned`, no Esc, reopened when closed, the last tab left alone).
-- `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`), and
+- `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`; in an `.astro` file a
+  missing one is added as `class`, and a `class:list` is shown, not edited), and
   `client.ts`, the chip panel. Previews per element, keeping each one's runtime classes, and puts
   the page back on close only for an unsaved preview, so it never races the bundler's update.
   `catalog.ts` is what the project's Tailwind knows, from its own design system (v4's

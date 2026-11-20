@@ -11,7 +11,7 @@
 import type { Plugin } from 'vite';
 
 import { endpoints, nodeMiddleware, redirect } from './tools/endpoints.ts';
-import { clientModule, type DeicticOptions, mark, prepare } from './tools/integration.ts';
+import { clientModule, type DeicticOptions, mark, markAstro, prepare } from './tools/integration.ts';
 
 export { clientModule, type DeicticOptions };
 
@@ -50,6 +50,8 @@ export function deictic(options: DeicticOptions = {}): Plugin {
       order: 'pre',
       handler(code, id) {
         const [path = ''] = id.split('?');
+        // An `.astro` component itself, not the styles and scripts Astro loads from it by a query.
+        if (path.endsWith('.astro')) return id === path ? markAstro(code, path, root) : undefined;
         const browser = this.environment.config.consumer === 'client';
         return mark(code, path, root, browser ? `\nimport ${JSON.stringify(CLIENT)};\n` : '');
       },

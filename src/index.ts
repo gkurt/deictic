@@ -51,6 +51,7 @@ export interface Source {
   /** The target's file, from the project's root. */
   file: string;
   code: string;
+  /** The file's module; for an `.astro` component, its frontmatter's. */
   program: Program;
   /** The target's opening tag. */
   element: JSXOpeningElement;

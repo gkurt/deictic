@@ -4,7 +4,8 @@
  * Astro renders a page on the server and may send it with no script at all, so nothing in the browser
  * would import the client module, which under Vite comes with the first JSX module. The integration
  * injects it into every page instead. JSX components (React's, Preact's, Solid's) are marked, on the
- * server and in islands; `.astro` components aren't JSX, and aren't.
+ * server and in islands, and with Astro 7, whose parser says where their tags are, `.astro` components
+ * too (`tools/astro.ts`).
  */
 import { CLIENT, deictic as vitePlugin, type DeicticOptions } from './vite.ts';
 
