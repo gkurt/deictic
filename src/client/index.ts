@@ -425,7 +425,7 @@ function openPanel({
   panel.append(head, bar, body, status);
   root.append(panel);
   if (pinned) panel.classList.add('pinned');
-  else place(panel, element.getBoundingClientRect(), true);
+  const release = pinned ? undefined : keepInView(panel, body, element.getBoundingClientRect());
 
   let cleanup: (() => void) | void;
   const say = (text: string, problem = false) => {
@@ -482,6 +482,7 @@ function openPanel({
 
   const done = (leaving = false) => {
     unmount();
+    release?.();
     panel.remove();
     window.removeEventListener('keydown', onKey, true);
     onClose(current, leaving);
@@ -555,18 +556,78 @@ function openPanel({
   return { close: done };
 }
 
-/** Puts an outline over `r`, or a panel beside it: below, or above when there is no room. */
-function place(el: HTMLElement, r: DOMRect, beside = false): void {
-  if (!beside) {
-    Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-    return;
-  }
-  const below = r.bottom + 8;
-  const room = window.innerHeight - below;
-  Object.assign(el.style, {
-    left: `${Math.max(8, Math.min(r.left, window.innerWidth - 368))}px`,
-    ...(room > 240 || room > r.top ? { top: `${below}px`, bottom: '' } : { top: '', bottom: `${window.innerHeight - r.top + 8}px` }),
-  });
+/** Puts an outline over `r`. */
+function place(el: HTMLElement, r: DOMRect): void {
+  Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+}
+
+const MARGIN = 8;
+// Under this much room on either side, the panel overlaps the element rather than shrink to a sliver beside it.
+const LEAST = 160;
+
+/**
+ * Keeps a panel beside `r` (the element as it was clicked) and inside the viewport, as its tabs fill it and the
+ * window resizes: below, or above where it fits better, its height capped to the room there, so the body scrolls
+ * rather than the panel leaving the window. Fixed, so it never changes the page's own scrolling. Answers a release.
+ */
+function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => void {
+  let frame = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const fit = () => {
+    cancelAnimationFrame(frame);
+    clearTimeout(timer);
+    frame = 0;
+    timer = undefined;
+    // The viewport without the page's scrollbars.
+    const width = document.documentElement.clientWidth;
+    const height = document.documentElement.clientHeight;
+    // What the panel would take with no cap: its frame, and all of its body.
+    const wanted = panel.offsetHeight - body.clientHeight + body.scrollHeight;
+    const top = Math.min(Math.max(r.top, 0), height);
+    const bottom = Math.min(Math.max(r.bottom, 0), height);
+    const below = height - bottom - 2 * MARGIN;
+    const above = top - 2 * MARGIN;
+    const cap = Math.max(0, Math.min(height * 0.6, height - 2 * MARGIN));
+    let at: number;
+    let room: number;
+    if (Math.max(below, above) < LEAST) {
+      room = height - 2 * MARGIN;
+      at = Math.min(Math.max(bottom + MARGIN, MARGIN), height - MARGIN - Math.min(wanted, room));
+    } else if (wanted <= below || below >= above) {
+      room = Math.min(below, cap);
+      at = bottom + MARGIN;
+    } else {
+      room = Math.min(above, cap);
+      at = top - MARGIN - Math.min(wanted, room);
+    }
+    Object.assign(panel.style, {
+      left: `${Math.max(MARGIN, Math.min(r.left, width - MARGIN - panel.offsetWidth))}px`,
+      top: `${at}px`,
+      bottom: '',
+      maxHeight: `${room}px`,
+    });
+  };
+  // Not in the observers' callbacks, where a change of size is a "ResizeObserver loop" error on the page. The next
+  // frame, or a moment later where there's none: a hidden tab draws no frames, and its popup still fits when shown.
+  const later = () => {
+    frame ||= requestAnimationFrame(fit);
+    timer ??= setTimeout(fit, 50);
+  };
+  fit();
+  // A tab's content arrives after the panel opens, and changes as it's used, as does the status line. Both, as a
+  // resize observer reports only while the page renders: a hidden tab's popup would keep its first place.
+  const resized = new ResizeObserver(later);
+  resized.observe(panel);
+  const changed = new MutationObserver(later);
+  changed.observe(panel, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', later);
+  return () => {
+    cancelAnimationFrame(frame);
+    clearTimeout(timer);
+    resized.disconnect();
+    changed.disconnect();
+    window.removeEventListener('resize', later);
+  };
 }
 
 function div(className: string): HTMLDivElement {

@@ -15,6 +15,8 @@ export const STYLE = `
   /* Inherited by everything in the root: a thumb and no track, on whatever the panel's background is. */
   scrollbar-color: var(--deictic-line) transparent;
 }
+/* The host takes no room in the page: everything in it is fixed, so nothing of deictic's moves or scrolls it. */
+:host(deictic-overlay) { display: contents; }
 .box {
   position: fixed;
   display: none;
@@ -40,7 +42,7 @@ export const STYLE = `
 .panel {
   position: fixed;
   z-index: 2147483647;
-  width: 360px;
+  width: min(360px, calc(100vw - 16px));
   max-height: 60vh;
   display: flex;
   flex-direction: column;

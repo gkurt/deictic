@@ -26,6 +26,8 @@
 
 /* Scrollbars: a thumb and no track, on whatever is behind them. Inherited by every scrolling box. */
 html {
+  /* The page's own colour, not the browser's white: the root scrollbar's track and an overscroll show it. */
+  background: var(--bg);
   scrollbar-color: color-mix(in srgb, var(--muted) 50%, transparent) transparent;
 }
 
