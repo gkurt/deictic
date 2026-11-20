@@ -19,9 +19,11 @@ console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, by ${root.author?.
 console.log(`\nAsked:\n${asked.trim()}\n`);
 // The part inside the element that was pointed at, where nothing marked it: what the person means.
 const pointed = where.match(/\nPointed at, inside it: `([^`]*)`\n`{3,}\w*\n([\s\S]*?)\n`{3,}/);
-console.log((pointed ? where.slice(0, pointed.index) : where).trim());
-// The short facts are labels: the viewport to look at the page in, and where the element is in the one shot.
+// Where, from the labels: the place, the page, and the viewport to look at it in.
 const facts = [
+  ['deictic.project', (v) => `Project ${v}`],
+  ['deictic.at', (v) => `${v} <${root.labels['deictic.tag'] ?? '?'}>`],
+  ['deictic.url', (v) => v],
   ['deictic.viewport', (v) => `Viewport ${v}`],
   ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
   ['deictic.box', (v) => `In the screenshot at x,y,width,height ${v} (CSS pixels from its top left)`],
@@ -30,6 +32,9 @@ for (const [key, say] of facts) {
   const line = root.labels[key] === undefined ? undefined : say(root.labels[key]);
   if (line !== undefined) console.log(line);
 }
+// What no label holds: what's attached and drawn on it.
+const told = (pointed ? where.slice(0, pointed.index) : where).trim();
+if (told !== '') console.log(told);
 if (pointed) console.log(`\nPointed at, inside it: ${pointed[1]}\n  ${pointed[2]}`);
 
 // The place as the task saw it, against the file now: the element's opening tag may have moved or changed.

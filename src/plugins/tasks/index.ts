@@ -1,14 +1,17 @@
 /**
  * `deictic/tasks`: open its tab on an element to add a task about it to a Vercel Board
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
- * line and tag, and the page. The short facts beside them (viewport, how many, where it is in the shot)
- * are labels. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
+ * line and tag, the page and the project, all as labels beside the short facts (viewport, how many, where
+ * it is in the shot). Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
  * from there; deictic only adds them.
  *
  * Adding one is a change like any other: undo cancels the task, while no one has claimed it, and redo
  * adds it again, as a new task. Each task carries `deictic.at=<file:line:column>`, so the panel
  * lists the ones about the element clicked, until its line moves.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { Board } from '@vercel/board';
 
 import { definePlugin, Refusal, type ServerContext, type Shortcut, type Source, type Target } from '#src/index.ts';
@@ -28,6 +31,11 @@ export interface TasksOptions {
   board?: TaskBoard;
   /** The channel tasks go to: `deictic` by default. */
   channel?: string;
+  /**
+   * The project the tasks are about, as the `deictic.project` label, to tell them apart on a board several
+   * projects share: by default the `name` in the root's `package.json`, and no label where it has none.
+   */
+  project?: string;
   /** Labels every task gets besides deictic's own, for whoever works them to filter by (`vb tail --label`). None by default. */
   labels?: Record<string, string>;
   /**
@@ -145,6 +153,7 @@ export function tasks(options: TasksOptions = {}) {
 
   // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
+  let project = options.project;
   /** The screenshots and recordings to attach, uploaded to the board, or nothing when there are none. */
   const attach = async (op: Op): Promise<string[] | undefined> => {
     // All read first, so one no longer kept uploads none.
@@ -176,6 +185,7 @@ export function tasks(options: TasksOptions = {}) {
     shortcut: options.shortcut,
     setup: (given) => {
       context = given;
+      project ??= nameOf(given.root);
     },
     read: (_source, target) =>
       asked(async () => {
@@ -193,11 +203,15 @@ export function tasks(options: TasksOptions = {}) {
       }),
     apply: (source, target, op) => {
       if (op.text.trim() === '') throw new Refusal('say what should change first');
-      const labels = { ...options.labels, ...labelsOf(source, target, op) };
+      const labels = {
+        ...options.labels,
+        ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
+        ...labelsOf(source, target, op),
+      };
       return asked(async () => {
         const attachments = await attach(op);
         return {
-          done: await create({ channel, text: textOf(target, op), labels, ...(attachments === undefined ? {} : { attachments }) }),
+          done: await create({ channel, text: textOf(op), labels, ...(attachments === undefined ? {} : { attachments }) }),
         };
       });
     },
@@ -287,9 +301,20 @@ const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.r
 /** A label's value: a board holds 256 characters. */
 const LABEL = 256;
 
+/** The project's name: the `name` in the root's `package.json`, or nothing where it has none. */
+function nameOf(root: string): string | undefined {
+  try {
+    const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: unknown };
+    return typeof name === 'string' && name !== '' ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The facts about the element, as labels: short values a script reads without parsing the text, and a watch
  * filters by. `deictic.line` is the opening tag's first line as the task saw it, to tell later that it moved.
+ * `deictic.url` is the page's whole URL, where a label holds it: `textOf` says a longer one.
  */
 function labelsOf({ code, element }: Source, target: Target, op: Op): Record<string, string> {
   const [shot] = op.screenshots ?? [];
@@ -298,6 +323,7 @@ function labelsOf({ code, element }: Source, target: Target, op: Op): Record<str
     'deictic.tag': target.tag,
     'deictic.line': clip(code.slice(element.start, element.end).split('\n', 1)[0]!.trim(), LABEL),
     'deictic.page': clip(new URL(op.page).pathname, LABEL),
+    ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
     'deictic.count': String(op.count),
     ...(op.screenshots?.length === 1 && shot !== undefined ? { 'deictic.box': boxOf(shot.box).join(',') } : {}),
@@ -307,21 +333,19 @@ function labelsOf({ code, element }: Source, target: Target, op: Op): Record<str
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;
 
 /**
- * The task's text: what was typed, then where and what's attached, for a person reading the board. The rest
- * is in the labels, and the source is in the file. A board holds 10,000 characters.
+ * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, what
+ * was pointed at inside the element, and a URL too long for one. A board holds 10,000 characters.
  */
-function textOf(target: Target, op: Op): string {
-  const tail = [
-    '',
-    '---',
-    `\`${atOf(target)}\` · \`<${target.tag}>\``,
-    op.page,
+function textOf(op: Op): string {
+  const more = [
+    ...(op.page.length <= LABEL ? [] : [op.page]),
     ...shotsOf(op.screenshots ?? []),
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
-  ].join('\n');
+  ];
+  const tail = more.length === 0 ? '' : ['', '---', ...more].join('\n');
   return clip(op.text.trim(), 10_000 - tail.length) + tail;
 }
 

@@ -70,12 +70,16 @@ beside the preset:
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt; `false` for none
   plugins: recommended({
-    tasks: { channel: 'ui', labels: { team: 'web' } },
+    tasks: { channel: 'ui', project: 'storefront', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },
     voice: false,
   }),
 });
 ```
+
+A task is the words typed and its attachments; the rest is labels: `deictic.project` (the `project` option, or by
+default your `package.json`'s name, to tell projects apart on one board), `deictic.at`, `deictic.url`,
+`deictic.viewport` and more, and your own `labels` beside them.
 
 Screenshots and recordings hide what [rrweb](https://github.com/rrweb-io/rrweb) would, by its names: `rr-block`
 blanks an element, `rr-mask` masks its text, `maskAllInputs` masks every field (passwords always are). Nothing of

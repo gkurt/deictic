@@ -49,14 +49,14 @@ To fit what they choose instead: a plugin's options go under its name, `false` l
 (`recommended({ tasks: { channel: 'ui' }, voice: false })`), and one outside the preset goes beside it
 (`[...recommended(), tailwind()]`, `tailwind` from `deictic/tailwind`). Every plugin:
 
-| Plugin          | What it adds                                                          | Install too                                                           |
-| --------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `tasks()`       | The Task tab; `{ channel, labels }` route them (`deictic` by default) | `@vercel/board`                                                       |
-| `screenshots()` | A shot of the page attached to a task; `{ renderer: dom() }` in-page  | `rrweb-snapshot`, `playwright-core` (`modern-screenshot` for `dom()`) |
-| `annotations()` | Marks on the page, on shots (Annotate) and in recordings              |                                                                       |
-| `recordings()`  | Record beside Attach: a screen recording attached to a task           | `rrweb`, `rrweb-player` (its replay)                                  |
-| `voice()`       | The mic, in recordings and as voice notes in a task                   |                                                                       |
-| `tailwind()`    | Edit an element's classes in place                                    |                                                                       |
+| Plugin          | What it adds                                                                            | Install too                                                           |
+| --------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `tasks()`       | The Task tab; `{ channel, project, labels }` route and name them (`deictic` by default) | `@vercel/board`                                                       |
+| `screenshots()` | A shot of the page attached to a task; `{ renderer: dom() }` in-page                    | `rrweb-snapshot`, `playwright-core` (`modern-screenshot` for `dom()`) |
+| `annotations()` | Marks on the page, on shots (Annotate) and in recordings                                |                                                                       |
+| `recordings()`  | Record beside Attach: a screen recording attached to a task                             | `rrweb`, `rrweb-player` (its replay)                                  |
+| `voice()`       | The mic, in recordings and as voice notes in a task                                     |                                                                       |
+| `tailwind()`    | Edit an element's classes in place                                                      |                                                                       |
 
 `deictic({ shortcut })` changes Alt-click, or `false` for none. The plugins' order is the tabs' order: keep theirs.
 

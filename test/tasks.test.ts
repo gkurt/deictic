@@ -3,7 +3,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
-import { type Model, tasks } from '#src/plugins/tasks/index.ts';
+import { type Model, tasks, type TasksOptions } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
 import { project } from './fixture.ts';
@@ -20,11 +20,11 @@ const op = {
   count: 1,
 };
 
-function setup(channel: string) {
-  const p = project({ 'src/App.tsx': 'export const App = () => <h1 className="text-4xl">Pricing</h1>;\n' });
+function setup(channel: string, options: TasksOptions = {}, files: Record<string, string> = {}) {
+  const p = project({ 'src/App.tsx': 'export const App = () => <h1 className="text-4xl">Pricing</h1>;\n', ...files });
   const handle = endpoints({
     root: p.root,
-    plugins: [tasks({ board: team, channel, labels: { team: 'web' } })],
+    plugins: [tasks({ board: team, channel, labels: { team: 'web' }, ...options })],
     open: () => redirect('/'),
   });
   const post = async <T>(route: string, body: unknown = {}) => {
@@ -55,15 +55,35 @@ test('adds a task saying what and where, and lists it on the element', async () 
     'deictic.tag': 'h1',
     'deictic.line': '<h1 className="text-4xl">',
     'deictic.page': '/pricing',
+    'deictic.url': op.page,
     'deictic.viewport': '390x844',
     'deictic.count': '1',
     'board.task': 'ready',
   });
-  expect(message.text).toStartWith(op.text);
-  // The place and the page, and nothing of the source or the rendered HTML after them.
-  expect(message.text).toEndWith(['', '---', '`src/App.tsx:1:26` · `<h1>`', op.page].join('\n'));
+  // Only what was typed: where it is and the page are labels, and no package.json names a project.
+  expect(message.text).toBe(op.text);
   // A task touches no file.
   expect(p.read('src/App.tsx')).toContain('className="text-4xl"');
+});
+
+test("names the project: the package.json's name, or the option's", async () => {
+  const files = { 'package.json': '{ "name": "@shop/storefront" }' };
+  const labelsOf = async (channel: string, options?: TasksOptions) => {
+    const { post, target } = setup(channel, options, files);
+    const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
+    return (await team.thread(json.model.tasks[0]!.id)).message.labels;
+  };
+  expect((await labelsOf('named'))['deictic.project']).toBe('@shop/storefront');
+  expect((await labelsOf('renamed', { project: 'shop' }))['deictic.project']).toBe('shop');
+});
+
+test("a URL too long for a label stays in the task's text", async () => {
+  const { post, target } = setup('long');
+  const page = `${ORIGIN}/pricing?q=${'x'.repeat(300)}`;
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, page } });
+  const { message } = await team.thread(json.model.tasks[0]!.id);
+  expect(message.labels['deictic.url']).toBeUndefined();
+  expect(message.text).toBe(`${op.text}\n---\n${page}`);
 });
 
 test('says what was pointed at inside the element, where nothing marked it', async () => {

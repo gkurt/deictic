@@ -34,7 +34,7 @@ createInterface({ input: tail.stdout }).on('line', (line) => {
     const at = p.labels?.['deictic.at'];
     roots.set(
       p.thread,
-      `"${first(p.text ?? '')}"${at ? ` at ${at}` : ''}${p.labels?.['deictic.page'] ? ` on ${p.labels['deictic.page']}` : ''}`,
+      `"${first(p.text ?? '')}"${at ? ` at ${at}` : ''}${p.labels?.['deictic.page'] ? ` on ${p.labels['deictic.page']}` : ''}${p.labels?.['deictic.project'] ? ` in ${p.labels['deictic.project']}` : ''}`,
     );
   }
   if (e.type === 'task.created') say(`new task #${p.id}: ${roots.get(p.thread) ?? ''}. Read it: vb read ${p.id}`);
