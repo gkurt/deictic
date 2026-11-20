@@ -149,6 +149,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `stop` posts it and lets the mic go (`cancel` keeps nothing). The recording toolbar's mic (its live waveform beside it while on) makes a clip of each
   stretch it's on, at its offset (`Kept.voice`); the replay plays them in step and starts paused, as a browser
   plays sound only after a click.
+- `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
+  recordings and voice, in their tabs' order, each with its options under its name or left out with `false`. Server
+  halves only, like every factory. The README, homepage and skill show it, and other plugins in prose.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text (what was typed, then where) and
   labels it `deictic.at`; `read` lists the element's tasks by that label, and the channel's page

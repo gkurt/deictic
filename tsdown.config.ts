@@ -25,6 +25,7 @@ export default defineConfig({
     'recordings/client': 'src/plugins/recordings/client.ts',
     'voice/index': 'src/plugins/voice/index.ts',
     'voice/client': 'src/plugins/voice/client.ts',
+    'recommended/index': 'src/plugins/recommended/index.ts',
   },
   format: 'esm',
   platform: 'node',

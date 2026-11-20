@@ -74,18 +74,21 @@ export function Home() {
       <section className="py-16">
         <h2 className="text-2xl font-bold">Set up</h2>
         <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-5 text-sm text-zinc-100">
+          npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core
+        </pre>
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-5 text-sm text-zinc-100">
           {`// vite.config.ts
 import { deictic } from 'deictic/vite';
-import { tailwind } from 'deictic/tailwind';
-import { tasks } from 'deictic/tasks';
+import { recommended } from 'deictic/recommended';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), deictic({ plugins: [tailwind(), tasks()] })],
+  plugins: [react(), deictic({ plugins: recommended() })],
 });`}
         </pre>
         <p className="mt-3 text-sm text-zinc-500">
-          It runs in <code>vite dev</code> only. Tasks need <code>@vercel/board</code> and a board: <code>npx vb serve</code> runs one on
-          your machine.
+          The recommended plugins: tasks, with a screenshot to draw on, a screen recording or your voice attached. It runs in{' '}
+          <code>vite dev</code> only, and on Next.js, webpack, Rspack, Bun and Astro too. Tasks go to a board: <code>npx vb serve</code>{' '}
+          runs one on your machine. Tailwind class editing and more are plugins you add beside it.
         </p>
 
         <h2 className="mt-14 text-2xl font-bold">How it works</h2>

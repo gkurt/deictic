@@ -172,6 +172,13 @@
         "default": "./dist/voice/client.js"
       }
     },
+    "./recommended": {
+      "deictic@dev": "./src/plugins/recommended/index.ts",
+      "default": {
+        "types": "./dist/recommended/index.d.ts",
+        "default": "./dist/recommended/index.js"
+      }
+    },
     "./webpack": {
       "deictic@dev": "./src/webpack.ts",
       "default": {

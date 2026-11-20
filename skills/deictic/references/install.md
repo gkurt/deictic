@@ -38,18 +38,16 @@ npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwrigh
 ```
 
 ```ts
-import { annotations } from 'deictic/annotations';
-import { recordings } from 'deictic/recordings';
-import { screenshots } from 'deictic/screenshots';
-import { tasks } from 'deictic/tasks';
-import { voice } from 'deictic/voice';
+import { recommended } from 'deictic/recommended';
 
-deictic({ plugins: [tasks(), screenshots(), annotations(), recordings(), voice()] });
+deictic({ plugins: recommended() });
 ```
 
 Screenshots render in a Chromium: Playwright's (`npx playwright install chromium`), else Chrome or Edge if installed.
 
-Every plugin, to fit what they choose instead:
+To fit what they choose instead: a plugin's options go under its name, `false` leaves one out
+(`recommended({ tasks: { channel: 'ui' }, voice: false })`), and one outside the preset goes beside it
+(`[...recommended(), tailwind()]`, `tailwind` from `deictic/tailwind`). Every plugin:
 
 | Plugin          | What it adds                                                          | Install too                                                           |
 | --------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------- |

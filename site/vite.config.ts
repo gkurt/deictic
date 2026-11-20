@@ -2,13 +2,9 @@ import { resolve } from 'node:path';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { annotations } from 'deictic/annotations';
-import { recordings } from 'deictic/recordings';
-import { screenshots } from 'deictic/screenshots';
+import { recommended } from 'deictic/recommended';
 import { tailwind } from 'deictic/tailwind';
-import { tasks } from 'deictic/tasks';
 import { deictic } from 'deictic/vite';
-import { voice } from 'deictic/voice';
 import { defineConfig } from 'vite';
 
 import { localBoard } from './board.ts';
@@ -21,7 +17,7 @@ export default defineConfig({
     react({ compiler: true }),
     tailwindcss(),
     localBoard(),
-    deictic({ plugins: [tasks({ labels: { kind: 'ui' } }), screenshots(), annotations(), recordings(), voice(), tailwind()] }),
+    deictic({ plugins: [...recommended({ tasks: { labels: { kind: 'ui' } } }), tailwind()] }),
   ],
   // Its own port, so it runs beside the examples' dev servers on Vite's default.
   server: { port: 5180 },

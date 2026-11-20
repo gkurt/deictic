@@ -5,9 +5,11 @@ files and can be undone.
 
 Hold **Alt** and point: the element is outlined with its tag, its file and line, and how many
 elements on the page come from the same place in the source. **Alt-click** to open the popup, with a
-tab for each plugin. In the Tailwind tab, add or remove classes and they preview on every one of those elements, then **Save** writes
-them to the `className` in your file. The bundler's usual hot update brings the page in line. **↶**
-and **↷** undo and redo, across every change deictic made.
+tab for each plugin. With the recommended plugins, say in the Task tab what should change, attach a
+screenshot to draw on, a screen recording or a voice note, and it goes to a [Vercel Board](https://vercel.com/docs/board)
+for you, a teammate or an agent to work. Or make the change yourself: with the [Tailwind](#what-the-tailwind-plugin-edits)
+plugin, add or remove classes and they preview on every one of those elements, then **Save** writes them to the
+`className` in your file. **↶** and **↷** undo and redo, across every change deictic made.
 
 deictic itself is the glue: the transform that ties each element to its source, the dev server's
 endpoints, the history, shortcuts and the popup. What you can do comes from plugins, every one of
@@ -19,8 +21,13 @@ plugins that others build on (see [Writing a plugin](#writing-a-plugin)).
 ## Install
 
 ```bash
-npm install -D deictic
+npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core
 ```
+
+`recommended()` is the plugins for tasks: [tasks](#tasks-on-a-vercel-board), [screenshots](#screenshots),
+[annotations](#annotations), [recordings](#recordings) and [voice](#voice), and the packages beside deictic
+are theirs. Screenshots render in a Chromium: Playwright's (`npx playwright install chromium`), else Chrome or
+Edge. Tasks go to a board: `npx vb serve` runs one on your machine (see [Tasks](#tasks-on-a-vercel-board)).
 
 Then add it to your bundler. Every integration takes the same options (`plugins`, `shortcut`), runs in
 the dev server only (a build includes none of it), and loads nothing with no plugins.
@@ -28,12 +35,12 @@ the dev server only (a build includes none of it), and loads nothing with no plu
 **Vite** (and anything built on it: React Router, TanStack Start, SvelteKit with JSX…):
 
 ```ts
-import { tailwind } from 'deictic/tailwind';
 // vite.config.ts
+import { recommended } from 'deictic/recommended';
 import { deictic } from 'deictic/vite';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), deictic({ plugins: [tailwind()] })],
+  plugins: [react(), deictic({ plugins: recommended() })],
 });
 ```
 
@@ -42,19 +49,19 @@ export default defineConfig({
 ```ts
 // next.config.ts
 import { withDeictic } from 'deictic/next';
-import { tailwind } from 'deictic/tailwind';
+import { recommended } from 'deictic/recommended';
 
-export default withDeictic(nextConfig, { plugins: [tailwind()] });
+export default withDeictic(nextConfig, { plugins: recommended() });
 ```
 
 **webpack 5 and Rspack** (with their dev servers):
 
 ```ts
-import { tailwind } from 'deictic/tailwind';
 // webpack.config.ts or rspack.config.ts
+import { recommended } from 'deictic/recommended';
 import { DeicticPlugin } from 'deictic/webpack';
 
-export default { mode: 'development', plugins: [new DeicticPlugin({ plugins: [tailwind()] })] };
+export default { mode: 'development', plugins: [new DeicticPlugin({ plugins: recommended() })] };
 ```
 
 Opening a file in the editor needs `launch-editor` installed. Where the dev server is started by hand,
@@ -66,7 +73,7 @@ server's.
 ```ts
 // deictic.plugin.ts
 import { deictic } from 'deictic/bun';
-export default deictic({ plugins: [tailwind()] });
+export default deictic({ plugins: recommended() });
 
 // server.ts
 import tools from './deictic.plugin.ts';
@@ -79,7 +86,12 @@ Bun.serve({ routes: { ...tools.routes, '/*': index }, development: true });
 plugins = ["./deictic.plugin.ts"]
 ```
 
-**Astro**: `integrations: [deictic({ plugins: [tailwind()] })]`, from `deictic/astro`.
+**Astro**: `integrations: [deictic({ plugins: recommended() })]`, from `deictic/astro`.
+
+Each plugin takes its options under its name, and `false` leaves one out:
+`recommended({ tasks: { channel: 'ui' }, voice: false })`. Any other plugin goes beside them, the preset spread
+into a list with it (`[...recommended(), …]`), as the [Tailwind](#what-the-tailwind-plugin-edits) plugin from
+`deictic/tailwind` does to edit classes in place.
 
 React Native (Metro) isn't supported: there is no DOM to point at. Outside Vite, the module that starts
 the overlay is written to `.deictic/client.js` as the dev server starts, as those bundlers have no
@@ -94,11 +106,10 @@ plugin can also have a shortcut of its own, none by default, which opens the pop
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // or `false`, leaving only plugins' own
-  plugins: [
-    tailwind({ shortcut: { modifiers: ['Alt', 'Shift'] } }),
-    tasks({ shortcut: { modifiers: ['Alt'], button: 'right' } }),
-    annotations(),
-  ],
+  plugins: recommended({
+    tasks: { shortcut: { modifiers: ['Alt'], button: 'right' } },
+    annotations: { shortcut: { modifiers: ['Alt', 'Shift'] } },
+  }),
 });
 ```
 
@@ -109,6 +120,9 @@ shortcuts may share keys with different buttons. A shortcut with no modifiers, a
 alike (deictic's own among them) stop the dev server as it starts, saying what to write instead.
 
 ## What the Tailwind plugin edits
+
+It isn't in the preset: add `tailwind()` from `deictic/tailwind` beside it, and its tab edits an element's
+classes in place, with no task needed.
 
 | In the source                             | In the panel                                       |
 | ----------------------------------------- | -------------------------------------------------- |
@@ -139,17 +153,12 @@ npx skills add ./node_modules/deictic
 ```
 
 ```bash
-npm install -D @vercel/board
 npx vb serve                                   # a board on this machine, kept in .board/
 BOARD_URL=http://127.0.0.1:4100/api/board vite # or leave BOARD_URL out for your team's board, through `vercel login`
 ```
 
 ```ts
-import { tailwind } from 'deictic/tailwind';
-import { tasks } from 'deictic/tasks';
-import { deictic } from 'deictic/vite';
-
-deictic({ plugins: [tailwind(), tasks({ channel: 'ui', labels: { kind: 'ui' } })] });
+deictic({ plugins: recommended({ tasks: { channel: 'ui', labels: { kind: 'ui' } } }) });
 ```
 
 A task's text is what you typed, then where: the element's `file:line:column` and tag, the page's
@@ -184,16 +193,12 @@ How a shot is made is its renderer's:
 | `rrweb()`, the default | Snapshots the page's DOM with rrweb and renders it in a browser beside the dev server. Text lays out as the page's does.          | `rrweb-snapshot`, `playwright-core` |
 | `dom()`                | Draws the page in the page itself, from its DOM. For a target with no server to render on; text may lay out a little differently. | `modern-screenshot`                 |
 
-```bash
-npm install -D rrweb-snapshot playwright-core
-```
-
 ```ts
-import { dom, rrweb, screenshots } from 'deictic/screenshots';
+import { dom } from 'deictic/screenshots';
 
-deictic({ plugins: [tailwind(), tasks(), screenshots({ maskAllInputs: true })] });
-// In a page with no server to render on:
-screenshots({ renderer: dom() });
+deictic({ plugins: recommended({ screenshots: { maskAllInputs: true } }) });
+// In a page with no server to render on (and `modern-screenshot` installed):
+recommended({ screenshots: { renderer: dom() } });
 ```
 
 `rrweb()` renders in any Chromium: Playwright's own when installed (`npx playwright install chromium`),
@@ -254,9 +259,7 @@ another tab, Done or Esc leaves it and the marks stay, per page, for the tab's s
 them off.
 
 ```ts
-import { annotations } from 'deictic/annotations';
-
-deictic({ plugins: [tasks(), screenshots(), annotations({ color: '#0ea5e9' })] });
+deictic({ plugins: recommended({ annotations: { color: '#0ea5e9' } }) });
 ```
 
 With screenshots loaded, a shot draws the marks over the page (from the same SVG the page shows), and a
@@ -288,14 +291,10 @@ Stop brings the popup back on the element, with what you'd typed and attached, a
 chip that plays it back in the lightbox; like a drawn screenshot, it takes the place of the box. The task gets the recording as rrweb's events (JSON), and its text says how long
 it ran and where it replays while the dev server keeps it.
 
-```bash
-npm install -D rrweb rrweb-player   # rrweb records; rrweb-player plays it back
-```
+rrweb records, and rrweb-player plays it back.
 
 ```ts
-import { recordings } from 'deictic/recordings';
-
-deictic({ plugins: [tasks(), screenshots(), annotations(), recordings({ maskAllInputs: true })] });
+deictic({ plugins: recommended({ recordings: { maskAllInputs: true } }) });
 ```
 
 It masks as screenshots do, by rrweb's names and defaults, and leaves out deictic's own UI. What's
@@ -321,12 +320,6 @@ replay plays what it took in step with the page.
 
 Every chip opens the same lightbox: shots, recordings (their replay, in a frame) and voice notes, ← and → between
 them, growing out of the chip clicked and back into it on close.
-
-```ts
-import { voice } from 'deictic/voice';
-
-deictic({ plugins: [tasks(), screenshots(), annotations(), recordings(), voice()] });
-```
 
 The browser asks for the mic the first time, and lets it go between takes. Clips are what the browser's
 `MediaRecorder` makes (WebM with Opus in Chrome and Firefox, MP4 in Safari), kept in
@@ -395,7 +388,7 @@ export default defineClientPlugin<{ title: string }, { title: string }>({
 ```
 
 ```ts
-deictic({ plugins: [tailwind(), title()] });
+deictic({ plugins: [...recommended(), title()] });
 ```
 
 A panel draws in the overlay's shadow root, styled by its custom properties (`--deictic-accent`, `--deictic-bg`…).
