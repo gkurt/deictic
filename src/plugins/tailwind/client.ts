@@ -47,8 +47,11 @@ const STYLE = `
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
 }
 .editor[hidden], .suggest[hidden] { display: none; }
-.editor .top { display: flex; align-items: center; padding: 2px 2px 2px 8px; font: 12px ui-monospace, monospace; color: var(--deictic-muted); }
-.editor .top button { margin-left: auto; }
+.editor .top { display: flex; align-items: center; gap: 4px; padding: 2px 2px 2px 8px; font: 12px ui-monospace, monospace; color: var(--deictic-muted); }
+.editor .top button:first-of-type { margin-left: auto; }
+.editor .top .more { padding: 0 6px; font: 12px/18px system-ui, sans-serif; }
+.editor .top .more[aria-expanded='true'] { border-color: var(--deictic-accent); color: var(--deictic-fg); }
+.custom[hidden] { display: none; }
 .alts { position: relative; display: flex; flex-wrap: wrap; gap: 4px; max-height: 190px; padding: 2px 8px 8px; overflow: auto; }
 .alts button { display: inline-flex; align-items: center; gap: 5px; padding: 0 6px; font: 12px/20px ui-monospace, monospace; }
 .alts button[aria-pressed='true'] { border-color: var(--deictic-accent); color: var(--deictic-accent); }
@@ -374,6 +377,21 @@ export default defineClientPlugin<Model, Op>({
           });
         });
         form.append(field, set);
+        // Shown on asking, or where the class already has a value of its own to show.
+        let asked = custom.value !== undefined;
+        const more = make('button', 'more', 'Custom');
+        more.title = 'Set a value of your own';
+        const show = () => {
+          form.hidden = !asked;
+          more.setAttribute('aria-expanded', String(asked));
+        };
+        show();
+        more.addEventListener('click', () => {
+          asked = !asked;
+          show();
+          if (asked) field.focus();
+        });
+        close.before(more);
         editor.append(form);
       }
       // Esc closes the editor, not the popup, and reaches it only from inside: so the focus goes in.
