@@ -123,6 +123,19 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`), and
   `client.ts`, the chip panel. Previews per element, keeping each one's runtime classes, and puts
   the page back on close only for an unsaved preview, so it never races the bundler's update.
+  `catalog.ts` is what the project's Tailwind knows, from its own design system (v4's
+  `__unstable__loadDesignSystem` in `@tailwindcss/node`, found from the root or through an integration's
+  package; the `css` option names the stylesheet with the theme, read again when it changes): `complete`
+  (a word typed, under variants and `!`, a class's modifiers after `/`, and variants), `info` (a colour, a
+  value with theme variables and simple `calc` worked out), `alternatives` (a kind is the properties a class
+  sets, ordered by size where it has one, written with the class's own variants and modifier, and `custom`
+  to put a value in brackets) and `css` (for classes the page's build hasn't seen, in `@layer utilities`,
+  `@property` lifted out). The routes of the same names answer the panel, and nothing without Tailwind v4
+  (one warning, a plain panel). In the panel the field completes its last word (↑ ↓, Enter or Tab; the list
+  is a `data-deictic-modal` while shown), a known class's chip shows a swatch or its value and opens the
+  editor (also a modal): its kind's classes, colours as rows of shades, and a field (and a colour picker)
+  for a value of one's own. A preview's CSS goes in a `<style>` in the page's head until the panel unmounts.
+  `test/tailwind-catalog.test.ts` runs it on the site's Tailwind.
 - `src/plugins/screenshots/`: no panel. `index.ts`, the server half: keeps the latest `keep` PNGs under
   `.deictic/screenshots` (IDs sort by time), answers `read(id)` to other plugins, and its `add`
   route takes a PNG, or JSON its renderer's `render` makes one of. A `Renderer` is a page module (`client`, which

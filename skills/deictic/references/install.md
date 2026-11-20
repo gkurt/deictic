@@ -56,7 +56,7 @@ To fit what they choose instead: a plugin's options go under its name, `false` l
 | `annotations()` | Marks on the page, on shots (Annotate) and in recordings                                |                                                                       |
 | `recordings()`  | Record beside Attach: a screen recording attached to a task                             | `rrweb`, `rrweb-player` (its replay)                                  |
 | `voice()`       | The mic, in recordings and as voice notes in a task                                     |                                                                       |
-| `tailwind()`    | Edit an element's classes in place                                                      |                                                                       |
+| `tailwind()`    | Edit an element's classes in place; `{ css: 'src/index.css' }` names the theme's sheet  |                                                                       |
 
 `deictic({ shortcut })` changes Alt-click, or `false` for none. The plugins' order is the tabs' order: keep theirs.
 

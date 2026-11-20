@@ -13,7 +13,12 @@ import { localBoard } from './board.ts';
 export default defineConfig({
   // GitHub Pages serves it under the repository's name (`BASE=/deictic/`, set by the deploy workflow).
   base: process.env.BASE ?? '/',
-  plugins: [react({ compiler: true }), tailwindcss(), localBoard(), deictic({ plugins: [...recommended(), tailwind()] })],
+  plugins: [
+    react({ compiler: true }),
+    tailwindcss(),
+    localBoard(),
+    deictic({ plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
+  ],
   // Its own port, so it runs beside the examples' dev servers on Vite's default.
   server: { port: 5180 },
   build: {

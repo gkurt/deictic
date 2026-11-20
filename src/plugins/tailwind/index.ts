@@ -5,16 +5,29 @@
  * with no `${}`, or the first argument of a class helper (`cn('…', active && '…')`), whose other
  * arguments stay as they are. A list built any other way is shown, not edited, since there is no one
  * place for a class to go. An element without the attribute gets one.
+ *
+ * Its routes answer the panel from the project's own Tailwind (`catalog.ts`): what completes a word typed
+ * (`complete`), what each class sets (`info`), the classes of a class's kind (`alternatives`) and the CSS of
+ * classes the page's build hasn't seen (`css`). Without Tailwind v4 they answer nothing, and the panel is plain.
  */
 import type { Expression, JSXAttribute, JSXOpeningElement } from 'oxc-parser';
 
-import { definePlugin, Refusal, type Shortcut } from '#src/index.ts';
+import { definePlugin, Refusal, type ServerContext, type Shortcut } from '#src/index.ts';
+
+import { type Catalog, loadCatalog } from './catalog.ts';
+
+export type { Alternatives, ClassInfo } from './catalog.ts';
 
 export interface TailwindOptions {
   /** Calls whose first argument is a class list: `cn`, `clsx`, `cx`, `twMerge`, `classNames` by default. */
   helpers?: string[];
   /** The attribute an element without one gets: `className`, or `class` for Solid and Preact. */
   attribute?: 'className' | 'class';
+  /**
+   * The stylesheet that imports Tailwind and holds the theme, from the project's root: `src/index.css`. What
+   * the panel completes and shows comes from it. Tailwind's default theme without one.
+   */
+  css?: string;
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
   shortcut?: Shortcut;
 }
@@ -41,10 +54,39 @@ const HELPERS = ['cn', 'clsx', 'cx', 'twMerge', 'classNames'];
 export function tailwind(options: TailwindOptions = {}) {
   const helpers = new Set(options.helpers ?? HELPERS);
   const attribute = options.attribute ?? 'className';
+  // Loaded on the first ask, as it takes a moment, and once: a project without Tailwind v4 has none.
+  let loading: Promise<Catalog | undefined> | undefined;
+  const catalog = ({ root }: ServerContext) =>
+    (loading ??= loadCatalog(root, options.css).catch((problem: unknown) => {
+      console.warn(`deictic/tailwind: no completions or class details, as ${problem instanceof Error ? problem.message : String(problem)}`);
+      return undefined;
+    }));
+  const asked = async (request: Request): Promise<string[]> => {
+    const body = (await request.json().catch(() => undefined)) as { classes?: unknown } | undefined;
+    return Array.isArray(body?.classes) ? body.classes.filter((c): c is string => typeof c === 'string').slice(0, 500) : [];
+  };
   return definePlugin<Model, Op>({
     name: 'tailwind',
     client: 'deictic/tailwind/client',
     shortcut: options.shortcut,
+    routes: {
+      // `complete?q=fle`: the classes for a word being typed.
+      complete: async (request, context) => {
+        const query = new URL(request.url).searchParams.get('q') ?? '';
+        return Response.json({ items: (await catalog(context))?.complete(query) ?? [] });
+      },
+      // What each of `classes` sets. `available` is false where there's no catalog, so the panel stops asking.
+      info: async (request, context) => {
+        const known = await catalog(context);
+        return Response.json({ available: known !== undefined, items: known?.info(await asked(request)) ?? [] });
+      },
+      // `alternatives?class=text-sm`: the classes of its kind, or nothing for one Tailwind doesn't know.
+      alternatives: async (request, context) => {
+        const name = new URL(request.url).searchParams.get('class') ?? '';
+        return Response.json((await catalog(context))?.alternatives(name) ?? null);
+      },
+      css: async (request, context) => Response.json({ css: (await catalog(context))?.css(await asked(request)) ?? '' }),
+    },
     read({ code, element }) {
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') return { editable: false, source: spot.source };
