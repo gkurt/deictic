@@ -44,10 +44,15 @@ export function deictic(options: DeicticOptions = {}): Plugin {
     },
     resolveId: (id) => (id === CLIENT ? CLIENT_ID : undefined),
     load: (id) => (id === CLIENT_ID ? clientModule(plugins, base, shortcut) : undefined),
-    transform(code, id) {
-      const [path = ''] = id.split('?');
-      const browser = this.environment.config.consumer === 'client';
-      return mark(code, path, root, browser ? `\nimport ${JSON.stringify(CLIENT)};\n` : '');
+    transform: {
+      // First of all, not only first of the `pre` plugins: the React Compiler (`react({ compiler: true })`) is
+      // `pre` too and compiles the JSX away, so after it there'd be no element to mark, wherever deictic is listed.
+      order: 'pre',
+      handler(code, id) {
+        const [path = ''] = id.split('?');
+        const browser = this.environment.config.consumer === 'client';
+        return mark(code, path, root, browser ? `\nimport ${JSON.stringify(CLIENT)};\n` : '');
+      },
     },
   };
 }

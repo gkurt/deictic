@@ -63,7 +63,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `nodeMiddleware` mounts them on Vite. Every request waits for the plugins' setups. A plugin without
   `read` reads `null` and isn't checked against the source; one without `apply` refuses ops.
   Writes run one at a time, since a plugin's own change may wait on the network.
-- `src/vite.ts`: `enforce: 'pre'`, `apply: 'serve'`. In the browser each marked module appends
+- `src/vite.ts`: `enforce: 'pre'` and its transform `order: 'pre'` (before the React Compiler, also `pre`, compiles the JSX away), `apply: 'serve'`. In the browser each marked module appends
   `import "virtual:deictic/client"`, which starts the overlay with deictic's own shortcut and each plugin that
   has a `client`, and its checked shortcut where it has one. No plugins by default.
   `open` redirects to Vite's `/__open-in-editor`.

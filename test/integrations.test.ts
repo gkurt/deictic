@@ -5,12 +5,15 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 
 import { rspack } from '@rspack/core';
+import react from '@vitejs/plugin-react';
+import { createServer as createVite } from 'vite';
 
 import { deictic as astro } from '#src/astro.ts';
 import { deictic as bun } from '#src/bun.ts';
 import { definePlugin } from '#src/index.ts';
 import loader, { type LoaderOptions } from '#src/loader.ts';
 import { withDeictic } from '#src/next.ts';
+import { deictic as vite } from '#src/vite.ts';
 import { DeicticPlugin } from '#src/webpack.ts';
 
 import { project } from './fixture.ts';
@@ -188,6 +191,32 @@ describe('Bun', () => {
     const p = project({ 'src/App.tsx': APP });
     expect(setUp(bun({ root: p.root }), { entrypoints: ['src/App.tsx'] })).toBeUndefined();
   });
+});
+
+describe('Vite', () => {
+  test('marks JSX before the React Compiler compiles it away, wherever deictic is listed', async () => {
+    const p = project({
+      'src/App.tsx': `${APP}export const Page = () => <App />;
+`,
+    });
+    const server = await createVite({
+      root: p.root,
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, ws: false },
+      optimizeDeps: { noDiscovery: true, include: [] },
+      plugins: [react({ compiler: true }), vite()],
+    });
+    try {
+      const code = (await server.transformRequest('/src/App.tsx'))!.code;
+      expect(code).toContain('"data-deictic": "src/App.tsx:1:26"');
+      expect(code).toContain('__x00__deictic/client'); // the client's import, as Vite rewrites it
+      // And the compiler still ran on what deictic marked.
+      expect(code).toContain('compiler-runtime');
+    } finally {
+      await server.close();
+    }
+  }, 30_000);
 });
 
 describe('Astro', () => {
