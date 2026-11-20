@@ -87,6 +87,20 @@ interface Started {
 let started: Started | undefined;
 
 /**
+ * What the page hears on `window` as the popup opens over it on an element (its `detail` a `PopupOpened`) and as
+ * it closes: for a page that moves on its own to hold still meanwhile, as deictic's site does. Not for one pinned.
+ */
+export const POPUP_OPENED = 'deictic:open';
+export const POPUP_CLOSED = 'deictic:close';
+
+export interface PopupOpened {
+  /** The element it's open on. */
+  element: Element;
+  /** The plugin whose tab it opened at. */
+  tab: string;
+}
+
+/**
  * Opens the popup over the page on `element`, as deictic's own shortcut does: at `tab` (a plugin's name), or at the
  * tab used last. For a page that opens it from a gesture of its own, as deictic's site does on a plain click.
  * Answers whether it opened: not where no plugin has a tab, or `element` has no mark. The overlay must have started.
@@ -463,6 +477,7 @@ function openPanel({
   if (pinned) panel.classList.add('pinned');
   const release = pinned ? undefined : keepInView(panel, body, head, element);
   const unmark = pinned ? undefined : outline(root, element);
+  if (!pinned) window.dispatchEvent(new CustomEvent<PopupOpened>(POPUP_OPENED, { detail: { element, tab: first.plugin.name } }));
 
   let cleanup: (() => void) | void;
   // The button that keeps what the shown tab would lose, while there's something: `unsaved`, from the panel.
@@ -528,6 +543,7 @@ function openPanel({
     panel.remove();
     window.removeEventListener('keydown', onKey, true);
     window.removeEventListener('pointerdown', onOutside, true);
+    if (!pinned) window.dispatchEvent(new CustomEvent(POPUP_CLOSED));
     onClose(current, leaving);
   };
   const onKey = (e: KeyboardEvent) => {
@@ -638,10 +654,14 @@ function place(el: HTMLElement, r: DOMRect): void {
   Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
 }
 
+/** How far from the element the popup's outline is drawn, in pixels. */
+const ROOM = 4;
+
 /**
  * Outlines the element the popup is open on, for as long as it is: which one it's about, where several look alike
- * or the popup covers it. With no fill, so a change tried on it shows in its own colours. Read each frame, as the
- * element moves with the page's scrolling, its layout and what a panel previews on it. Answers what removes it.
+ * or the popup covers it. Dashed, with no fill and a little room around the element, so nothing of it is drawn on:
+ * a border, a ring or a colour tried on it shows as it is. Read each frame, as the element moves with the page's
+ * scrolling, its layout and what a panel previews on it. Answers what removes it.
  */
 function outline(root: ShadowRoot, element: Element): () => void {
   const box = div('box on');
@@ -655,7 +675,7 @@ function outline(root: ShadowRoot, element: Element): () => void {
     if (now === was) return;
     was = now;
     box.classList.toggle('shown', now !== '');
-    place(box, r);
+    place(box, new DOMRect(r.left - ROOM, r.top - ROOM, r.width + 2 * ROOM, r.height + 2 * ROOM));
   };
   follow();
   return () => {

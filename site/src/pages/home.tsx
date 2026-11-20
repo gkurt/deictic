@@ -135,28 +135,47 @@ function openDeictic(e: MouseEvent<HTMLElement>) {
   if (marked !== null) void import('deictic/client').then(({ openPopup }) => openPopup(marked));
 }
 
-/** A rendered element beside its source: pointing at either lights the other. Left alone, it steps through them. */
+/**
+ * A rendered element beside its source: pointing at either lights the other. Left alone, it steps through them.
+ * While deictic's popup is open it holds still, whatever the pointer passes over: what's lit is what the popup is
+ * on, and a class tried on it there isn't rendered away.
+ */
 function Demo() {
   const [pointed, setPointed] = useState<Tag | null>(null);
   const [step, setStep] = useState(2);
+  const [held, setHeld] = useState(false);
+  // `deictic:open` and `deictic:close`: strings, not deictic's constants, which would bring the overlay into a build.
+  useEffect(() => {
+    const hold = () => setHeld(true);
+    const release = () => setHeld(false);
+    window.addEventListener('deictic:open', hold);
+    window.addEventListener('deictic:close', release);
+    return () => {
+      window.removeEventListener('deictic:open', hold);
+      window.removeEventListener('deictic:close', release);
+    };
+  }, []);
   // A timer is the browser's: it steps while nothing is pointed at, and not at all where motion is reduced.
   useEffect(() => {
-    if (pointed !== null || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (held || pointed !== null || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
     const timer = setInterval(() => setStep((s) => s + 1), 1800);
     return () => clearInterval(timer);
-  }, [pointed]);
+  }, [pointed, held]);
   const active = pointed ?? TAGS[step % TAGS.length]!;
   const { line, column } = AT[active];
+  const light = (tag: Tag | null) => {
+    if (!held) setPointed(tag);
+  };
 
   // The innermost element under the pointer, not each of its ancestors in turn.
   const point = (tag: Tag) => (e: PointerEvent) => {
     e.stopPropagation();
-    setPointed(tag);
+    light(tag);
   };
   const mark = (tag: Tag) => (active === tag ? <Label tag={tag} /> : null);
 
   return (
-    <figure className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm" onPointerLeave={() => setPointed(null)}>
+    <figure className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm" onPointerLeave={() => light(null)}>
       <div className="grid sm:grid-cols-2">
         <div className="flex items-center justify-center border-b border-line px-6 py-12 sm:border-r sm:border-b-0">
           <article
@@ -193,7 +212,7 @@ function Demo() {
               <div
                 key={text}
                 className={cn('border-l-2 border-transparent px-4', tag === active && i + 1 === line && 'border-signal bg-signal/10')}
-                onPointerEnter={() => setPointed(tag ?? null)}
+                onPointerEnter={() => light(tag ?? null)}
               >
                 <span className="mr-4 text-muted select-none">{i + 1}</span>
                 {paint(text)}

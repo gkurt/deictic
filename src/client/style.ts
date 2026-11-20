@@ -28,8 +28,8 @@ export const STYLE = `
 }
 .box.shown { display: block; }
 .box.inner { outline: 1px dashed var(--deictic-accent); background: none; }
-/* The element the popup is open on: no fill, so what's tried on it shows as it is. */
-.box.on { background: none; }
+/* The element the popup is open on: dashed and off it a little, with no fill, so what's tried on it shows as it is. */
+.box.on { outline: 1px dashed var(--deictic-accent); border-radius: 4px; background: none; }
 .label {
   position: absolute;
   left: -2px;

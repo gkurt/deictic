@@ -107,7 +107,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   Outlines the marked element under the pointer while a shortcut's keys are held, and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
   tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. While it's open over the page its element
-  stays outlined (`.box.on`, no fill, followed each frame), keys typed in it stop at the host, so the page's own
+  stays outlined (`.box.on`: dashed, `ROOM` pixels off it and with no fill, so nothing is drawn on the element; followed each frame), keys typed in it stop at the host, so the page's own
   shortcuts don't run on them, and its Esc is kept from the page. It follows its element as the page moves it
   (`keepInView`, read each frame) until it's dragged by its head, and then stays where it's put, in the window. A press on the page outside it closes it, unless the shown panel
   said `unsaved`: then its button shakes, the popup stays, and no shortcut or `openPopup` opens another over it
@@ -118,7 +118,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`
   (a task names its path and HTML). `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
-  homepage demo's plain click). `popupIn(container, { tab, element })` shows the real popup pinned in a
+  homepage demo's plain click). As it opens over the page and as it closes, the page hears `deictic:open`
+  (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
+  `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a
   page (its own shadow root, `.panel.pinned`, no Esc, reopened when closed, the last tab left alone).
 - `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`), and
   `client.ts`, the chip panel. Previews per element, keeping each one's runtime classes, and puts
