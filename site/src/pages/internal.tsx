@@ -12,7 +12,7 @@ export function Internal() {
   return (
     <Shell>
       <section className="py-10">
-        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Internal</p>
+        <p className="text-sm font-medium text-signal-text">Internal</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">The popup, pinned</h1>
         <p className="mt-3 max-w-2xl text-zinc-600 dark:text-zinc-400">
           Each tab of deictic's popup, open on the button beside it and working as it does over a page. Hold <Kbd>Alt</Kbd> and point inside
@@ -124,7 +124,7 @@ function Pinned({ tab, title }: { tab: string; title: string }) {
     <section>
       <h2 className="mb-4 text-lg font-semibold">{title}</h2>
       <div className="flex flex-wrap items-start gap-8">
-        <button ref={target} type="button" className="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-700">
+        <button ref={target} type="button" className="rounded-lg bg-signal px-4 py-2 font-medium text-on-signal hover:brightness-110">
           Open the playground
         </button>
         {/* `data-tab` tells the pinned popups apart in a task, as they share this line. */}

@@ -4,7 +4,8 @@
  */
 export const STYLE = `
 :host {
-  --deictic-accent: #7c3aed;
+  --deictic-accent: #12b358;
+  --deictic-on-accent: #04130b;
   --deictic-bg: #18181b;
   --deictic-fg: #f4f4f5;
   --deictic-muted: #a1a1aa;
@@ -19,7 +20,7 @@ export const STYLE = `
   pointer-events: none;
   box-sizing: border-box;
   outline: 2px solid var(--deictic-accent);
-  background: rgb(124 58 237 / 0.08);
+  background: rgb(18 179 88 / 0.1);
 }
 .box.shown { display: block; }
 .box.inner { outline: 1px dashed var(--deictic-accent); background: none; }
@@ -30,7 +31,7 @@ export const STYLE = `
   padding: 1px 6px;
   font: 12px/1.5 ui-monospace, monospace;
   white-space: nowrap;
-  color: #fff;
+  color: var(--deictic-on-accent);
   background: var(--deictic-accent);
 }
 .label.below { top: 100%; bottom: auto; }
@@ -131,7 +132,7 @@ export const STYLE = `
   padding: 0;
   border: 0;
   border-radius: 50%;
-  color: #fff;
+  color: var(--deictic-on-accent);
   background: var(--deictic-accent);
 }
 .lb-play svg { width: 16px; height: 16px; }
@@ -190,7 +191,7 @@ button {
 }
 button:hover { border-color: var(--deictic-muted); }
 button:disabled { opacity: 0.5; cursor: default; }
-button.primary { background: var(--deictic-accent); border-color: var(--deictic-accent); color: #fff; }
+button.primary { background: var(--deictic-accent); border-color: var(--deictic-accent); color: var(--deictic-on-accent); }
 input, textarea {
   box-sizing: border-box;
   width: 100%;

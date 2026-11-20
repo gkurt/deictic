@@ -391,7 +391,7 @@ export default defineClientPlugin<{ title: string }, { title: string }>({
 deictic({ plugins: [...recommended(), title()] });
 ```
 
-A panel draws in the overlay's shadow root, styled by its custom properties (`--deictic-accent`, `--deictic-bg`…).
+A panel draws in the overlay's shadow root, styled by its custom properties (`--deictic-accent`, `--deictic-on-accent` for text on it, `--deictic-bg`…).
 Give a control a `title` as anywhere: the overlay shows it in a tooltip of its own, soon after the pointer rests or
 keyboard focus lands, and a control with no text of its own is named by it.
 

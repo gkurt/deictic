@@ -171,7 +171,7 @@ function player(url: string, autoplay: boolean): { element: HTMLElement; leave: 
   const time = div('lb-time');
   el.append(play, wave, time);
   const audio = new Audio(url);
-  const colors: Colors = { played: '#a78bfa', rest: '#52525b' };
+  const colors: Colors = { played: '#3ddc7c', rest: '#52525b' };
   // Flat until the clip's read: the bars rise when its peaks are in.
   let peaks: number[] = Array<number>(120).fill(0.05);
   let frame = 0;

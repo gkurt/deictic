@@ -29,7 +29,7 @@ function Plan({ name, price, perks, chosen, onChoose }: (typeof plans)[number] &
     <li
       className={cn(
         'flex flex-col rounded-xl border border-zinc-200 p-5 dark:border-zinc-800',
-        chosen && 'border-violet-500 ring-2 ring-violet-200 dark:ring-violet-900',
+        chosen && 'border-signal ring-2 ring-signal/25',
       )}
     >
       <h3 className="text-lg font-semibold">{name}</h3>
@@ -52,7 +52,7 @@ function Plan({ name, price, perks, chosen, onChoose }: (typeof plans)[number] &
 
 function Guide() {
   return (
-    <aside className="rounded-xl border border-violet-200 bg-violet-50 p-5 text-sm dark:border-violet-900 dark:bg-violet-950/40">
+    <aside className="rounded-xl border border-signal/30 bg-signal/10 p-5 text-sm">
       <h2 className="font-semibold">Try it on this page</h2>
       <ul className="mt-3 space-y-2">
         <li>
@@ -76,12 +76,7 @@ function Guide() {
       </ul>
       <p className="mt-4 text-zinc-600 dark:text-zinc-400">
         Tasks go to{' '}
-        <a
-          className="text-violet-700 underline dark:text-violet-300"
-          href={BOARD.replace(/\/api\/board$/, '/')}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className="text-signal-text underline" href={BOARD.replace(/\/api\/board$/, '/')} target="_blank" rel="noreferrer">
           the board
         </a>
         . Work them as an agent would:
@@ -98,7 +93,7 @@ export function Example() {
     <Shell>
       <div className="grid gap-8 py-10 lg:grid-cols-[1fr_320px]">
         <div className="relative space-y-10 rounded-2xl border-2 border-dashed border-zinc-300 p-6 dark:border-zinc-700">
-          <p className="absolute -top-3 left-4 bg-white px-2 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:bg-zinc-950">
+          <p className="absolute -top-3 left-4 bg-bg px-2 text-xs font-medium tracking-wide text-zinc-500 uppercase">
             Sample UI to try deictic on · not a real product
           </p>
           <section>

@@ -10,7 +10,7 @@ export const TOOLS_STYLE = `
 .annotations-tools .icon { display: inline-flex; align-items: center; justify-content: center; padding: 3px 5px; }
 .annotations-tools .icon svg { width: 16px; height: 16px; }
 .annotations-tools .gap { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--deictic-line); }
-.annotations-tools button[aria-pressed='true'] { background: var(--deictic-accent); border-color: var(--deictic-accent); color: #fff; }
+.annotations-tools button[aria-pressed='true'] { background: var(--deictic-accent); border-color: var(--deictic-accent); color: var(--deictic-on-accent); }
 .annotations-tools .end { margin-left: auto; }
 .annotations-hint { margin: 6px 0 0; font-size: 12px; color: var(--deictic-muted); }
 `;

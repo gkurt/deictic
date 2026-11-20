@@ -89,7 +89,7 @@ declare module 'deictic' {
 export interface AnnotationsOptions {
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
   shortcut?: Shortcut;
-  /** The colour marks are drawn in: a red that deictic's own violet isn't. */
+  /** The colour marks are drawn in: a red that deictic's own green isn't. */
   color?: string;
 }
 

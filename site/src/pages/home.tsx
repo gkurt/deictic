@@ -1,106 +1,306 @@
+import { type PointerEvent, type ReactNode, useEffect, useState } from 'react';
+
+import { cn } from '#src/cn.ts';
+
 import { Kbd, Shell } from '#src/shell.tsx';
 
-const features = [
-  {
-    keys: ['Alt'],
-    title: 'Add a task',
-    body: "Alt-click an element and say what should change. It goes to a Vercel Board with the file, line, tag, page and rendered HTML, for whoever works the board's tasks: you, a teammate, or your own agent.",
-  },
-  {
-    keys: ['Alt'],
-    title: 'Edit the classes',
-    body: 'Switch to the Tailwind tab and its classes open as chips. Add or remove them, see every element from that line change at once, then Save writes them to the className in your file.',
-  },
-  {
-    keys: ['↶', '↷'],
-    title: 'Undo anything',
-    body: 'Every change, a file edit or a task, lands in one history. Undo puts a file back while it is still as deictic left it, and cancels a task while no one has claimed it.',
-  },
+const base = import.meta.env.BASE_URL;
+
+// The demo's file, and where each of its tags opens in it: what the transform writes to `data-deictic`.
+const FILE = 'src/Plan.tsx';
+const SOURCE = [
+  'export function Plan() {',
+  '  return (',
+  '    <article>',
+  '      <h3>Pro</h3>',
+  '      <p>$12 / month</p>',
+  '      <button>Upgrade</button>',
+  '    </article>',
+  '  );',
+  '}',
+];
+const TAGS = ['h3', 'p', 'button', 'article'] as const;
+type Tag = (typeof TAGS)[number];
+const AT: Record<Tag, { line: number; column: number }> = {
+  article: { line: 3, column: 5 },
+  h3: { line: 4, column: 7 },
+  p: { line: 5, column: 7 },
+  button: { line: 6, column: 7 },
+};
+// A closing tag's line points at its element too.
+const LINES: Record<number, Tag> = { 3: 'article', 4: 'h3', 5: 'p', 6: 'button', 7: 'article' };
+
+const plugins = [
+  ['tasks', 'task → Vercel Board'],
+  ['screenshots', 'element PNG, masked'],
+  ['annotations', 'box, arrow, pen, note'],
+  ['recordings', 'rrweb replay'],
+  ['voice', 'mic clips'],
+  ['tailwind', 'class edits → file'],
 ];
 
-const steps = [
+const PEERS = 'npm i -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core';
+
+const setups = [
   [
-    'Element → source',
-    'A transform marks each host element with data-deictic="src/App.tsx:12:5" at build time, so it works for server components and points at the tag itself.',
+    'Vite',
+    `// vite.config.ts
+import { recommended } from 'deictic/recommended';
+import { deictic } from 'deictic/vite';
+
+export default defineConfig({
+  plugins: [react(), deictic({ plugins: recommended() })],
+});`,
   ],
   [
-    'Plugins',
-    'A server half reads the element from the parsed file and answers edits, or makes a change of its own. A client half draws the panel.',
+    'Next.js',
+    `// next.config.ts
+import { withDeictic } from 'deictic/next';
+import { recommended } from 'deictic/recommended';
+
+export default withDeictic(nextConfig, { plugins: recommended() });`,
   ],
   [
-    'Same origin',
-    'Changes go to /__deictic/* on the dev server, as same-origin JSON only. No token reaches the page, and none of it is in a build.',
+    'webpack · Rspack',
+    `// webpack.config.ts, rspack.config.ts
+import { recommended } from 'deictic/recommended';
+import { DeicticPlugin } from 'deictic/webpack';
+
+export default {
+  mode: 'development',
+  plugins: [new DeicticPlugin({ plugins: recommended() })],
+};`,
   ],
-];
+  [
+    'Bun',
+    `// deictic.plugin.ts
+import { deictic } from 'deictic/bun';
+import { recommended } from 'deictic/recommended';
+export default deictic({ plugins: recommended() });
+
+// server.ts
+import tools from './deictic.plugin.ts';
+Bun.serve({ routes: { ...tools.routes, '/*': index }, development: true });
+
+# bunfig.toml
+[serve.static]
+plugins = ["./deictic.plugin.ts"]`,
+  ],
+  [
+    'Astro',
+    `// astro.config.ts
+import { deictic } from 'deictic/astro';
+import { recommended } from 'deictic/recommended';
+
+export default defineConfig({
+  integrations: [deictic({ plugins: recommended() })],
+});`,
+  ],
+] as const;
+
+function Copy({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <button type="button" className="shrink-0 cursor-pointer font-mono text-xs text-muted hover:text-fg" onClick={() => void copy()}>
+      {copied ? 'copied' : 'copy'}
+    </button>
+  );
+}
+
+/** The outline's label, as the overlay draws it. */
+function Label({ tag }: { tag: Tag }) {
+  return (
+    <span className="pointer-events-none absolute bottom-full -left-0.5 bg-signal px-1.5 font-mono text-[11px] leading-5 font-normal tracking-normal whitespace-nowrap text-on-signal">
+      {FILE}:{AT[tag].line}:{AT[tag].column}
+    </span>
+  );
+}
+
+const OUTLINED = 'outline-2 outline-signal bg-signal/10';
+
+/** A rendered element beside its source: pointing at either lights the other. Left alone, it steps through them. */
+function Demo() {
+  const [pointed, setPointed] = useState<Tag | null>(null);
+  const [step, setStep] = useState(2);
+  // A timer is the browser's: it steps while nothing is pointed at, and not at all where motion is reduced.
+  useEffect(() => {
+    if (pointed !== null || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const timer = setInterval(() => setStep((s) => s + 1), 1800);
+    return () => clearInterval(timer);
+  }, [pointed]);
+  const active = pointed ?? TAGS[step % TAGS.length]!;
+  const { line, column } = AT[active];
+
+  // The innermost element under the pointer, not each of its ancestors in turn.
+  const point = (tag: Tag) => (e: PointerEvent) => {
+    e.stopPropagation();
+    setPointed(tag);
+  };
+  const mark = (tag: Tag) => (active === tag ? <Label tag={tag} /> : null);
+
+  return (
+    <figure className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm" onPointerLeave={() => setPointed(null)}>
+      <div className="grid sm:grid-cols-2">
+        <div className="flex items-center justify-center border-b border-line px-6 py-12 sm:border-r sm:border-b-0">
+          <article
+            className={cn('relative w-52 rounded-md border border-line p-6 font-sans', active === 'article' && OUTLINED)}
+            onPointerOver={point('article')}
+          >
+            {mark('article')}
+            <h3 className={cn('relative text-lg font-semibold', active === 'h3' && OUTLINED)} onPointerOver={point('h3')}>
+              {mark('h3')}
+              Pro
+            </h3>
+            <p className={cn('relative mt-6 text-sm text-muted', active === 'p' && OUTLINED)} onPointerOver={point('p')}>
+              {mark('p')}
+              $12 / month
+            </p>
+            <button
+              type="button"
+              className={cn(
+                'relative mt-7 w-full rounded bg-fg px-3 py-1.5 text-sm text-bg',
+                active === 'button' && 'outline-2 outline-signal',
+              )}
+              onPointerOver={point('button')}
+            >
+              {mark('button')}
+              Upgrade
+            </button>
+          </article>
+        </div>
+        <pre className="overflow-x-auto py-4 leading-6">
+          {SOURCE.map((text, i) => {
+            const tag = LINES[i + 1];
+            return (
+              <div
+                key={text}
+                className={cn('border-l-2 border-transparent px-4', tag === active && i + 1 === line && 'border-signal bg-signal/10')}
+                onPointerEnter={() => setPointed(tag ?? null)}
+              >
+                <span className="mr-4 text-muted select-none">{i + 1}</span>
+                {paint(text)}
+              </div>
+            );
+          })}
+        </pre>
+      </div>
+      <figcaption className="border-t border-line px-4 py-2.5 text-xs text-muted">
+        {`<${active} data-deictic="`}
+        <span className="text-signal-text tabular-nums">
+          {FILE}:{line}:{column}
+        </span>
+        {'">'}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** A source line with its tags in the signal colour. */
+function paint(text: string): ReactNode {
+  return text.split(/(<\/?[a-z0-9]+>)/).map((part, i) =>
+    part.startsWith('<') ? (
+      // The parts of one line never reorder.
+      // oxlint-disable-next-line react/no-array-index-key
+      <span key={i} className="text-signal-text">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+function Setup() {
+  const [chosen, setChosen] = useState(0);
+  const code = setups[chosen]![1];
+  return (
+    <div className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm">
+      <div className="flex items-center gap-4 border-b border-line px-4 py-2.5 text-xs">
+        <span className="min-w-0 flex-1 truncate">{PEERS}</span>
+        <Copy text={PEERS} />
+      </div>
+      <div role="tablist" className="flex overflow-x-auto overflow-y-hidden border-b border-line text-xs">
+        {setups.map(([name], i) => (
+          <button
+            key={name}
+            type="button"
+            role="tab"
+            aria-selected={i === chosen}
+            className={cn(
+              'cursor-pointer border-b-2 px-4 py-2.5 whitespace-nowrap',
+              i === chosen ? 'border-signal text-fg' : 'border-transparent text-muted hover:text-fg',
+            )}
+            onClick={() => setChosen(i)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <pre role="tabpanel" className="overflow-x-auto p-4 leading-6">
+        {code.split('\n').map((text, i) => (
+          // The lines of one snippet never reorder.
+          // oxlint-disable-next-line react/no-array-index-key
+          <div key={i} className={cn(/^(\/\/|#) /.test(text) && 'text-muted')}>
+            {text || ' '}
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
 
 export function Home() {
   return (
     <Shell>
-      <section className="py-16 sm:py-24">
-        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Devtools for your running app</p>
-        <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight text-balance sm:text-5xl">Point at it. Change what made it.</h1>
-        <p className="mt-5 max-w-xl text-lg text-zinc-600 dark:text-zinc-400">
-          Hold Alt and point at any element: deictic finds the line that rendered it. Edit it there and the source changes, or leave a task
-          for later.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <a
-            href={`${import.meta.env.BASE_URL}example/`}
-            className="rounded-md bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500"
-          >
-            Open the playground
-          </a>
-          <code className="rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">npm install -D deictic</code>
+      <section className="relative py-16 sm:py-24">
+        <div className="grid-paper pointer-events-none absolute inset-x-0 top-0 h-96" />
+        <div className="relative">
+          <h1 className="text-5xl font-bold tracking-tighter sm:text-7xl">
+            Element <span className="text-signal-text">→</span> source.
+          </h1>
+          <p className="mt-6 max-w-md text-muted">
+            <Kbd>Alt</Kbd>-click anything in your dev server. File a task on it, or edit its classes in the file.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-sm">
+            <span className="flex items-center gap-4 rounded-md border border-line bg-surface px-3 py-2">
+              npm i -D deictic
+              <Copy text="npm i -D deictic" />
+            </span>
+            <a href={`${base}example/`} className="rounded-md bg-signal px-4 py-2 font-medium text-on-signal hover:brightness-110">
+              playground →
+            </a>
+          </div>
+          <div className="mt-14">
+            <Demo />
+          </div>
+          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs text-muted">
+            <li>dev server only</li>
+            <li>0 bytes in a build</li>
+            <li>same-origin</li>
+            <li>undo · redo</li>
+          </ul>
         </div>
-        <p className="mt-6 text-sm text-zinc-500">
-          This page runs it too: hold <Kbd>Alt</Kbd> and point at this paragraph.
-        </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {features.map((f) => (
-          <article key={f.title} className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-            <div className="flex gap-1">
-              {f.keys.map((k) => (
-                <Kbd key={k}>{k}</Kbd>
-              ))}
-            </div>
-            <h2 className="mt-3 font-semibold">{f.title}</h2>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{f.body}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="py-16">
-        <h2 className="text-2xl font-bold">Set up</h2>
-        <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-5 text-sm text-zinc-100">
-          npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core
-        </pre>
-        <pre className="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-5 text-sm text-zinc-100">
-          {`// vite.config.ts
-import { deictic } from 'deictic/vite';
-import { recommended } from 'deictic/recommended';
-
-export default defineConfig({
-  plugins: [react(), deictic({ plugins: recommended() })],
-});`}
-        </pre>
-        <p className="mt-3 text-sm text-zinc-500">
-          The recommended plugins: tasks, with a screenshot to draw on, a screen recording or your voice attached. It runs in{' '}
-          <code>vite dev</code> only, and on Next.js, webpack, Rspack, Bun and Astro too. Tasks go to a board: <code>npx vb serve</code>{' '}
-          runs one on your machine. Tailwind class editing and more are plugins you add beside it.
-        </p>
-
-        <h2 className="mt-14 text-2xl font-bold">How it works</h2>
-        <ol className="mt-4 grid gap-4 sm:grid-cols-3">
-          {steps.map(([title, body], i) => (
-            <li key={title} className="text-sm">
-              <span className="font-mono text-violet-600 dark:text-violet-400">0{i + 1}</span>
-              <h3 className="mt-1 font-semibold">{title}</h3>
-              <p className="mt-1 text-zinc-600 dark:text-zinc-400">{body}</p>
+      <section className="grid gap-x-10 gap-y-6 pb-20 sm:grid-cols-[10rem_1fr]">
+        <h2 className="font-mono text-sm text-muted">plugins</h2>
+        <ul className="grid gap-px overflow-hidden rounded-lg border border-line bg-line font-mono text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {plugins.map(([name, what]) => (
+            <li key={name} className="bg-surface px-4 py-3">
+              <span className="text-muted">deictic/</span>
+              {name}
+              <p className="mt-0.5 text-xs text-muted">{what}</p>
             </li>
           ))}
-        </ol>
+        </ul>
+
+        <h2 className="font-mono text-sm text-muted">setup</h2>
+        <Setup />
       </section>
     </Shell>
   );

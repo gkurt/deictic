@@ -1,3 +1,44 @@
 @import 'tailwindcss';
 
 @custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* The brand: ink, paper and one signal green, the overlay's accent (`--deictic-accent`). */
+:root {
+  --bg: #f6f7f3;
+  --surface: #ffffff;
+  --fg: #0b0e0c;
+  --muted: #5f6861;
+  --line: #dde1d9;
+  /* The signal as text: the fill is too light to read on paper. */
+  --signal-text: #0a7f3f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e0c;
+    --surface: #111512;
+    --fg: #eef1ec;
+    --muted: #8a938c;
+    --line: #232a25;
+    --signal-text: #3ddc7c;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-signal: #12b358;
+  --color-on-signal: #04130b;
+  --color-signal-text: var(--signal-text);
+  --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Graph paper behind the hero, fading out below it. */
+.grid-paper {
+  background-image: radial-gradient(color-mix(in srgb, var(--muted) 40%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}

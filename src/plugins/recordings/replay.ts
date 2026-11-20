@@ -24,7 +24,7 @@ export const REPLAY = `<!doctype html>
 <title>Recording · deictic</title>
 <link rel="stylesheet" href="../player.css">
 <style>
-  :root { color-scheme: dark; --accent: #8b5cf6; }
+  :root { color-scheme: dark; --accent: #12b358; }
   body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: #18181b; color: #fafafa; font: 13px/1.4 system-ui, sans-serif; }
   header { display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid #3f3f46; }
   header a { color: #a1a1aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -50,7 +50,7 @@ export const REPLAY = `<!doctype html>
   #main .rr-player .rr-controller__btns button { color: #e4e4e7; }
   #main .rr-player .rr-controller__btns button:disabled { color: #52525b; }
   #main .rr-player .rr-controller__btns button svg { fill: currentColor; }
-  #main .rr-player .rr-controller__btns button.active { color: #fff; background: var(--accent); }
+  #main .rr-player .rr-controller__btns button.active { color: #04130b; background: var(--accent); }
   #main .rr-player .rr-controller__btns button:active { background: color-mix(in srgb, var(--accent) 60%, transparent); }
   #main .rr-player .switch .label { color: #e4e4e7; }
   #main .rr-player .switch.disabled .label { color: #52525b; }
@@ -98,7 +98,7 @@ export const REPLAY = `<!doctype html>
         autoPlay: !Number.isFinite(t) && clips.length === 0,
         showController: !bare,
         speedOption: [1, 2, 4, 8],
-        tags: { ${JSON.stringify(MARKS)}: '#8b5cf6' },
+        tags: { ${JSON.stringify(MARKS)}: '#12b358' },
         inactiveColor: '#3f3f46',
         mouseTail: false,
       },
