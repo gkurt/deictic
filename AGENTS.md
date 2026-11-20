@@ -184,7 +184,11 @@ restart it to load the new build (the site's restart restarts its board too, whi
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
 integrations, also from `dist`; `test/integrations.test.ts` covers each integration, Rspack with a real compile.
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
-in their output, each scan first shown to find it in a build where deictic runs.
+in their output, each scan first shown to find it in a build where deictic runs. With the React Compiler on, marking
+must still see JSX as written: `integrations.test.ts` covers Vite (`react({ compiler: true })`) and Rspack (`babel-loader`
+with `babel-plugin-react-compiler`), and `test/next-dev.test.ts` runs a real `next dev` with `reactCompiler: true`, deictic
+from `dist` (build first), in a fixture whose `node_modules/deictic` is the manifest and a link to `dist` (a link to the
+repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. `site/board.ts` starts `vb serve` on

@@ -116,6 +116,44 @@ describe('webpack and Rspack', () => {
   }, 30_000);
 });
 
+describe('webpack and Rspack, with the React Compiler', () => {
+  test("marks JSX before the app's babel-loader compiles it with the React Compiler", async () => {
+    const p = project({ 'src/main.jsx': APP });
+    const compiler = rspack({
+      mode: 'development',
+      context: p.root,
+      entry: './src/main.jsx',
+      output: { path: join(p.root, 'dist') },
+      devtool: false,
+      module: {
+        rules: [
+          {
+            test: /\.jsx$/,
+            loader: 'babel-loader',
+            options: {
+              babelrc: false,
+              configFile: false,
+              plugins: ['babel-plugin-react-compiler'],
+              presets: [['@babel/preset-react', { runtime: 'automatic' }]],
+            },
+          },
+        ],
+      },
+      externals: [/^deictic(\/|$)/, /^react(\/|$)/],
+      plugins: [new DeicticPlugin()],
+    });
+    const error = await new Promise<string | undefined>((done) =>
+      compiler.run((e, stats) => compiler.close(() => done(e?.message ?? (stats?.hasErrors() ? stats.toString() : undefined)))),
+    );
+    expect(error).toBeUndefined();
+    const js = readFileSync(join(p.root, 'dist/main.js'), 'utf8');
+    expect(js).toContain('"data-deictic": "src/main.jsx:1:26"');
+    expect(js).toContain('.deictic/client.js');
+    // And the compiler still ran on what deictic marked.
+    expect(js).toContain('react/compiler-runtime');
+  }, 30_000);
+});
+
 describe('Next', () => {
   type Rule = { condition: unknown; loaders: { loader: string; options: LoaderOptions }[] };
   type Config = {
