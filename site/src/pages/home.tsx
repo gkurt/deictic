@@ -1,4 +1,4 @@
-import { type PointerEvent, type ReactNode, useEffect, useState } from 'react';
+import { type MouseEvent, type PointerEvent, type ReactNode, useEffect, useState } from 'react';
 
 import { cn } from '#src/cn.ts';
 
@@ -125,6 +125,16 @@ function Label({ tag }: { tag: Tag }) {
 
 const OUTLINED = 'outline-2 outline-signal bg-signal/10';
 
+/**
+ * On the dev server deictic runs on this page too: a click in the demo card opens its popup on what was clicked, as
+ * Alt-click would. A build has no deictic, and no import of it either.
+ */
+function openDeictic(e: MouseEvent<HTMLElement>) {
+  if (!import.meta.env.DEV || !(e.target instanceof Element)) return;
+  const marked = e.target.closest('[data-deictic]');
+  if (marked !== null) void import('deictic/client').then(({ openPopup }) => openPopup(marked));
+}
+
 /** A rendered element beside its source: pointing at either lights the other. Left alone, it steps through them. */
 function Demo() {
   const [pointed, setPointed] = useState<Tag | null>(null);
@@ -150,7 +160,8 @@ function Demo() {
       <div className="grid sm:grid-cols-2">
         <div className="flex items-center justify-center border-b border-line px-6 py-12 sm:border-r sm:border-b-0">
           <article
-            className={cn('relative w-52 rounded-md border border-line p-6 font-sans', active === 'article' && OUTLINED)}
+            className={cn('relative w-52 cursor-pointer rounded-md border border-line p-6 font-sans', active === 'article' && OUTLINED)}
+            onClick={openDeictic}
             onPointerOver={point('article')}
           >
             {mark('article')}

@@ -71,9 +71,21 @@ interface Started {
   base: string;
   contextOf: (name: string) => ClientContext;
   tabs: Tab[];
+  /** Opens the popup over the page on an element, at a tab or the one used last: `openPopup`. */
+  open: (element: Element, tab?: string) => boolean;
 }
 
 let started: Started | undefined;
+
+/**
+ * Opens the popup over the page on `element`, as deictic's own shortcut does: at `tab` (a plugin's name), or at the
+ * tab used last. For a page that opens it from a gesture of its own, as deictic's site does on a plain click.
+ * Answers whether it opened: not where no plugin has a tab, or `element` has no mark. The overlay must have started.
+ */
+export function openPopup(element: Element, { tab }: { tab?: string } = {}): boolean {
+  if (started === undefined) throw new Error('deictic: the overlay has not started, so there is no popup to open');
+  return started.open(element, tab);
+}
 
 /**
  * Shows the popup in `container`, open at a tab (`tab`, a plugin's name, or the first) on `element`, where
@@ -186,7 +198,7 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
     }
   }
   const tabs: Tab[] = given.flatMap(({ plugin }) => (plugin.mount === undefined ? [] : [{ plugin, mount: plugin.mount }]));
-  started = { base, contextOf, tabs };
+  started = { base, contextOf, tabs, open: (element, tab) => tabs.length > 0 && openAt(tab ?? last().plugin.name, element) };
   const last = () => {
     let name: string | null = null;
     try {

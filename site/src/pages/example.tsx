@@ -4,8 +4,6 @@ import { cn } from '#src/cn.ts';
 
 import { Kbd, Shell } from '#src/shell.tsx';
 
-const BOARD = import.meta.env.BOARD_URL;
-
 const plans = [
   { name: 'Hobby', price: 0, perks: ['1 project', 'Community support'] },
   { name: 'Pro', price: 12, perks: ['Unlimited projects', 'Email support', 'Custom domains'] },
@@ -52,32 +50,11 @@ function Plan({ name, price, perks, chosen, onChoose }: (typeof plans)[number] &
 
 function Guide() {
   return (
-    <aside className="rounded-xl border border-signal/30 bg-signal/10 p-5 text-sm">
+    <aside className="self-start rounded-xl border border-signal/30 bg-signal/10 p-5 text-sm">
       <h2 className="font-semibold">Try it on this page</h2>
-      <ul className="mt-3 space-y-2">
-        <li>
-          <Kbd>Alt</Kbd> + click an element, say what should change, and <b>Add task</b>.
-        </li>
-        <li>
-          Attach a screenshot, <b>Annotate</b> it with boxes, arrows and notes, <b>Record</b> the page as you use it, or leave a{' '}
-          <b>Voice</b> note.
-        </li>
-        <li>
-          Shots and recordings hide <code>rr-mask</code> text and <code>rr-block</code> elements: see the last row.
-        </li>
-        <li>
-          <Kbd>↶</Kbd> in the popup cancels a task no one has claimed yet.
-        </li>
-      </ul>
-      <p className="mt-4 text-zinc-600 dark:text-zinc-400">
-        Tasks go to{' '}
-        <a className="text-signal-text underline" href={BOARD.replace(/\/api\/board$/, '/')} target="_blank" rel="noreferrer">
-          the board
-        </a>
-        . Work them as an agent would:
+      <p className="mt-3">
+        <Kbd>Alt</Kbd> + click to add a task, with annotations, recordings and voice notes.
       </p>
-      <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs text-zinc-100">{`BOARD_URL=${BOARD} \\
-  npx vb tasks claim --ready deictic --as fixer`}</pre>
     </aside>
   );
 }
