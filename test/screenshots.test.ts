@@ -79,6 +79,10 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
   expect(message.attachments).toEqual([expect.objectContaining({ name: `${id}.png`, type: 'image/png', size: PNG.length })]);
 
   const box = { x: 0, y: 0, width: 1, height: 1 };
+  // With no words, the task is named by what's attached; with nothing attached either, it's refused.
+  const wordless = await post({ plugin: 'tasks', target, op: { ...op, text: ' ', screenshots: [{ id, box }] } });
+  expect(wordless.model.tasks.map((t) => t.title)).toContain('See the screenshot');
+  expect((await post({ plugin: 'tasks', target, op: { ...op, text: ' ' } })).problem).toBe('say what should change first');
   expect(
     (
       await post({

@@ -37,8 +37,8 @@ task: read the file. For the element as it rendered, open the page.
 
 ## 2. Understand what they want
 
-- The typed text is the request. When it's short ("fix this", "solve it"), the attachments carry it: look at
-  every screenshot, and for a recording, its timeline, frames and voice ([recordings.md](recordings.md)).
+- The typed text is the request. When it's short ("fix this", "solve it") or stands in for none typed ("See the
+  recording"), the attachments carry it: look at every screenshot, and for a recording, its timeline, frames and voice ([recordings.md](recordings.md)).
 - A screenshot is a PNG: download it (`vb download <attachment> <dir>`) and look at it. Marks are drawn in;
   the notes are in the task's text too.
 - The element is one place; what the person means may be its component, its parent, a sibling (the next card in a

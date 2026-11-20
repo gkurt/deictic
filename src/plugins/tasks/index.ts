@@ -293,7 +293,8 @@ export function tasks(options: TasksOptions = {}) {
           return { done: { kind: 'removed' as const, ...kept } };
         });
       }
-      if (op.text.trim() === '') throw new Refusal('say what should change first');
+      // A new task may go without words where something attached says it; a task's words are never changed to none.
+      if (op.text.trim() === '' && ('edit' in op || shown(op) === undefined)) throw new Refusal('say what should change first');
       if ('edit' in op) {
         return asked(async () => {
           const before = (await openTask(await boardOf(), op.edit, 'edit')).text;
@@ -346,7 +347,7 @@ export function tasks(options: TasksOptions = {}) {
       const named = (id: string) => `task "${clip(before.tasks.find((t) => t.id === id)?.title ?? `#${id}`, 60)}"`;
       if ('remove' in op) return `delete ${named(op.remove)}`;
       if ('edit' in op) return `edit ${named(op.edit)}`;
-      return `task "${clip(op.text.trim().split('\n', 1)[0]!, 60)}"`;
+      return `task "${clip(wordsOf(op).split('\n', 1)[0]!, 60)}"`;
     },
   });
 }
@@ -472,7 +473,22 @@ function textOf(op: Op): string {
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
   const tail = more.length === 0 ? '' : REST + more.join('\n');
-  return clip(op.text.trim(), 10_000 - tail.length) + tail;
+  return clip(wordsOf(op), 10_000 - tail.length) + tail;
+}
+
+/** The task's words: what was typed, or where nothing was, a line that sends the reader to what's attached. */
+const wordsOf = (op: Op) => (op.text.trim() === '' ? (shown(op) ?? '') : op.text.trim());
+
+/** `See the recording and the voice note`: what stands for the words of a task sent with none, where something is attached. */
+function shown(op: Op): string | undefined {
+  const named = (count: number | undefined, word: string) =>
+    count === undefined || count === 0 ? [] : [`the ${word}${count === 1 ? '' : 's'}`];
+  const attached = [
+    ...named(op.screenshots?.length, 'screenshot'),
+    ...named(op.recordings?.length, 'recording'),
+    ...named(op.voice?.length, 'voice note'),
+  ];
+  return attached.length === 0 ? undefined : `See ${new Intl.ListFormat('en', { type: 'conjunction' }).format(attached)}`;
 }
 
 const fence = (text: string, lang: string) => `\`\`\`\`${lang}\n${clip(text, 1500)}\n\`\`\`\``;

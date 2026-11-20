@@ -78,7 +78,7 @@ deictic({
 });
 ```
 
-A task is the words typed and its attachments; the rest is labels: `deictic.project` (the `project` option, or by
+A task is the words typed and its attachments (with none typed, a line naming what's attached); the rest is labels: `deictic.project` (the `project` option, or by
 default your `package.json`'s name, to tell projects apart on one board), `deictic.at`, `deictic.url`,
 `deictic.viewport` and more, and your own `labels` beside them.
 

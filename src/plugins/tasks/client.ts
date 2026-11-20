@@ -211,6 +211,9 @@ export default defineClientPlugin<Model, Change>({
     let voices: Clip[] = [];
     let busy = false;
     const attachedCount = () => chips.length + recordings.length + voices.length;
+    // A task goes with words, or with something attached that says it; not while one is going.
+    let sending = false;
+    const able = () => (add.disabled = sending || (text.value.trim() === '' && attachedCount() === 0));
     // Record and Voice, where their plugins are: beside Annotate, or after the chips while the box is away.
     const more = () => [...(recorder !== undefined ? [record] : []), ...(voice !== undefined ? [speak] : [])];
     const chip = (content: (string | Node)[], title: string, at: number, remove: string, drop: () => void) => {
@@ -289,6 +292,7 @@ export default defineClientPlugin<Model, Change>({
         ...(attached && shots !== undefined && notes !== undefined ? [another] : []),
         ...(attached ? more() : []),
       );
+      able();
       mark();
     };
     const dropShot = (c: Chip) => {
@@ -502,7 +506,7 @@ export default defineClientPlugin<Model, Change>({
           return item;
         }),
       );
-      add.disabled = text.value.trim() === '';
+      able();
       mark();
     };
 
@@ -527,9 +531,12 @@ export default defineClientPlugin<Model, Change>({
     };
 
     const send = async () => {
-      if (text.value.trim() === '' || busy) return;
-      add.disabled = true;
+      if (busy || sending) return;
+      // A take still going is kept first: it may be all there is to send.
       await speakOff();
+      if (able()) return;
+      sending = true;
+      able();
       problem.textContent = '';
       let screenshots: Op['screenshots'];
       try {
@@ -538,7 +545,8 @@ export default defineClientPlugin<Model, Change>({
         // Said under the shots, which stay as they are: untick the box, or remove the chips, to send without.
         problem.textContent = messageOf(e);
         add.textContent = 'Add task';
-        add.disabled = false;
+        sending = false;
+        able();
         return;
       }
       add.textContent = 'Add task';
@@ -574,7 +582,8 @@ export default defineClientPlugin<Model, Change>({
       } catch {
         // The panel's status says why; what was typed and drawn stays, to send again.
       }
-      add.disabled = text.value.trim() === '';
+      sending = false;
+      able();
     };
 
     // Back from recording: what was kept, and the recording, or why there's none.
@@ -590,7 +599,7 @@ export default defineClientPlugin<Model, Change>({
     }
 
     text.addEventListener('input', () => {
-      add.disabled = text.value.trim() === '';
+      able();
       mark();
     });
     text.addEventListener('keydown', (e) => {
