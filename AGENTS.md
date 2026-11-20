@@ -107,7 +107,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `data-deictic-modal` is in the root, Esc is that modal's, not the popup's. Pointing goes down through open
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`
-  (a task names its path and HTML). `popupIn(container, { tab, element })` shows the real popup pinned in a
+  (a task names its path and HTML). `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
+  homepage demo's plain click). `popupIn(container, { tab, element })` shows the real popup pinned in a
   page (its own shadow root, `.panel.pinned`, no Esc, reopened when closed, the last tab left alone).
 - `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`), and
   `client.ts`, the chip panel. Previews per element, keeping each one's runtime classes, and puts
