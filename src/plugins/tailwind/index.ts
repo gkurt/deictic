@@ -10,7 +10,7 @@
  * (`complete`), what each class sets (`info`), the classes of a class's kind (`alternatives`) and the CSS of
  * classes the page's build hasn't seen (`css`). Without Tailwind v4 they answer nothing, and the panel is plain.
  */
-import type { Expression, JSXAttribute, JSXOpeningElement } from 'oxc-parser';
+import type { Argument, Expression, JSXAttribute, JSXOpeningElement, Program } from 'oxc-parser';
 
 import { definePlugin, Refusal, type ServerContext, type Shortcut } from '#src/index.ts';
 
@@ -36,17 +36,27 @@ export type Model =
   | {
       editable: true;
       classes: string;
-      /** The helper's other arguments, as written, which add classes at runtime: `active && 'ring'`. */
-      rest?: string;
+      /** The helper's other arguments, which add classes at runtime, each read as far as the source says. */
+      others?: Extra[];
     }
   | { editable: false; source: string };
+
+/** Classes a helper's argument adds: `active && 'ring'` is `ring` when `active`. */
+export interface Extra {
+  /** The argument, or the part of it these classes come from, as written. */
+  source: string;
+  /** The classes, where the source spells them out: there, or in a `const` of the file it names. */
+  classes?: string;
+  /** What must hold for them to be added, as written: `active === 'h3'`. None where they always are. */
+  when?: string;
+}
 
 export interface Op {
   classes: string;
 }
 
 /** Where a class list sits in the source: the text between its quotes, or where a missing attribute goes. */
-type List = { kind: 'list'; start: number; end: number; quote: string; rest?: string };
+type List = { kind: 'list'; start: number; end: number; quote: string; others?: Argument[] };
 type Spot = List | { kind: 'missing'; at: number } | { kind: 'fixed'; source: string };
 
 const HELPERS = ['cn', 'clsx', 'cx', 'twMerge', 'classNames'];
@@ -87,11 +97,12 @@ export function tailwind(options: TailwindOptions = {}) {
       },
       css: async (request, context) => Response.json({ css: (await catalog(context))?.css(await asked(request)) ?? '' }),
     },
-    read({ code, element }) {
+    read({ code, element, program }) {
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') return { editable: false, source: spot.source };
       if (spot.kind === 'missing') return { editable: true, classes: '' };
-      return { editable: true, classes: code.slice(spot.start, spot.end), ...(spot.rest === undefined ? {} : { rest: spot.rest }) };
+      const others = spot.others?.flatMap((argument) => extrasOf(argument, code, program));
+      return { editable: true, classes: code.slice(spot.start, spot.end), ...(others === undefined ? {} : { others }) };
     },
     apply({ code, element }, _target, { classes }) {
       const list = classes.trim().split(/\s+/).filter(Boolean).join(' ');
@@ -121,12 +132,57 @@ function spotOf(element: JSXOpeningElement, code: string, helpers: Set<string>):
   if (e.type === 'CallExpression' && e.callee.type === 'Identifier' && helpers.has(e.callee.name)) {
     const [first, ...others] = e.arguments;
     const head = first === undefined || first.type === 'SpreadElement' ? undefined : listIn(first, code);
-    if (head !== undefined) {
-      const rest = others.length === 0 ? undefined : code.slice(others[0]!.start, others.at(-1)!.end);
-      return rest === undefined ? head : { ...head, rest };
-    }
+    if (head !== undefined) return others.length === 0 ? head : { ...head, others };
   }
   return { kind: 'fixed', source: code.slice(attr.start, attr.end) };
+}
+
+/**
+ * What one of a helper's arguments adds, and when: `on && 'ring'`, `on ? 'a' : 'b'`, `{ ring: on }`, a string,
+ * or a name for one. Anything else is only its source, as nothing says what it adds.
+ */
+function extrasOf(argument: Argument, code: string, program: Program): Extra[] {
+  const source = (node: { start: number; end: number }) => code.slice(node.start, node.end);
+  const added = (e: Expression, when?: string): Extra => {
+    const classes = stringOf(e, program);
+    return { source: source(e), ...(classes === undefined ? {} : { classes }), ...(when === undefined ? {} : { when }) };
+  };
+  const e = argument;
+  if (e.type === 'SpreadElement') return [{ source: source(e) }];
+  if (e.type === 'LogicalExpression' && e.operator === '&&') return [added(e.right, source(e.left))];
+  if (e.type === 'ConditionalExpression') {
+    const test = source(e.test);
+    const not = e.test.type === 'Identifier' ? `!${test}` : `!(${test})`;
+    // A branch that adds nothing (`on ? 'ring' : undefined`) isn't one to show.
+    return [added(e.consequent, test), added(e.alternate, not)].filter(
+      (extra) => extra.classes !== '' && !/^(undefined|null|false)$/.test(extra.source),
+    );
+  }
+  if (e.type === 'ObjectExpression') {
+    return e.properties.map((property): Extra => {
+      if (property.type !== 'Property' || property.computed) return { source: source(property) };
+      const classes = property.key.type === 'Identifier' ? property.key.name : stringOf(property.key, program, false);
+      if (classes === undefined) return { source: source(property) };
+      const always = property.value.type === 'Literal' && property.value.value === true;
+      return { source: source(property), classes, ...(always ? {} : { when: source(property.value) }) };
+    });
+  }
+  return [added(e)];
+}
+
+/** A string the source spells out: a literal, a template with nothing interpolated, or a top-level `const` of one. */
+function stringOf(e: { type: string }, program: Program, named = true): string | undefined {
+  const node = e as Expression;
+  if (node.type === 'Literal') return typeof node.value === 'string' ? node.value : undefined;
+  if (node.type === 'TemplateLiteral') return node.expressions.length === 0 ? (node.quasis[0]?.value.cooked ?? undefined) : undefined;
+  if (node.type !== 'Identifier' || !named) return undefined;
+  for (const statement of program.body) {
+    const declared = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+    if (declared?.type !== 'VariableDeclaration' || declared.kind !== 'const') continue;
+    for (const { id, init } of declared.declarations)
+      if (id.type === 'Identifier' && id.name === node.name && init) return stringOf(init, program, false);
+  }
+  return undefined;
 }
 
 /** A string literal or a template with nothing interpolated, as the text between its quotes. */

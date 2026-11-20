@@ -136,7 +136,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   editor (also a modal; both are boxes in the overlay's root, fixed under what they're about and placed each
   frame, never in the popup's flow, which would resize it): its kind's classes, colours as rows of shades, and, behind its Custom button (open where the class
   already has one), a field (and a colour picker) for a value of one's own. A preview's CSS goes in a `<style>` in the page's head until the panel unmounts.
-  `test/tailwind-catalog.test.ts` runs it on the site's Tailwind.
+  `test/tailwind-catalog.test.ts` runs it on the site's Tailwind. A helper's other arguments come in the model
+  as `others`, each an `Extra` (`extrasOf`): the classes it adds where the source spells them out (a string, a
+  top-level `const` of one, an object's key) and what they wait on (`a && …`, `a ? … : …`, `{ ring: on }`), or
+  only its source. The panel shows them under their condition as dashed chips, faint while not on the element.
 - `src/plugins/screenshots/`: no panel. `index.ts`, the server half: keeps the latest `keep` PNGs under
   `.deictic/screenshots` (IDs sort by time), answers `read(id)` to other plugins, and its `add`
   route takes a PNG, or JSON its renderer's `render` makes one of. A `Renderer` is a page module (`client`, which

@@ -36,8 +36,36 @@ test('edits a string or a plain template in braces', () => {
 
 test("edits a helper's first argument and shows the rest", () => {
   const { model, after } = edit(`const a = <div className={cn('p-2', on && 'ring', x)}/>;`, 'p-4');
-  expect(model).toEqual({ editable: true, classes: 'p-2', rest: "on && 'ring', x" });
+  expect(model).toEqual({
+    editable: true,
+    classes: 'p-2',
+    others: [{ source: "'ring'", classes: 'ring', when: 'on' }, { source: 'x' }],
+  });
   expect(after).toBe(`const a = <div className={cn('p-4', on && 'ring', x)}/>;`);
+});
+
+test("reads a helper's other arguments as classes and what they wait on", () => {
+  const code = [
+    `const OUTLINED = 'outline-2 bg-signal/10';`,
+    'export const BASE = `flex`;',
+    `const a = <div className={cn('p-2', active === 'h3' && OUTLINED, on ? 'ring' : 'shadow', off ? 'hidden' : undefined, { italic: slanted, 'font-bold': true, [key]: 1 }, BASE, ...more, pick(x))}/>;`,
+  ].join('\n');
+  expect(edit(code, 'p-2').model).toEqual({
+    editable: true,
+    classes: 'p-2',
+    others: [
+      { source: 'OUTLINED', classes: 'outline-2 bg-signal/10', when: "active === 'h3'" },
+      { source: "'ring'", classes: 'ring', when: 'on' },
+      { source: "'shadow'", classes: 'shadow', when: '!on' },
+      { source: "'hidden'", classes: 'hidden', when: 'off' },
+      { source: 'italic: slanted', classes: 'italic', when: 'slanted' },
+      { source: "'font-bold': true", classes: 'font-bold' },
+      { source: '[key]: 1' },
+      { source: 'BASE', classes: 'flex' },
+      { source: '...more' },
+      { source: 'pick(x)' },
+    ],
+  });
 });
 
 test('adds the attribute to an element without one', () => {

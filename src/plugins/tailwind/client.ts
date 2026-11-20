@@ -67,7 +67,14 @@ const STYLE = `
 .option[aria-selected='true'] { background: rgb(255 255 255 / 0.1); }
 .option .hint { margin-left: auto; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; align-items: center; }
-.rest { margin-top: 6px; color: var(--deictic-muted); font-size: 12px; }
+.extras { display: grid; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--deictic-line); font-size: 12px; color: var(--deictic-muted); }
+.extra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.extra .when { flex-basis: 100%; }
+.extra code { color: var(--deictic-fg); }
+/* The code's own classes: shown, not edited here, and faint while their condition doesn't hold. */
+.chip.fixed { border-style: dashed; }
+.chip.fixed .name { padding-right: 6px; }
+.chip.fixed.off { opacity: 0.45; }
 `;
 
 const split = (list: string) => list.split(/\s+/).filter(Boolean);
@@ -123,7 +130,7 @@ export default defineClientPlugin<Model, Op>({
     // What the page has beyond the source's list: classes the helper's other arguments added, per element. Read
     // only for a helper, as the page may not have caught up with the source yet (just after an undo).
     const runtime = context.elements.map((el) =>
-      model.rest === undefined ? [] : split(el.getAttribute('class') ?? '').filter((c) => !saved.includes(c)),
+      model.others === undefined ? [] : split(el.getAttribute('class') ?? '').filter((c) => !saved.includes(c)),
     );
     const unsaved = () => draft.join(' ') !== saved.join(' ');
     let previewed = false;
@@ -195,7 +202,38 @@ export default defineClientPlugin<Model, Op>({
       following = requestAnimationFrame(follow);
       place();
     });
-    if (model.rest !== undefined) panel.append(make('div', 'rest', `Also added at runtime: ${model.rest}`));
+    const extras = make('div', 'extras');
+    const others = model.others ?? [];
+    if (others.length > 0) panel.append(extras);
+    // What the clicked element has of them now, as the page rendered it.
+    const lit = new Set(runtime[context.elements.indexOf(context.element)] ?? []);
+    /** The helper's other arguments: what each adds as chips under what it waits on, or its code where nothing says. */
+    const drawExtras = () => {
+      extras.replaceChildren(
+        ...others.map((extra) => {
+          const row = make('div', 'extra');
+          const when = make('div', 'when');
+          if (extra.when === undefined) when.append('Always');
+          else when.append('When ', make('code', '', extra.when));
+          row.append(when);
+          // Nothing says what it adds (a call, a prop): its code is all there is to show.
+          if (extra.classes === undefined) {
+            when.append(', whatever ', make('code', '', extra.source), ' adds');
+            return row;
+          }
+          for (const c of split(extra.classes)) {
+            const on = lit.has(c);
+            const chip = make('span', on ? 'chip fixed' : 'chip fixed off');
+            chip.title = on ? 'On the element now. Change it in the code' : 'Not on the element now. Change it in the code';
+            const name = make('span', 'name');
+            face(name, known.get(c) ?? { name: c, known: false });
+            chip.append(name);
+            row.append(chip);
+          }
+          return row;
+        }),
+      );
+    };
 
     // The classes the page's build had as the panel opened: any other may have no CSS there yet.
     const built = new Set(saved);
@@ -246,13 +284,16 @@ export default defineClientPlugin<Model, Op>({
       );
     };
     const describe = async () => {
-      const missing = draft.filter((c) => !known.has(c));
+      const shown = [...draft, ...others.flatMap((extra) => split(extra.classes ?? ''))];
+      const missing = [...new Set(shown)].filter((c) => !known.has(c));
       if (plain || missing.length === 0) return;
       const answer = await ask<{ available: boolean; items: ClassInfo[] }>('info', naming(missing));
       if (answer === undefined) return;
       plain = !answer.available;
       for (const item of answer.items) known.set(item.name, item);
-      if (answer.items.length > 0) drawChips();
+      if (answer.items.length === 0) return;
+      drawChips();
+      drawExtras();
     };
     const render = () => {
       drawChips();
@@ -508,6 +549,7 @@ export default defineClientPlugin<Model, Op>({
       if (!add()) void commit().catch(() => {});
     });
     save.addEventListener('click', () => void commit().catch(() => {}));
+    drawExtras();
     render();
     input.focus();
 
