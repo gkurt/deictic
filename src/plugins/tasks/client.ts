@@ -14,7 +14,7 @@
  * Where the voice plugin is, Voice records the mic here in the panel: stopped, it's a chip that plays it.
  */
 import { liveWaveform } from '#src/client/waveform.ts';
-import { defineClientPlugin, type LightboxItem } from '#src/index.ts';
+import { defineClientPlugin, type LightboxItem, type Target } from '#src/index.ts';
 
 // For `use()`'s types: the plugins may not be loaded, and nothing of them runs here.
 import type { Annotation, Annotations, Picture } from '#src/plugins/annotations/index.ts';
@@ -22,7 +22,7 @@ import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
-import type { Marks, Model, Op } from './index.ts';
+import type { Marks, Model, Op, TaskAdded } from './index.ts';
 
 const STYLE = `
 .tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
@@ -125,6 +125,31 @@ function pathTo(inner: Element, outer: Element): string {
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
   return Object.assign(document.createElement(tag), props);
+}
+
+/** The event the page hears of each added task by, on `window`: its `detail` is a `TaskAdded`. */
+export const TASK_ADDED = 'deictic:task';
+
+/** Tells the page of a task just added: the newest of the element's tasks, as the board answered them. */
+function announce(model: Model, op: Op, target: Target): void {
+  const task = model.tasks.at(-1);
+  if (task === undefined) return;
+  const marks = (op.annotations?.count ?? 0) + (op.screenshots ?? []).reduce((n, shot) => n + (shot.marks?.count ?? 0), 0);
+  const detail: TaskAdded = {
+    id: task.id,
+    title: task.title,
+    state: task.state,
+    channel: model.channel,
+    target,
+    page: op.page,
+    attached: {
+      screenshots: op.screenshots?.length ?? 0,
+      recordings: op.recordings?.length ?? 0,
+      voice: op.voice?.length ?? 0,
+      marks,
+    },
+  };
+  window.dispatchEvent(new CustomEvent(TASK_ADDED, { detail }));
 }
 
 export default defineClientPlugin<Model, Op>({
@@ -423,31 +448,32 @@ export default defineClientPlugin<Model, Op>({
       add.textContent = 'Add task';
       const { element: el, elements } = context;
       try {
-        render(
-          await context.apply({
-            text: text.value,
-            page: location.href,
-            viewport: { width: innerWidth, height: innerHeight },
-            html: el.outerHTML.slice(0, 4000),
-            ...(context.pointed === undefined
-              ? {}
-              : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
-            count: elements.length,
-            ...(screenshots === undefined ? {} : { screenshots }),
-            ...(recordings.length === 0
-              ? {}
-              : {
-                  recordings: recordings.map(({ id, duration, url, voice: clips }) => ({
-                    id,
-                    duration,
-                    replay: new URL(url, location.href).href,
-                    ...(clips === undefined ? {} : { voice: clips.map((c) => c.id) }),
-                  })),
-                }),
-            ...(voices.length === 0 ? {} : { voice: voices.map(({ id, duration }) => ({ id, duration })) }),
-            ...annotationsOf(notes),
-          }),
-        );
+        const op: Op = {
+          text: text.value,
+          page: location.href,
+          viewport: { width: innerWidth, height: innerHeight },
+          html: el.outerHTML.slice(0, 4000),
+          ...(context.pointed === undefined
+            ? {}
+            : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
+          count: elements.length,
+          ...(screenshots === undefined ? {} : { screenshots }),
+          ...(recordings.length === 0
+            ? {}
+            : {
+                recordings: recordings.map(({ id, duration, url, voice: clips }) => ({
+                  id,
+                  duration,
+                  replay: new URL(url, location.href).href,
+                  ...(clips === undefined ? {} : { voice: clips.map((c) => c.id) }),
+                })),
+              }),
+          ...(voices.length === 0 ? {} : { voice: voices.map(({ id, duration }) => ({ id, duration })) }),
+          ...annotationsOf(notes),
+        };
+        const model = await context.apply(op);
+        render(model);
+        announce(model, op, context.target);
         text.value = '';
         reset();
       } catch {

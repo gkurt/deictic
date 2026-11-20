@@ -167,6 +167,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
   `Op.recordings` attaches each one's JSON (and its voice clips) and says how long it ran and where it replays.
+  After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
+  `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached), which the playground lists as a board.
   With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add ./node_modules/deictic`):

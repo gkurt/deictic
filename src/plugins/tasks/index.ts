@@ -86,6 +86,24 @@ export interface Op {
   annotations?: Marks;
 }
 
+/**
+ * A task the Task tab just added, as the page hears of it: the `detail` of a `deictic:task` event on `window`, for a
+ * page that shows its own tasks (deictic's playground lists them as a board does).
+ */
+export interface TaskAdded {
+  id: string;
+  /** The first line of what was typed. */
+  title: string;
+  state: string;
+  channel: string;
+  /** The element: its file, line and column, and its tag. */
+  target: Target;
+  /** The page's URL. */
+  page: string;
+  /** How many of each were attached; `marks` counts those drawn on shots and on the page. */
+  attached: { screenshots: number; recordings: number; voice: number; marks: number };
+}
+
 /** Marks, as a task tells of them: how many, and what the notes among them say. */
 export interface Marks {
   count: number;
