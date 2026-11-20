@@ -7,5 +7,5 @@ import { defineConfig } from 'vite';
 
 // Tasks go to the board BOARD_URL names: `npx vb serve` runs one on this machine.
 export default defineConfig({
-  plugins: [react({ compiler: true }), tailwindcss(), deictic({ plugins: [tasks({ labels: { kind: 'ui' } }), tailwind()] })],
+  plugins: [react({ compiler: true }), tailwindcss(), deictic({ plugins: [tasks(), tailwind()] })],
 });

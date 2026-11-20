@@ -28,7 +28,7 @@ export interface TasksOptions {
   board?: TaskBoard;
   /** The channel tasks go to: `deictic` by default. */
   channel?: string;
-  /** Labels every task gets besides deictic's own: `{ kind: 'ui' }`. */
+  /** Labels every task gets besides deictic's own, for whoever works them to filter by (`vb tail --label`). None by default. */
   labels?: Record<string, string>;
   /**
    * Where the panel links the channel to, for a person to see its tasks. By default the board's own page

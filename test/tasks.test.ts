@@ -23,7 +23,11 @@ const op = {
 
 function setup(channel: string) {
   const p = project({ 'src/App.tsx': 'export const App = () => <h1 className="text-4xl">Pricing</h1>;\n' });
-  const handle = endpoints({ root: p.root, plugins: [tasks({ board: team, channel, labels: { kind: 'ui' } })], open: () => redirect('/') });
+  const handle = endpoints({
+    root: p.root,
+    plugins: [tasks({ board: team, channel, labels: { team: 'web' } })],
+    open: () => redirect('/'),
+  });
   const post = async <T>(route: string, body: unknown = {}) => {
     const res = (await handle(
       new Request(`${ORIGIN}/__deictic/${route}`, {
@@ -46,7 +50,7 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect(json.model.tasks).toEqual([{ id: expect.any(String), title: 'The headline wraps on phones', state: 'ready' }]);
 
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.labels).toEqual({ kind: 'ui', 'deictic.at': 'src/App.tsx:1:26', 'deictic.page': '/pricing', 'board.task': 'ready' });
+  expect(message.labels).toEqual({ team: 'web', 'deictic.at': 'src/App.tsx:1:26', 'deictic.page': '/pricing', 'board.task': 'ready' });
   expect(message.text).toStartWith(op.text);
   expect(message.text).toContain('`src/App.tsx:1:26` · `<h1>`');
   expect(message.text).toContain(`${op.page} at 390×844`);

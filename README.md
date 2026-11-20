@@ -158,12 +158,12 @@ BOARD_URL=http://127.0.0.1:4100/api/board vite # or leave BOARD_URL out for your
 ```
 
 ```ts
-deictic({ plugins: recommended({ tasks: { channel: 'ui', labels: { kind: 'ui' } } }) });
+deictic({ plugins: recommended({ tasks: { channel: 'ui' } }) });
 ```
 
 A task's text is what you typed, then where: the element's `file:line:column` and tag, the page's
 URL and viewport, its opening tag as the source writes it, and its HTML as it rendered. It is
-labeled `deictic.at=<file:line:column>` and `deictic.page=<path>`, and the panel lists the
+labeled `deictic.at=<file:line:column>` and `deictic.page=<path>`, plus any `labels` you pass, and the panel lists the
 tasks about the element you clicked with their state, until its line moves. The channel's name links
 to its page on a board `vb serve` runs; for another board, pass `link: (channel) => url`. Pass `board` to use a
 board of your own making, as `board({ name: 'qa' })` from `@vercel/board` answers it.
