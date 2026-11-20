@@ -57,8 +57,9 @@ npx skills add ./node_modules/deictic
 
 In the Task tab, **Attach** adds a screenshot of the page, **Annotate** opens it to draw boxes, arrows and notes on,
 **Record** records the page as you use it (drawing as you go, with the mic on if you like), and **Voice** records a
-note. Each is a chip that opens in a lightbox. The panel lists the tasks already about the element, and undo
-cancels a task no one has claimed yet. The page hears of each task added as a `deictic:task` event on `window`, its `detail` the task's ID,
+note. Each is a chip that opens in a lightbox. The panel lists the tasks already about the element: each one's ID opens it
+on the board, and one no one has claimed yet can be edited or deleted there (deleting cancels it on the board). Undo
+takes any of it back. The page hears of each task added as a `deictic:task` event on `window`, its `detail` the task's ID,
 title, element and what was attached.
 
 ## Options

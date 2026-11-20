@@ -46,7 +46,9 @@ test('adds a task saying what and where, and lists it on the element', async () 
 
   const { json } = await post<{ model: Model; change: { label: string; files: string[] } }>('apply', { plugin: 'tasks', target, op });
   expect(json.change).toMatchObject({ label: 'tasks src/App.tsx:1: task "The headline wraps on phones"', files: [] });
-  expect(json.model.tasks).toEqual([{ id: expect.any(String), title: 'The headline wraps on phones', state: 'ready' }]);
+  expect(json.model.tasks).toEqual([
+    { id: expect.any(String), title: 'The headline wraps on phones', text: op.text, state: 'ready', open: true },
+  ]);
 
   const { message } = await team.thread(json.model.tasks[0]!.id);
   expect(message.labels).toEqual({
@@ -127,6 +129,75 @@ test('refuses to undo a task someone has claimed', async () => {
   expect(undo.json.problem).toMatch(/^task \d+ is claimed by .+ now: cancel it on the board if you still mean to$/);
 });
 
+test("edits a task's words, keeping what follows them, and undo puts them back", async () => {
+  const { post, target } = setup('edit');
+  const pointed = { path: 'span.icon', html: '<span class="icon"></span>' };
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, pointed } });
+  const { id } = json.model.tasks[0]!;
+  const before = (await team.thread(id)).message.text;
+
+  const edited = await post<{ model: Model; change: { label: string } }>('apply', {
+    plugin: 'tasks',
+    target,
+    op: { edit: id, text: 'Keep the headline on one line' },
+  });
+  expect(edited.json.change.label).toBe('tasks src/App.tsx:1: edit task "The headline wraps on phones"');
+  expect(edited.json.model.tasks[0]).toMatchObject({ id, title: 'Keep the headline on one line', text: 'Keep the headline on one line' });
+  expect((await team.thread(id)).message.text).toBe(`Keep the headline on one line${before.slice(op.text.length)}`);
+
+  await post('undo');
+  expect((await team.thread(id)).message.text).toBe(before);
+  await post('redo');
+  expect((await team.thread(id)).message.text).toStartWith('Keep the headline on one line\n---\n');
+
+  // Edited on the board since: an undo would write over that, so it's refused.
+  await team.edit(id, 'Changed on the board');
+  expect((await post('undo')).json.problem).toBe(`task ${id} has been edited since: change it on the board`);
+  expect((await post('apply', { plugin: 'tasks', target, op: { edit: id, text: ' ' } })).json.problem).toBe('say what should change first');
+});
+
+test('deletes a task by canceling it, and undo adds it again, as a new one', async () => {
+  const { post, target } = setup('remove');
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
+  const { id } = json.model.tasks[0]!;
+
+  const removed = await post<{ model: Model; change: { label: string } }>('apply', { plugin: 'tasks', target, op: { remove: id } });
+  expect(removed.json.change.label).toBe('tasks src/App.tsx:1: delete task "The headline wraps on phones"');
+  expect(removed.json.model.tasks).toEqual([]);
+  expect((await team.thread(id)).message.task?.state).toBe('canceled');
+
+  // A board cancels for good, so what comes back is the same task under a new ID, which a redo cancels.
+  await post('undo');
+  const [again] = (await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks;
+  expect(again).toMatchObject({ title: 'The headline wraps on phones', open: true });
+  expect(again!.id).not.toBe(id);
+  const { message } = await team.thread(again!.id);
+  expect(message.labels).toMatchObject({ team: 'web', 'deictic.at': 'src/App.tsx:1:26', 'board.task': 'ready' });
+  await post('redo');
+  expect((await team.thread(again!.id)).message.task?.state).toBe('canceled');
+});
+
+test("changes only an open task of the channel's own", async () => {
+  const { post, target } = setup('own');
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
+  const { id } = json.model.tasks[0]!;
+  const other = (await team.tasks.create('elsewhere', 'Not one of ours')).task.id;
+  for (const change of [{ remove: other }, { edit: other, text: 'x' }]) {
+    expect((await post('apply', { plugin: 'tasks', target, op: change })).json.problem).toBe(
+      `#${other} isn't a task of deictic's in #own: reload the page for the ones that are`,
+    );
+  }
+
+  await team.tasks.claim(id);
+  expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks[0]).toMatchObject({ open: false });
+  expect((await post('apply', { plugin: 'tasks', target, op: { remove: id } })).json.problem).toMatch(
+    / is claimed by .+ now: cancel it on the board/,
+  );
+  expect((await post('apply', { plugin: 'tasks', target, op: { edit: id, text: 'x' } })).json.problem).toMatch(
+    / now: edit it on the board/,
+  );
+});
+
 test('refuses an empty task, and says how to reach a board when there is none', async () => {
   const { post, target } = setup('empty');
   expect((await post('apply', { plugin: 'tasks', target, op: { ...op, text: '  ' } })).json.problem).toBe('say what should change first');
@@ -149,6 +220,7 @@ test("links the channel to a local board's page, to the page `link` names, or no
   const at = (url: string) => ({
     tasks: team.tasks,
     thread: team.thread,
+    edit: team.edit,
     upload: (input: Parameters<typeof team.upload>[0]) => team.upload(input),
     discovery: async () => ({ ...(await team.discovery()), url }),
   });
@@ -169,4 +241,26 @@ test("links the channel to a local board's page, to the page `link` names, or no
   expect(await linkFor({ board: at('http://127.0.0.1:4100/api/board'), link: (c) => `https://boards.test/${c}` })).toBe(
     'https://boards.test/ui/home',
   );
+
+  // Each task's ID links to its thread there, or to what `link` says of it.
+  const linksOf = async (options: Parameters<typeof tasks>[0]) => {
+    const p = project({ 'src/App.tsx': 'export const App = () => <h1>x</h1>;\n' });
+    const handle = endpoints({ root: p.root, plugins: [tasks({ channel: 'ui/links', ...options })], open: () => redirect('/') });
+    const res = (await handle(
+      new Request(`${ORIGIN}/__deictic/apply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: ORIGIN },
+        body: JSON.stringify({ plugin: 'tasks', target: p.target('src/App.tsx', 'h1'), op }),
+      }),
+    ))!;
+    return ((await res.json()) as { model: Model }).model.tasks.at(-1)!;
+  };
+  const local = await linksOf({ board: at('http://127.0.0.1:4100/api/board') });
+  expect(local.link).toBe(`http://127.0.0.1:4100/c/ui/links?thread=${local.id}`);
+  expect((await linksOf({ board: at('https://board.example.com/api/board') })).link).toBeUndefined();
+  const named = await linksOf({
+    board: at('https://board.example.com/api/board'),
+    link: (c, id) => `https://boards.test/${c}/${id ?? ''}`,
+  });
+  expect(named.link).toBe(`https://boards.test/ui/links/${named.id}`);
 });

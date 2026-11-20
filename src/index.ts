@@ -122,8 +122,11 @@ export interface ServerPlugin<Model = unknown, Op = unknown, Record = unknown, A
   read?(source: Source, target: Target): Maybe<Model>;
   /** Text edits for deictic to write, or a change the plugin made itself. */
   apply?(source: Source, target: Target, op: Op): Maybe<TextEdit[] | Done<Record>>;
-  /** Takes back a change `apply` made itself, or throws a `Refusal` saying why it can't any more. */
-  undo?(record: Record): Maybe<void>;
+  /**
+   * Takes back a change `apply` made itself, or throws a `Refusal` saying why it can't any more. It may
+   * answer what the next redo needs, where that differs (what it put back has a new ID).
+   */
+  undo?(record: Record): Maybe<void | Record>;
   /** Makes it again after an undo, and answers what the next undo needs, which may differ (a new ID). */
   redo?(record: Record): Maybe<Record>;
   /** Says what an op does, for the history: `className: px-2 → px-4`. */

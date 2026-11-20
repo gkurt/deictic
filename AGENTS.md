@@ -56,7 +56,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/tools/history.ts`: every change as each file's whole text before and after, or as a plugin's
   name and record, in `.deictic/history.json`. Undo and redo refuse when a file isn't
   as the change left it, and call the plugin for its own (refusing when it isn't loaded). A redone
-  record is replaced by what `redo` answers. A new change drops the redo stack.
+  record is replaced by what `redo` answers, and an undone one by what `undo` does, where it answers one. A new change drops the redo stack.
 - `src/tools/endpoints.ts`: `/__deictic/{read,apply,undo,redo}` (same-origin JSON POSTs only),
   `history` and `open` (GET), and each plugin's `routes` under `plugins/<name>/<route>` (anything but
   GET and HEAD from the page's origin only, in any content type), over `Request` and `Response`;
@@ -158,8 +158,14 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
   or the root's `package.json`, `at`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
   the user's own `labels`; the source and the rendered HTML aren't sent. `read` lists the element's tasks by that label, and the channel's page
-  (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`). Undo cancels the task
-  unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `client.ts` is the Task tab. With
+  (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`), each task with its own
+  (`?thread=<id>` there, or `link(channel, id)`), its whole typed text and whether it's `open`. Undo cancels the task
+  unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` takes a `Change`: a new task (`Op`),
+  `{ edit: id, text }` (the words before the `---`, with the message's revision, undone by writing the old text back
+  unless it was edited since) or `{ remove: id }` (canceled, which a board never reopens, so the record keeps the task
+  whole and undo adds it again under a new ID). Both only for an open task of the channel's with `deictic.at`.
+  `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
+  `data-deictic-modal` so Esc is its) and Delete. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. With annotations

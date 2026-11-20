@@ -21,7 +21,7 @@ import type { Box } from '#src/plugins/screenshots/index.ts';
 import type { Clips } from '#src/plugins/voice/index.ts';
 
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload'>;
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit'>;
 
 export interface TasksOptions {
   /**
@@ -39,11 +39,12 @@ export interface TasksOptions {
   /** Labels every task gets besides deictic's own, for whoever works them to filter by (`vb tail --label`). None by default. */
   labels?: Record<string, string>;
   /**
-   * Where the panel links the channel to, for a person to see its tasks. By default the board's own page
-   * when it's one `vb serve` runs on this machine (`http://127.0.0.1:4100/c/deictic`), and none for
-   * another board, whose pages deictic can't know.
+   * Where the panel links the channel to, for a person to see its tasks, and with `task`, where it links
+   * that task's ID to. By default the board's own pages when it's one `vb serve` runs on this machine
+   * (`http://127.0.0.1:4100/c/deictic`, and `?thread=<id>` on it), and none for another board, whose pages
+   * deictic can't know.
    */
-  link?: (channel: string) => string | undefined;
+  link?: (channel: string, task?: string) => string | undefined;
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
   shortcut?: Shortcut;
 }
@@ -52,7 +53,13 @@ export interface Task {
   id: string;
   /** The first line of what was typed. */
   title: string;
+  /** What was typed, whole: what an edit changes. */
+  text: string;
   state: string;
+  /** Whether it can still be edited or deleted: no one has claimed it. */
+  open: boolean;
+  /** Its page on the board, when there's one to link to. */
+  link?: string;
 }
 
 export interface Model {
@@ -63,7 +70,13 @@ export interface Model {
   tasks: Task[];
 }
 
-/** What the page knows and the source doesn't. */
+/**
+ * What the Task tab asks for: a new task (an `Op`), other words for one it lists (`edit` is its ID), or
+ * that one deleted (`remove` is its ID), which cancels it on the board.
+ */
+export type Change = Op | { edit: string; text: string } | { remove: string };
+
+/** A new task: what the page knows and the source doesn't. */
 export interface Op {
   text: string;
   /** The page's URL. */
@@ -125,7 +138,28 @@ export interface Added {
   attachments?: string[];
 }
 
+/** A task's words changed: its message's whole text before and after. */
+export interface Edited {
+  kind: 'edited';
+  id: string;
+  before: string;
+  after: string;
+}
+
+/**
+ * A task deleted in the panel: canceled on the board, for good, as a board has it. So it's kept whole, and
+ * an undo adds it again, as a new task whose ID the record then has.
+ */
+export interface Removed extends Added {
+  kind: 'removed';
+}
+
+/** What the history keeps of a change: a task added has no `kind`, as it had none before there were others. */
+export type Kept = Added | Edited | Removed;
+
 const AT = 'deictic.at';
+/** What parts what was typed from the rest of a task's text. */
+const REST = '\n---\n';
 const OPEN = new Set(['waiting', 'ready', 'blocked']);
 
 export function tasks(options: TasksOptions = {}) {
@@ -140,6 +174,41 @@ export function tasks(options: TasksOptions = {}) {
       link = undefined;
       return undefined;
     }));
+  /** A task's page: what `link` says, or its thread on the channel's own page on this machine. */
+  const taskLink = (page: string | undefined, id: string) =>
+    options.link ? options.link(channel, id) : page === undefined ? undefined : `${page}?thread=${encodeURIComponent(id)}`;
+  /**
+   * One of this channel's tasks about an element, while it's still open: the page names it by ID, so
+   * nothing else on the board is its to change, nor a task someone has taken up.
+   */
+  const openTask = async (team: TaskBoard, id: string, verb: string) => {
+    const { message } = await team.thread(id);
+    if (message.channel !== channel || message.labels[AT] === undefined)
+      throw new Refusal(`#${id} isn't a task of deictic's in #${channel}: reload the page for the ones that are`);
+
+    const { task } = message;
+    if (task !== undefined && !OPEN.has(task.state)) {
+      throw new Refusal(
+        `task ${id} is ${task.state}${task.claim ? ` by ${task.claim.actor}` : ''} now: ${verb} it on the board if you still mean to`,
+      );
+    }
+    return message;
+  };
+  /** Cancels an open task of ours, and answers it as it was. */
+  const cancel = async (id: string, reason: string) => {
+    const team = await boardOf();
+    const message = await openTask(team, id, 'cancel');
+    await team.tasks.cancel(id, reason);
+    return message;
+  };
+  /** Puts a task's text from one to the other, unless it reads as neither any more. */
+  const rewrite = async (id: string, from: string, to: string) => {
+    const team = await boardOf();
+    const message = await openTask(team, id, 'edit');
+    if (message.text === to) return;
+    if (message.text !== from) throw new Refusal(`task ${id} has been edited since: change it on the board`);
+    await team.edit(id, to, { revision: message.revision });
+  };
   const create = async (record: Omit<Added, 'id'>): Promise<Added> => {
     const { task } = await (
       await boardOf()
@@ -179,7 +248,7 @@ export function tasks(options: TasksOptions = {}) {
     return Promise.all(files.map(async (file) => (await team.upload(file)).id));
   };
 
-  return definePlugin<Model, Op, Added>({
+  return definePlugin<Model, Change, Kept>({
     name: 'tasks',
     client: 'deictic/tasks/client',
     shortcut: options.shortcut,
@@ -197,12 +266,44 @@ export function tasks(options: TasksOptions = {}) {
           channel,
           ...(page === undefined ? {} : { link: page }),
           tasks: found
-            .map(({ message }) => ({ id: message.id, title: message.text.split('\n', 1)[0]!, state: message.task?.state ?? 'ready' }))
+            .map(({ message }) => {
+              const text = message.text.split(REST, 1)[0]!;
+              const state = message.task?.state ?? 'ready';
+              const to = taskLink(page, message.id);
+              return {
+                id: message.id,
+                title: text.split('\n', 1)[0]!,
+                text,
+                state,
+                open: OPEN.has(state),
+                ...(to === undefined ? {} : { link: to }),
+              };
+            })
             .filter((t) => t.state !== 'canceled'),
         };
       }),
     apply: (source, target, op) => {
+      if ('remove' in op) {
+        return asked(async () => {
+          const message = await cancel(op.remove, 'deleted in deictic');
+          // The board's own labels (`board.task`) are its to set on the task an undo adds.
+          const labels = Object.fromEntries(Object.entries(message.labels).filter(([key]) => !key.startsWith('board.')));
+          const attachments = message.attachments.map((a) => a.id);
+          const kept = { channel, id: op.remove, text: message.text, labels, ...(attachments.length === 0 ? {} : { attachments }) };
+          return { done: { kind: 'removed' as const, ...kept } };
+        });
+      }
       if (op.text.trim() === '') throw new Refusal('say what should change first');
+      if ('edit' in op) {
+        return asked(async () => {
+          const before = (await openTask(await boardOf(), op.edit, 'edit')).text;
+          // What follows the words (what's attached, what was pointed at) stays as it was.
+          const rest = before.includes(REST) ? before.slice(before.indexOf(REST)) : '';
+          const after = clip(op.text.trim(), 10_000 - rest.length) + rest;
+          await rewrite(op.edit, before, after);
+          return { done: { kind: 'edited' as const, id: op.edit, before, after } };
+        });
+      }
       const labels = {
         ...options.labels,
         ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
@@ -215,19 +316,38 @@ export function tasks(options: TasksOptions = {}) {
         };
       });
     },
-    undo: ({ id }) =>
+    undo: (record) =>
       asked(async () => {
-        const team = await boardOf();
-        const { task } = (await team.thread(id)).message;
-        if (task !== undefined && !OPEN.has(task.state)) {
-          throw new Refusal(
-            `task ${id} is ${task.state}${task.claim ? ` by ${task.claim.actor}` : ''} now: cancel it on the board if you still mean to`,
-          );
+        if (!('kind' in record)) {
+          await cancel(record.id, 'undone in deictic');
+          return undefined;
         }
-        await team.tasks.cancel(id, 'undone in deictic');
+        if (record.kind === 'edited') {
+          await rewrite(record.id, record.after, record.before);
+          return undefined;
+        }
+        const { kind, id: _, ...task } = record;
+        return { kind, ...(await create(task)) };
       }),
-    redo: ({ id: _, ...record }) => asked(() => create(record)),
-    describe: ({ text }) => `task "${clip(text.trim().split('\n', 1)[0]!, 60)}"`,
+    redo: (record) =>
+      asked(async () => {
+        if (!('kind' in record)) {
+          const { id: _, ...added } = record;
+          return create(added);
+        }
+        if (record.kind === 'edited') {
+          await rewrite(record.id, record.before, record.after);
+          return record;
+        }
+        await cancel(record.id, 'deleted in deictic');
+        return record;
+      }),
+    describe: (op, before) => {
+      const named = (id: string) => `task "${clip(before.tasks.find((t) => t.id === id)?.title ?? `#${id}`, 60)}"`;
+      if ('remove' in op) return `delete ${named(op.remove)}`;
+      if ('edit' in op) return `edit ${named(op.edit)}`;
+      return `task "${clip(op.text.trim().split('\n', 1)[0]!, 60)}"`;
+    },
   });
 }
 
@@ -351,7 +471,7 @@ function textOf(op: Op): string {
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
-  const tail = more.length === 0 ? '' : ['', '---', ...more].join('\n');
+  const tail = more.length === 0 ? '' : REST + more.join('\n');
   return clip(op.text.trim(), 10_000 - tail.length) + tail;
 }
 

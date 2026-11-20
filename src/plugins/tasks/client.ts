@@ -1,5 +1,7 @@
 /**
- * The tasks panel: the tasks already about this element and their state, and a field to add one.
+ * The tasks panel: the tasks already about this element and their state, and a field to add one. Each
+ * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
+ * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
  * the source can't tell; and where the annotations plugin is loaded, what's marked on the page.
  *
@@ -22,7 +24,7 @@ import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
-import type { Marks, Model, Op, TaskAdded } from './index.ts';
+import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
 
 const STYLE = `
 .tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
@@ -31,6 +33,14 @@ const STYLE = `
 .tasks .state { font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
 .tasks .state.completed { color: #4ade80; }
 .tasks .state.failed { color: var(--deictic-problem); }
+.tasks a { color: inherit; text-decoration: none; }
+.tasks a:hover { text-decoration: underline; }
+.tasks .act { align-self: center; display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
+.tasks .act:hover { color: var(--deictic-fg); }
+.tasks .act svg { width: 12px; height: 12px; }
+.tasks li.editing { display: grid; }
+.tasks li.editing .row { margin-top: 0; }
+.tasks li.editing .actions { display: flex; gap: 6px; }
 textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-serif; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; align-items: center; }
 .hint { color: var(--deictic-muted); font-size: 12px; }
@@ -56,6 +66,10 @@ textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-se
 .shot[hidden], .chips[hidden], label[hidden] { display: none; }
 `;
 
+const ICON = (path: string) =>
+  `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`;
+const EDIT = ICON('M4 20h4L19 9l-4-4L4 16z');
+const DELETE = ICON('M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13');
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
 
 /** Marks as a task tells of them: how many, and what the notes say. */
@@ -152,7 +166,7 @@ function announce(model: Model, op: Op, target: Target): void {
   window.dispatchEvent(new CustomEvent(TASK_ADDED, { detail }));
 }
 
-export default defineClientPlugin<Model, Op>({
+export default defineClientPlugin<Model, Change>({
   name: 'tasks',
   label: 'Task',
   mount: (panel, context) => {
@@ -388,7 +402,59 @@ export default defineClientPlugin<Model, Op>({
     };
     speak.addEventListener('click', () => void (take === undefined ? speakOn() : speakOff()));
 
-    const render = ({ channel, link, tasks }: Model) => {
+    // The task whose words are open to change, by ID, and the tasks as last read.
+    let editing: string | undefined;
+    let shown = context.model;
+    /** Asks for a change to a listed task and shows the tasks as they are after; the panel's status says why not. */
+    const change = async (op: Change) => {
+      try {
+        editing = undefined;
+        render(await context.apply(op));
+      } catch {
+        render(shown);
+      }
+    };
+    /** A task's words in a field of their own: Save or Ctrl+Enter keeps them, Cancel or Esc leaves them. */
+    const editor = (t: Task) => {
+      // Marked a modal while it's open, so Esc is its and not the popup's.
+      const item = element('li', { className: 'editing' });
+      item.dataset['deicticModal'] = '';
+      const field = element('textarea', { value: t.text });
+      const save = element('button', { type: 'button', className: 'primary', textContent: 'Save' });
+      const leave = element('button', { type: 'button', textContent: 'Cancel' });
+      const buttons = element('div', { className: 'row' });
+      const right = element('span', { className: 'actions' });
+      right.append(leave, save);
+      buttons.append(element('code', { textContent: `#${t.id}` }), right);
+      item.append(field, buttons);
+      const done = () => {
+        editing = undefined;
+        render(shown);
+      };
+      const keep = () => {
+        if (field.value.trim() === '') return;
+        if (field.value.trim() === t.text) return done();
+        save.disabled = true;
+        void change({ edit: t.id, text: field.value });
+      };
+      field.addEventListener('input', () => (save.disabled = field.value.trim() === ''));
+      field.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          done();
+        }
+        if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        keep();
+      });
+      save.addEventListener('click', keep);
+      leave.addEventListener('click', done);
+      queueMicrotask(() => field.focus());
+      return item;
+    };
+    const render = (model: Model) => {
+      shown = model;
+      const { channel, link, tasks } = model;
       const name =
         link === undefined
           ? element('span')
@@ -397,13 +463,30 @@ export default defineClientPlugin<Model, Op>({
       hint.replaceChildren('to ', name);
       list.replaceChildren(
         ...tasks.map((t) => {
+          if (t.id === editing && t.open) return editor(t);
           const item = element('li');
+          const id = element('code', { textContent: `#${t.id}` });
           const title = element('span', { className: 'title', textContent: t.title, title: t.title });
-          item.append(
-            element('code', { textContent: `#${t.id}` }),
-            title,
-            element('span', { className: `state ${t.state}`, textContent: t.state }),
-          );
+          const state = element('span', { className: `state ${t.state}`, textContent: t.state });
+          if (t.link === undefined) {
+            item.append(id, title, state);
+          } else {
+            const to = element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
+            to.append(id);
+            item.append(to, title, state);
+          }
+          if (!t.open) return item;
+          const edit = element('button', { type: 'button', className: 'act', innerHTML: EDIT, title: 'Edit the task' });
+          edit.addEventListener('click', () => {
+            editing = t.id;
+            render(shown);
+          });
+          const remove = element('button', { type: 'button', className: 'act', innerHTML: DELETE, title: 'Delete the task' });
+          remove.addEventListener('click', () => {
+            remove.disabled = true;
+            void change({ remove: t.id });
+          });
+          item.append(edit, remove);
           return item;
         }),
       );

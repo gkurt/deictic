@@ -91,7 +91,7 @@ export class History {
     const change = this.#done.at(-1);
     if (change === undefined) throw new Refusal('nothing to undo');
     if ('files' in change) this.#put(change, 'after', 'before');
-    else await this.#pluginOf(change, 'undo').undo!(change.record);
+    else change.record = (await this.#pluginOf(change, 'undo').undo!(change.record)) ?? change.record;
     this.#done.pop();
     this.#undone.push(change);
     this.#save();
