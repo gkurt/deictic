@@ -289,6 +289,7 @@ export default defineClientPlugin<Model, Change>({
         ...(attached && shots !== undefined && notes !== undefined ? [another] : []),
         ...(attached ? more() : []),
       );
+      mark();
     };
     const dropShot = (c: Chip) => {
       URL.revokeObjectURL(c.url);
@@ -380,6 +381,7 @@ export default defineClientPlugin<Model, Change>({
       speak.title = 'Stop, and attach it';
       tick();
       ticking = setInterval(tick, 250);
+      mark();
     };
     const speakOff = async () => {
       const ending = take;
@@ -404,6 +406,10 @@ export default defineClientPlugin<Model, Change>({
 
     // The task whose words are open to change, by ID, and the tasks as last read.
     let editing: string | undefined;
+    // The Save of a listed task whose words were changed and not kept yet.
+    let edited: HTMLElement | undefined;
+    /** Tells the popup what leaving now would lose: a listed task's changed words, or a new one's, typed, attached or being spoken. */
+    const mark = () => context.unsaved(edited ?? (text.value.trim() !== '' || attachedCount() > 0 || take !== undefined ? add : undefined));
     let shown = context.model;
     /** Asks for a change to a listed task and shows the tasks as they are after; the panel's status says why not. */
     const change = async (op: Change) => {
@@ -437,7 +443,11 @@ export default defineClientPlugin<Model, Change>({
         save.disabled = true;
         void change({ edit: t.id, text: field.value });
       };
-      field.addEventListener('input', () => (save.disabled = field.value.trim() === ''));
+      field.addEventListener('input', () => {
+        save.disabled = field.value.trim() === '';
+        edited = field.value.trim() === t.text ? undefined : save;
+        mark();
+      });
       field.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
@@ -454,6 +464,8 @@ export default defineClientPlugin<Model, Change>({
     };
     const render = (model: Model) => {
       shown = model;
+      // A task being changed is drawn again with its words as they were.
+      edited = undefined;
       const { channel, link, tasks } = model;
       const name =
         link === undefined
@@ -491,6 +503,7 @@ export default defineClientPlugin<Model, Change>({
         }),
       );
       add.disabled = text.value.trim() === '';
+      mark();
     };
 
     /** The shots to attach: each chip's PNG, kept as a shot, or a shot taken now where the box is ticked. */
@@ -576,7 +589,10 @@ export default defineClientPlugin<Model, Change>({
       if (back.problem !== undefined) problem.textContent = back.problem;
     }
 
-    text.addEventListener('input', () => (add.disabled = text.value.trim() === ''));
+    text.addEventListener('input', () => {
+      add.disabled = text.value.trim() === '';
+      mark();
+    });
     text.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();

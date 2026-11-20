@@ -210,7 +210,13 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
     }
   }
   const tabs: Tab[] = given.flatMap(({ plugin }) => (plugin.mount === undefined ? [] : [{ plugin, mount: plugin.mount }]));
-  started = { base, contextOf, tabs, open: (element, tab) => tabs.length > 0 && openAt(tab ?? last().plugin.name, element) };
+  started = {
+    base,
+    contextOf,
+    tabs,
+    // Not over a popup holding something unsaved: the press that asked shook its button (`openPanel`).
+    open: (element, tab) => tabs.length > 0 && panel?.unsaved() !== true && openAt(tab ?? last().plugin.name, element),
+  };
   const last = () => {
     let name: string | null = null;
     try {
@@ -242,7 +248,7 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
 
   let pointer: { x: number; y: number } | undefined;
   let frame = 0;
-  let panel: { close: () => void } | undefined;
+  let panel: { close: () => void; unsaved: () => boolean } | undefined;
 
   /** The plugins whose keys are held: several, where they share keys and differ by button. */
   const heldBy = (e: MouseEvent | KeyboardEvent) => plugins.filter((p) => p.gesture.held(e));
@@ -333,6 +339,8 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
     e.stopPropagation();
     if (opened === press) return;
     opened = press;
+    // Still open after this press's pointerdown, outside it: it holds something unsaved, and shook its button.
+    if (panel?.unsaved() === true) return;
     openTab(found.tab(), hit.el, target, undefined, hit.pointed);
   };
   const openTab = (tab: Tab, el: Element, target: Target, resumed?: Resumed, pointed?: Element) => {
@@ -408,7 +416,7 @@ function openPanel({
   onClose,
   resumed: coming,
   reopen,
-}: PanelOptions): { close: () => void } {
+}: PanelOptions): { close: () => void; unsaved: () => boolean } {
   // Given to the first tab's first mount only: another tab, or a remount after an undo, starts afresh.
   let resumed = coming;
   const panel = div('panel');
@@ -453,10 +461,12 @@ function openPanel({
   panel.append(head, bar, body, status);
   root.append(panel);
   if (pinned) panel.classList.add('pinned');
-  const release = pinned ? undefined : keepInView(panel, body, element.getBoundingClientRect());
+  const release = pinned ? undefined : keepInView(panel, body, head, element);
   const unmark = pinned ? undefined : outline(root, element);
 
   let cleanup: (() => void) | void;
+  // The button that keeps what the shown tab would lose, while there's something: `unsaved`, from the panel.
+  let holding: HTMLElement | undefined;
   const say = (text: string, problem = false) => {
     status.textContent = text;
     status.classList.toggle('problem', problem);
@@ -474,6 +484,7 @@ function openPanel({
   const unmount = () => {
     cleanup?.();
     cleanup = undefined;
+    holding = undefined;
     body.replaceChildren();
   };
   // The change undone may be this tab's from before the panel opened: the panel reads its model again.
@@ -516,6 +527,7 @@ function openPanel({
     unmark?.();
     panel.remove();
     window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('pointerdown', onOutside, true);
     onClose(current, leaving);
   };
   const onKey = (e: KeyboardEvent) => {
@@ -526,7 +538,17 @@ function openPanel({
     e.stopPropagation();
     done();
   };
-  if (!pinned) window.addEventListener('keydown', onKey, true);
+  // A press on the page closes the popup, as it would a menu, unless that loses something: then the button that
+  // keeps it shakes. Anything in the overlay is the popup's own: a modal, the lightbox, the surface marks are drawn on.
+  const onOutside = (e: PointerEvent) => {
+    if (e.composedPath().includes(root.host)) return;
+    if (holding === undefined) return done();
+    shake(holding);
+  };
+  if (!pinned) {
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onOutside, true);
+  }
   undo.addEventListener('click', () => void step('undo'));
   redo.addEventListener('click', () => void step('redo'));
   close.addEventListener('click', () => done());
@@ -588,6 +610,9 @@ function openPanel({
         }
       },
       close: () => done(),
+      unsaved: (action) => {
+        if (read === reads) holding = action;
+      },
     });
   };
   const show = (tab: Tab) => {
@@ -598,7 +623,14 @@ function openPanel({
     void load();
   };
   show(first);
-  return { close: done };
+  return { close: done, unsaved: () => holding !== undefined };
+}
+
+/** Shakes a panel's button, in view: what a press outside does where closing would lose something. A blink where motion is reduced. */
+function shake(el: HTMLElement): void {
+  el.scrollIntoView({ block: 'nearest' });
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return void el.animate({ opacity: [1, 0.3, 1, 0.3, 1] }, 400);
+  el.animate({ translate: ['0', '-5px', '5px', '-4px', '4px', '-2px', '0'] }, { duration: 360, easing: 'ease-out' });
 }
 
 /** Puts an outline over `r`. */
@@ -636,14 +668,21 @@ const MARGIN = 8;
 // Under this much room on either side, the panel overlaps the element rather than shrink to a sliver beside it.
 const LEAST = 160;
 
+/** How far a press on the head moves, in pixels, before it's a drag: a click there leaves the popup following. */
+const SLACK = 3;
+
 /**
- * Keeps a panel beside `r` (the element as it was clicked) and inside the viewport, as its tabs fill it and the
- * window resizes: below, or above where it fits better, its height capped to the room there, so the body scrolls
- * rather than the panel leaving the window. Fixed, so it never changes the page's own scrolling. Answers a release.
+ * Keeps a panel beside `element` and inside the viewport, as its tabs fill it, the window resizes and the element
+ * moves with the page: below, or above where it fits better, its height capped to the room there, so the body
+ * scrolls rather than the panel leaving the window. Dragged by `handle`, it stays where it's put, in the window,
+ * and follows the element no more. Fixed, so it never changes the page's own scrolling. Answers a release.
  */
-function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => void {
+function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, element: Element): () => void {
   let frame = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Where the element was last seen: one gone from the page leaves the popup where it was.
+  let r = element.getBoundingClientRect();
+  let moved: { left: number; top: number } | undefined;
   const fit = () => {
     cancelAnimationFrame(frame);
     clearTimeout(timer);
@@ -654,6 +693,15 @@ function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => vo
     const height = document.documentElement.clientHeight;
     // What the panel would take with no cap: its frame, and all of its body.
     const wanted = panel.offsetHeight - body.clientHeight + body.scrollHeight;
+    if (moved !== undefined) {
+      const room = Math.max(0, height - 2 * MARGIN);
+      Object.assign(panel.style, {
+        left: `${Math.max(MARGIN, Math.min(moved.left, width - MARGIN - panel.offsetWidth))}px`,
+        top: `${Math.max(MARGIN, Math.min(moved.top, height - MARGIN - Math.min(wanted, room)))}px`,
+        maxHeight: `${room}px`,
+      });
+      return;
+    }
     const top = Math.min(Math.max(r.top, 0), height);
     const bottom = Math.min(Math.max(r.bottom, 0), height);
     const below = height - bottom - 2 * MARGIN;
@@ -685,6 +733,43 @@ function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => vo
     timer ??= setTimeout(fit, 50);
   };
   fit();
+  // Read each frame, as nothing tells of an element moving: the page scrolls, its layout shifts, a panel previews.
+  let watching = requestAnimationFrame(function watch() {
+    if (moved !== undefined) return;
+    watching = requestAnimationFrame(watch);
+    if (!element.isConnected) return;
+    const now = element.getBoundingClientRect();
+    if (now.left === r.left && now.top === r.top && now.width === r.width && now.height === r.height) return;
+    r = now;
+    fit();
+  });
+  // A drag starts on the head itself, not on a tab or the close in it.
+  let from: { x: number; y: number; left: number; top: number } | undefined;
+  const down = (e: PointerEvent) => {
+    if (e.button !== 0 || (e.target as Element).closest('button') !== null) return;
+    // Kept from the browser: no text selected along the way, and the field being typed in keeps its focus.
+    e.preventDefault();
+    const at = panel.getBoundingClientRect();
+    from = { x: e.clientX, y: e.clientY, left: at.left, top: at.top };
+    handle.setPointerCapture(e.pointerId);
+  };
+  const move = (e: PointerEvent) => {
+    if (from === undefined) return;
+    const x = e.clientX - from.x;
+    const y = e.clientY - from.y;
+    if (moved === undefined && Math.hypot(x, y) < SLACK) return;
+    moved = { left: from.left + x, top: from.top + y };
+    panel.classList.add('dragging');
+    fit();
+  };
+  const up = () => {
+    from = undefined;
+    panel.classList.remove('dragging');
+  };
+  handle.addEventListener('pointerdown', down);
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', up);
+  handle.addEventListener('pointercancel', up);
   // A tab's content arrives after the panel opens, and changes as it's used, as does the status line. Both, as a
   // resize observer reports only while the page renders: a hidden tab's popup would keep its first place.
   const resized = new ResizeObserver(later);
@@ -694,6 +779,7 @@ function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => vo
   window.addEventListener('resize', later);
   return () => {
     cancelAnimationFrame(frame);
+    cancelAnimationFrame(watching);
     clearTimeout(timer);
     resized.disconnect();
     changed.disconnect();

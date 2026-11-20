@@ -71,6 +71,7 @@ export default defineClientPlugin<Model, Op>({
 
     const preview = () => {
       save.disabled = !unsaved();
+      context.unsaved(unsaved() ? save : undefined);
       if (!unsaved() && !previewed) return;
       context.elements.forEach((el, i) => el.setAttribute('class', [...draft, ...runtime[i]!].join(' ')));
       previewed = true;

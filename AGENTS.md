@@ -32,7 +32,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `name`, sharing a `Model` and an `Op`. `ServerContext`/`ClientContext` carry `use(name)`, another
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes, and
-  `open(plugin, element)` to open the popup at a tab. A panel's context has `away(state, task)`: close, run
+  `open(plugin, element)` to open the popup at a tab. A panel's context has `unsaved(action)`: the button that keeps
+  what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). `Refusal` is an op
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
@@ -107,7 +108,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
   tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. While it's open over the page its element
   stays outlined (`.box.on`, no fill, followed each frame), keys typed in it stop at the host, so the page's own
-  shortcuts don't run on them, and its Esc is kept from the page. The popup's head is the tabs and
+  shortcuts don't run on them, and its Esc is kept from the page. It follows its element as the page moves it
+  (`keepInView`, read each frame) until it's dragged by its head, and then stays where it's put, in the window. A press on the page outside it closes it, unless the shown panel
+  said `unsaved`: then its button shakes, the popup stays, and no shortcut or `openPopup` opens another over it
+  (Esc and close still close it). The popup's head is the tabs and
   close, then open-in-editor (an arrow out, and an "Open in editor" tooltip), undo and redo, which are the shown tab's on this element (off when its `history` has nothing to take back or do again, titled with the change they would; read as a tab shows, after a change, and on pointerenter); a tab reads its model when shown (a read another overtook
   mounts nothing; the body keeps its height meanwhile, and "Reading…" shows only for a slow one), and after an undo or redo it remounts with the model read again. While an element marked
   `data-deictic-modal` is in the root, Esc is that modal's, not the popup's. Pointing goes down through open

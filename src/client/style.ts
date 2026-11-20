@@ -69,6 +69,9 @@ export const STYLE = `
   gap: 2px;
   padding: 4px 8px 0;
 }
+/* Over the page the head is what the popup is dragged by; no touch scrolling starts there. */
+.panel:not(.pinned) .head { cursor: grab; touch-action: none; user-select: none; }
+.panel.dragging .head, .panel.dragging .head button { cursor: grabbing; }
 .head .tab {
   border: 0;
   border-bottom: 2px solid transparent;

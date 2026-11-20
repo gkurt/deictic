@@ -198,6 +198,12 @@ export interface PanelContext<Model, Op> extends ClientContext {
   apply(op: Op): Promise<Model>;
   close: () => void;
   /**
+   * Says there's something here that leaving would lose (words typed, a change tried on the page), and the button
+   * that keeps it: a click outside the popup then shakes that button, where it would have closed the popup.
+   * `undefined` once there's nothing to lose. Forgotten as the panel unmounts.
+   */
+  unsaved: (action: HTMLElement | undefined) => void;
+  /**
    * Leaves the popup to do something on the page, then comes back: closes it, runs `task` (a recording, a
    * pick of another element), and opens it again at this tab on this element. The next mount gets
    * `resumed`: the `state` kept now (what was typed, what's attached), and what `task` answered, or why
