@@ -56,22 +56,17 @@ function Guide() {
       <h2 className="font-semibold">Try it on this page</h2>
       <ul className="mt-3 space-y-2">
         <li>
-          <Kbd>Alt</Kbd> + click an element: the popup, at the tab you used last.
+          <Kbd>Alt</Kbd> + click an element, say what should change, and <b>Add task</b>.
         </li>
         <li>
-          <b>Task</b>: add a task about it to the board. <b>Annotate</b>: boxes, arrows, a pen and notes on the page, which a task's
-          screenshot draws. <b>Tailwind</b>: edit its classes, written to <code>site/src/pages/example.tsx</code>.
+          Attach a screenshot, <b>Annotate</b> it with boxes, arrows and notes, <b>Record</b> the page as you use it, or leave a{' '}
+          <b>Voice</b> note.
         </li>
         <li>
-          In the Task tab, <b>Record</b> records the page with rrweb, with a toolbar to draw on it that drags to any edge. Its mic button
-          adds your voice. Stop brings the task back with the recording attached. <b>Voice</b> records a voice note right in the panel.
+          Shots and recordings hide <code>rr-mask</code> text and <code>rr-block</code> elements: see the last row.
         </li>
         <li>
-          <Kbd>↶</Kbd> <Kbd>↷</Kbd> in the popup: undo and redo any of it.
-        </li>
-        <li>
-          A task gets a screenshot, which hides <code>rr-mask</code> text and <code>rr-block</code> elements as rrweb does: see the last
-          row.
+          <Kbd>↶</Kbd> in the popup cancels a task no one has claimed yet.
         </li>
       </ul>
       <p className="mt-4 text-zinc-600 dark:text-zinc-400">

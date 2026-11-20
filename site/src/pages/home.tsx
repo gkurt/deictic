@@ -106,8 +106,10 @@ function Copy({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1200);
   };
   return (
-    <button type="button" className="shrink-0 cursor-pointer font-mono text-xs text-muted hover:text-fg" onClick={() => void copy()}>
-      {copied ? 'copied' : 'copy'}
+    // Both labels in one cell, one hidden: the button is as wide as "copied" all along, so nothing beside it moves.
+    <button type="button" className="grid shrink-0 cursor-pointer font-mono text-xs text-muted hover:text-fg" onClick={() => void copy()}>
+      <span className={`col-start-1 row-start-1 text-right ${copied ? 'invisible' : ''}`}>copy</span>
+      <span className={`col-start-1 row-start-1 text-right ${copied ? '' : 'invisible'}`}>copied</span>
     </button>
   );
 }
