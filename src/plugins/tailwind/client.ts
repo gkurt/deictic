@@ -7,7 +7,8 @@
  * typed. A chip of a class Tailwind knows shows what it sets (a colour's swatch, a size's value) and opens the
  * classes of its kind to switch between, with a field for a value of one's own (`text-[13px]`). A class no file
  * used before has no CSS in the page's build until it's saved, so the preview brings its own, in a style of the
- * page's that goes as the panel does. Without Tailwind v4 the chips are plain and nothing completes.
+ * page's that goes as the panel does. The completions and a chip's kind open in boxes of their own beside the popup
+ * (in the overlay's root, placed each frame), so the popup keeps its size and nothing in it moves. Without Tailwind v4 the chips are plain and nothing completes.
  */
 import { defineClientPlugin } from '#src/index.ts';
 
@@ -31,7 +32,20 @@ const STYLE = `
   background: linear-gradient(var(--c), var(--c)), repeating-conic-gradient(#71717a 0 25%, #d4d4d8 0 50%) 0 0 / 6px 6px;
 }
 .hint { color: var(--deictic-muted); }
-.editor { margin-bottom: 8px; border: 1px solid var(--deictic-line); border-radius: 6px; }
+/* Beside the popup, not in it: in its flow they'd resize it under the pointer with every word and click. */
+.editor, .suggest {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  border: 1px solid var(--deictic-line);
+  border-radius: 6px;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: var(--deictic-fg);
+  background: var(--deictic-bg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
 .editor[hidden], .suggest[hidden] { display: none; }
 .editor .top { display: flex; align-items: center; padding: 2px 2px 2px 8px; font: 12px ui-monospace, monospace; color: var(--deictic-muted); }
 .editor .top button { margin-left: auto; }
@@ -45,7 +59,7 @@ const STYLE = `
 .custom { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-top: 1px solid var(--deictic-line); }
 .custom input[type='color'] { flex: none; width: 28px; height: 24px; padding: 1px; cursor: pointer; }
 .custom input[aria-invalid='true'] { border-color: var(--deictic-problem); }
-.suggest { position: relative; max-height: 168px; margin-top: 4px; border: 1px solid var(--deictic-line); border-radius: 4px; overflow: auto; }
+.suggest { max-height: 168px; overflow: auto; }
 .option { display: flex; align-items: center; gap: 6px; padding: 1px 6px; font: 12px/20px ui-monospace, monospace; cursor: pointer; }
 .option[aria-selected='true'] { background: rgb(255 255 255 / 0.1); }
 .option .hint { margin-left: auto; }
@@ -144,7 +158,40 @@ export default defineClientPlugin<Model, Op>({
     const save = make('button', 'primary', 'Save');
     const row = make('div', 'row');
     row.append(save);
-    panel.append(chips, editor, input, list, row);
+    panel.append(chips, input, row);
+    // The root the panel is in, where its styles are: the overlay's, or its own where the popup is pinned in a page.
+    const around = panel.getRootNode();
+    const root = around instanceof ShadowRoot ? around : context.root;
+    root.append(editor, list);
+
+    /** The chip whose kind is open in the editor, by its place in the draft. */
+    let editing: number | undefined;
+    // Each box under what it's about (over it where there's no room under), as wide as the field, and kept there
+    // every frame: the popup follows its element and can be dragged, and a chip is drawn again with every change.
+    const floats: [box: HTMLElement, by: () => Element | undefined][] = [
+      [editor, () => (editing === undefined ? undefined : chips.children[editing])],
+      [list, () => input],
+    ];
+    const place = () => {
+      for (const [box, by] of floats) {
+        if (box.hidden !== false) continue;
+        const anchor = by();
+        if (anchor === undefined) continue;
+        const at = anchor.getBoundingClientRect();
+        const span = input.getBoundingClientRect();
+        const height = box.offsetHeight;
+        const below = window.innerHeight - at.bottom;
+        const top = height + 12 > below && at.top > below ? at.top - height - 4 : at.bottom + 4;
+        const place = `${Math.round(span.left)}px ${Math.round(top)}px`;
+        if (box.style.translate !== place) box.style.translate = place;
+        const width = `${Math.round(span.width)}px`;
+        if (box.style.width !== width) box.style.width = width;
+      }
+    };
+    let following = requestAnimationFrame(function follow() {
+      following = requestAnimationFrame(follow);
+      place();
+    });
     if (model.rest !== undefined) panel.append(make('div', 'rest', `Also added at runtime: ${model.rest}`));
 
     // The classes the page's build had as the panel opened: any other may have no CSS there yet.
@@ -171,8 +218,6 @@ export default defineClientPlugin<Model, Op>({
       void lend();
     };
 
-    /** The chip whose kind is open in the editor, by its place in the draft. */
-    let editing: number | undefined;
     let opened = 0;
     const drawChips = () => {
       chips.replaceChildren(
@@ -212,7 +257,7 @@ export default defineClientPlugin<Model, Op>({
       void describe();
     };
 
-    const shut = () => {
+    const shut = (focus = true) => {
       opened++;
       if (editing === undefined) return;
       editing = undefined;
@@ -220,8 +265,14 @@ export default defineClientPlugin<Model, Op>({
       editor.removeAttribute('data-deictic-modal');
       editor.replaceChildren();
       drawChips();
-      input.focus();
+      if (focus) input.focus();
     };
+    // A press anywhere else in the overlay closes the editor, as it would a menu. The chips open and close it themselves.
+    const onPress = (e: Event) => {
+      const path = e.composedPath();
+      if (!path.includes(editor) && !path.includes(chips)) shut(false);
+    };
+    root.addEventListener('pointerdown', onPress, true);
     /** Puts `name` where the open chip's class is. The same class twice would be one, so that's left. */
     const swap = (name: string, info: ClassInfo) => {
       if (editing === undefined || draft.includes(name)) return;
@@ -240,7 +291,7 @@ export default defineClientPlugin<Model, Op>({
       const top = make('div', 'top', found.label);
       const close = make('button', 'icon', '×');
       close.title = 'Close';
-      close.addEventListener('click', shut);
+      close.addEventListener('click', () => shut());
       top.append(close);
 
       const alts = make('div', 'alts');
@@ -328,6 +379,8 @@ export default defineClientPlugin<Model, Op>({
       // Esc closes the editor, not the popup, and reaches it only from inside: so the focus goes in.
       editor.setAttribute('data-deictic-modal', '');
       editor.hidden = false;
+      // Placed as it shows, not a frame later, when it would flash where it was.
+      place();
       const chosen = buttons.get(draft[at]);
       if (chosen !== undefined) alts.scrollTop = chosen.offsetTop - alts.clientHeight / 2;
       (chosen ?? editor.querySelector('button'))?.focus();
@@ -365,6 +418,7 @@ export default defineClientPlugin<Model, Op>({
           return option;
         }),
       );
+      place();
       const shown = list.children[active];
       if (!(shown instanceof HTMLElement)) return;
       if (shown.offsetTop < list.scrollTop) list.scrollTop = shown.offsetTop;
@@ -443,6 +497,10 @@ export default defineClientPlugin<Model, Op>({
     return () => {
       gone = true;
       sheet?.remove();
+      cancelAnimationFrame(following);
+      root.removeEventListener('pointerdown', onPress, true);
+      editor.remove();
+      list.remove();
       if (!unsaved()) return;
       context.elements.forEach((el, i) => {
         const was = originals[i];

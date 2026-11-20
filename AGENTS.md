@@ -133,7 +133,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `@property` lifted out). The routes of the same names answer the panel, and nothing without Tailwind v4
   (one warning, a plain panel). In the panel the field completes its last word (↑ ↓, Enter or Tab; the list
   is a `data-deictic-modal` while shown), a known class's chip shows a swatch or its value and opens the
-  editor (also a modal): its kind's classes, colours as rows of shades, and a field (and a colour picker)
+  editor (also a modal; both are boxes in the overlay's root, fixed under what they're about and placed each
+  frame, never in the popup's flow, which would resize it): its kind's classes, colours as rows of shades, and a field (and a colour picker)
   for a value of one's own. A preview's CSS goes in a `<style>` in the page's head until the panel unmounts.
   `test/tailwind-catalog.test.ts` runs it on the site's Tailwind.
 - `src/plugins/screenshots/`: no panel. `index.ts`, the server half: keeps the latest `keep` PNGs under
