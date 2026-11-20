@@ -139,7 +139,12 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `test/tailwind-catalog.test.ts` runs it on the site's Tailwind. A helper's other arguments come in the model
   as `others`, each an `Extra` (`extrasOf`): the classes it adds where the source spells them out (a string, a
   top-level `const` of one, an object's key) and what they wait on (`a && …`, `a ? … : …`, `{ ring: on }`), or
-  only its source. The panel shows them under their condition as dashed chips, faint while not on the element.
+  only its source. One whose classes are a string in the file is `editable` (`shared` names the `const` it's
+  in), and an op with `at` (its place in `others`) writes that string. In the panel each editable one is a state
+  to pick beside `Base`: its classes become the chips, forced onto the clicked element while it's picked, and a
+  dot marks those on the element now (most of their classes among its own, all the page says of a condition).
+  Each state keeps its draft; Save applies every changed one, a change each. The rest show under their
+  condition as dashed chips, faint while not on the element.
 - `src/plugins/screenshots/`: no panel. `index.ts`, the server half: keeps the latest `keep` PNGs under
   `.deictic/screenshots` (IDs sort by time), answers `read(id)` to other plugins, and its `add`
   route takes a PNG, or JSON its renderer's `render` makes one of. A `Renderer` is a page module (`client`, which

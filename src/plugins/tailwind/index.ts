@@ -49,10 +49,16 @@ export interface Extra {
   classes?: string;
   /** What must hold for them to be added, as written: `active === 'h3'`. None where they always are. */
   when?: string;
+  /** Set where the classes are a string in this file, which an op with `at` can write. */
+  editable?: true;
+  /** The `const` the string is in, where it isn't the argument itself: other elements may use it too. */
+  shared?: string;
 }
 
 export interface Op {
   classes: string;
+  /** Which of the model's `others` the classes are for, by its place there. The element's own list without. */
+  at?: number;
 }
 
 /** Where a class list sits in the source: the text between its quotes, or where a missing attribute goes. */
@@ -101,18 +107,30 @@ export function tailwind(options: TailwindOptions = {}) {
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') return { editable: false, source: spot.source };
       if (spot.kind === 'missing') return { editable: true, classes: '' };
-      const others = spot.others?.flatMap((argument) => extrasOf(argument, code, program));
+      const others = spot.others?.flatMap((argument) => extrasOf(argument, code, program)).map(({ spot: _, ...extra }) => extra);
       return { editable: true, classes: code.slice(spot.start, spot.end), ...(others === undefined ? {} : { others }) };
     },
-    apply({ code, element }, _target, { classes }) {
+    apply({ code, element, program }, _target, { classes, at }) {
       const list = classes.trim().split(/\s+/).filter(Boolean).join(' ');
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') throw new Refusal('this class list is built at runtime: edit it in the editor');
+      if (at !== undefined) {
+        const others = spot.kind === 'list' ? (spot.others ?? []).flatMap((argument) => extrasOf(argument, code, program)) : [];
+        const place = others[at]?.spot;
+        if (place === undefined)
+          throw new Refusal("these classes aren't a string in this file any more: reload, or edit them in the editor");
+        return [{ start: place.start, end: place.end, text: quoted(list, place.quote) }];
+      }
       if (spot.kind === 'missing')
         return list === '' ? [] : [{ start: spot.at, end: spot.at, text: ` ${attribute}="${quoted(list, '"')}"` }];
       return [{ start: spot.start, end: spot.end, text: quoted(list, spot.quote) }];
     },
-    describe: ({ classes }, before) => (before.editable ? diff(before.classes, classes) : 'classes'),
+    describe({ classes, at }, before) {
+      if (!before.editable) return 'classes';
+      if (at === undefined) return diff(before.classes, classes);
+      const other = before.others?.[at];
+      return `${diff(other?.classes ?? '', classes)}${other?.when === undefined ? '' : ` when ${other.when}`}`;
+    },
   });
 }
 
@@ -141,11 +159,19 @@ function spotOf(element: JSXOpeningElement, code: string, helpers: Set<string>):
  * What one of a helper's arguments adds, and when: `on && 'ring'`, `on ? 'a' : 'b'`, `{ ring: on }`, a string,
  * or a name for one. Anything else is only its source, as nothing says what it adds.
  */
-function extrasOf(argument: Argument, code: string, program: Program): Extra[] {
+function extrasOf(argument: Argument, code: string, program: Program): (Extra & { spot?: List })[] {
   const source = (node: { start: number; end: number }) => code.slice(node.start, node.end);
-  const added = (e: Expression, when?: string): Extra => {
-    const classes = stringOf(e, program);
-    return { source: source(e), ...(classes === undefined ? {} : { classes }), ...(when === undefined ? {} : { when }) };
+  const added = (e: { type: string; start: number; end: number }, when?: string, key = false): Extra & { spot?: List } => {
+    const found = stringOf(e, program, !key);
+    if (found === undefined) return { source: source(e), ...(when === undefined ? {} : { when }) };
+    return {
+      source: source(e),
+      classes: found.value,
+      ...(when === undefined ? {} : { when }),
+      editable: true,
+      ...(found.shared === undefined ? {} : { shared: found.shared }),
+      spot: list(found.node, code),
+    };
   };
   const e = argument;
   if (e.type === 'SpreadElement') return [{ source: source(e) }];
@@ -159,28 +185,43 @@ function extrasOf(argument: Argument, code: string, program: Program): Extra[] {
     );
   }
   if (e.type === 'ObjectExpression') {
-    return e.properties.map((property): Extra => {
+    return e.properties.map((property): Extra & { spot?: List } => {
       if (property.type !== 'Property' || property.computed) return { source: source(property) };
-      const classes = property.key.type === 'Identifier' ? property.key.name : stringOf(property.key, program, false);
-      if (classes === undefined) return { source: source(property) };
       const always = property.value.type === 'Literal' && property.value.value === true;
-      return { source: source(property), classes, ...(always ? {} : { when: source(property.value) }) };
+      const when = always ? {} : { when: source(property.value) };
+      // A bare key (`ring`) is a class, but not a string to write a list into.
+      if (property.key.type === 'Identifier') return { source: source(property), classes: property.key.name, ...when };
+      const { source: _, ...key } = added(property.key, undefined, true);
+      return key.classes === undefined ? { source: source(property) } : { source: source(property), ...key, ...when };
     });
   }
   return [added(e)];
 }
 
-/** A string the source spells out: a literal, a template with nothing interpolated, or a top-level `const` of one. */
-function stringOf(e: { type: string }, program: Program, named = true): string | undefined {
+/**
+ * A string the source spells out, and where: a literal, a template with nothing interpolated, or a top-level
+ * `const` of one (`shared`, its name).
+ */
+function stringOf(
+  e: { type: string },
+  program: Program,
+  named = true,
+): { value: string; node: { start: number; end: number }; shared?: string } | undefined {
   const node = e as Expression;
-  if (node.type === 'Literal') return typeof node.value === 'string' ? node.value : undefined;
-  if (node.type === 'TemplateLiteral') return node.expressions.length === 0 ? (node.quasis[0]?.value.cooked ?? undefined) : undefined;
+  if (node.type === 'Literal') return typeof node.value === 'string' ? { value: node.value, node } : undefined;
+  if (node.type === 'TemplateLiteral') {
+    const value = node.expressions.length === 0 ? node.quasis[0]?.value.cooked : undefined;
+    return value === undefined || value === null ? undefined : { value, node };
+  }
   if (node.type !== 'Identifier' || !named) return undefined;
   for (const statement of program.body) {
     const declared = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
     if (declared?.type !== 'VariableDeclaration' || declared.kind !== 'const') continue;
-    for (const { id, init } of declared.declarations)
-      if (id.type === 'Identifier' && id.name === node.name && init) return stringOf(init, program, false);
+    for (const { id, init } of declared.declarations) {
+      if (id.type !== 'Identifier' || id.name !== node.name || !init) continue;
+      const found = stringOf(init, program, false);
+      return found === undefined ? undefined : { ...found, shared: node.name };
+    }
   }
   return undefined;
 }

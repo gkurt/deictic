@@ -3,6 +3,11 @@
  * previews on the page at once, on every element from the same place in the source, keeping the
  * classes the source adds at runtime; closing without saving puts the page back.
  *
+ * Where a class helper adds more on a condition (`cn('…', active && '…')`), each condition whose classes are a
+ * string in the file is a state to pick, beside the element's own list: picked, its classes are the chips, and
+ * they show on the clicked element whether or not the condition holds there. A dot marks the ones that do hold,
+ * read from the element's classes, which is all the page says of a condition.
+ *
  * What the project's Tailwind knows comes from the server half's routes. The field completes the word being
  * typed. A chip of a class Tailwind knows shows what it sets (a colour's swatch, a size's value) and opens the
  * classes of its kind to switch between, with a field for a value of one's own (`text-[13px]`). A class no file
@@ -67,6 +72,13 @@ const STYLE = `
 .option[aria-selected='true'] { background: rgb(255 255 255 / 0.1); }
 .option .hint { margin-left: auto; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; align-items: center; }
+.states { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.state { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 0 8px; border-radius: 999px; font: 12px/20px ui-monospace, monospace; color: var(--deictic-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.state[aria-pressed='true'] { border-color: var(--deictic-accent); color: var(--deictic-fg); }
+.state .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--deictic-accent); }
+.note { margin: -2px 0 8px; font-size: 12px; color: var(--deictic-muted); }
+.note:empty { display: none; }
+.note code { color: var(--deictic-fg); }
 .extras { display: grid; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--deictic-line); font-size: 12px; color: var(--deictic-muted); }
 .extra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .extra .when { flex-basis: 100%; }
@@ -78,6 +90,14 @@ const STYLE = `
 `;
 
 const split = (list: string) => list.split(/\s+/).filter(Boolean);
+
+/** A list of classes to edit: the element's own, or those one of the helper's arguments adds (`at`, its place). */
+interface State {
+  at?: number;
+  label: string;
+  saved: string[];
+  draft: string[];
+}
 /** The family a shade is of: `bg-red` for `bg-red-500`. */
 const familyOf = (name: string) => /^(.*)-\d+(\/[^/]*)?!?$/.exec(name)?.[1];
 
@@ -125,15 +145,50 @@ export default defineClientPlugin<Model, Op>({
 
     // What the page rendered, to put back over a preview that wasn't saved.
     const originals = context.elements.map((el) => el.getAttribute('class'));
-    let saved = split(model.classes);
-    let draft = [...saved];
+    const others = model.others ?? [];
+    // The lists to edit: the element's own, then each of the helper's arguments whose classes are a string in the
+    // file, by its place among them. One is shown at a time, each keeps its draft, and Save writes every one changed.
+    const states: State[] = [
+      { label: 'Base', saved: split(model.classes), draft: split(model.classes) },
+      ...others.flatMap((other, at): State[] =>
+        other.editable === true
+          ? [{ at, label: other.when ?? other.source, saved: split(other.classes ?? ''), draft: split(other.classes ?? '') }]
+          : [],
+      ),
+    ];
+    const own = states[0]!;
+    let current = own;
     // What the page has beyond the source's list: classes the helper's other arguments added, per element. Read
     // only for a helper, as the page may not have caught up with the source yet (just after an undo).
     const runtime = context.elements.map((el) =>
-      model.others === undefined ? [] : split(el.getAttribute('class') ?? '').filter((c) => !saved.includes(c)),
+      model.others === undefined ? [] : split(el.getAttribute('class') ?? '').filter((c) => !own.saved.includes(c)),
     );
-    const unsaved = () => draft.join(' ') !== saved.join(' ');
+    // Which arguments' classes each element has now: all there is to see of a condition from the page. Most of
+    // them will do, as a helper that merges (`twMerge`) drops the ones a later class overrides.
+    const on = others.map((other) => {
+      const adds = split(other.classes ?? '');
+      return runtime.map((has) => adds.length > 0 && adds.filter((c) => has.includes(c)).length * 2 >= adds.length);
+    });
+    // And what no argument read here accounts for: left as it is through every preview.
+    const told = new Set(others.flatMap((other) => split(other.classes ?? '')));
+    const untold = runtime.map((has) => has.filter((c) => !told.has(c)));
+    const clicked = context.elements.indexOf(context.element);
+    /**
+     * An element's classes with each list as `pick` has it. `forced` adds the shown state's to the clicked element
+     * though its condition doesn't hold there, so there's something to see while it's edited.
+     */
+    const classesOf = (i: number, pick: (state: State) => string[], forced: boolean) => [
+      ...pick(own),
+      ...others.flatMap((other, at) => {
+        const state = states.find((s) => s.at === at);
+        if (on[at]![i] !== true && !(forced && state === current && i === clicked)) return [];
+        return state === undefined ? split(other.classes ?? '') : pick(state);
+      }),
+      ...untold[i]!,
+    ];
+    const unsaved = () => states.some((state) => state.draft.join(' ') !== state.saved.join(' '));
     let previewed = false;
+    let committed = false;
     let gone = false;
 
     // The server's answer, or nothing where it has none: the panel works without, only plainer.
@@ -168,13 +223,16 @@ export default defineClientPlugin<Model, Op>({
     const save = make('button', 'primary', 'Save');
     const row = make('div', 'row');
     row.append(save);
+    const picks = make('div', 'states');
+    const note = make('div', 'note');
+    if (states.length > 1) panel.append(picks, note);
     panel.append(chips, input, row);
     // The root the panel is in, where its styles are: the overlay's, or its own where the popup is pinned in a page.
     const around = panel.getRootNode();
     const root = around instanceof ShadowRoot ? around : context.root;
     root.append(editor, list);
 
-    /** The chip whose kind is open in the editor, by its place in the draft. */
+    /** The chip whose kind is open in the editor, by its place in the current.draft. */
     let editing: number | undefined;
     // Each box under what it's about (over it where there's no room under), as wide as the field, and kept there
     // every frame: the popup follows its element and can be dragged, and a chip is drawn again with every change.
@@ -203,14 +261,15 @@ export default defineClientPlugin<Model, Op>({
       place();
     });
     const extras = make('div', 'extras');
-    const others = model.others ?? [];
-    if (others.length > 0) panel.append(extras);
+    // The arguments with no list to edit here: a bare key, a call, a name from another file.
+    const fixed = others.filter((other) => other.editable !== true);
+    if (fixed.length > 0) panel.append(extras);
     // What the clicked element has of them now, as the page rendered it.
-    const lit = new Set(runtime[context.elements.indexOf(context.element)] ?? []);
-    /** The helper's other arguments: what each adds as chips under what it waits on, or its code where nothing says. */
+    const lit = new Set(runtime[clicked] ?? []);
+    /** Those arguments: what each adds as chips under what it waits on, or its code where nothing says. */
     const drawExtras = () => {
       extras.replaceChildren(
-        ...others.map((extra) => {
+        ...fixed.map((extra) => {
           const row = make('div', 'extra');
           const when = make('div', 'when');
           if (extra.when === undefined) when.append('Always');
@@ -236,11 +295,11 @@ export default defineClientPlugin<Model, Op>({
     };
 
     // The classes the page's build had as the panel opened: any other may have no CSS there yet.
-    const built = new Set(saved);
+    const built = new Set([...states.flatMap((state) => state.saved), ...told]);
     let sheet: HTMLStyleElement | undefined;
     let styled = '';
     const lend = async () => {
-      const fresh = draft.filter((c) => !built.has(c));
+      const fresh = [...new Set(states.flatMap((state) => state.draft))].filter((c) => !built.has(c));
       const key = fresh.join(' ');
       if (plain || key === styled) return;
       styled = key;
@@ -253,16 +312,41 @@ export default defineClientPlugin<Model, Op>({
     const preview = () => {
       save.disabled = !unsaved();
       context.unsaved(unsaved() ? save : undefined);
-      if (!unsaved() && !previewed) return;
-      context.elements.forEach((el, i) => el.setAttribute('class', [...draft, ...runtime[i]!].join(' ')));
+      if (!unsaved() && !previewed && current === own) return;
+      context.elements.forEach((el, i) => el.setAttribute('class', classesOf(i, (state) => state.draft, true).join(' ')));
       previewed = true;
       void lend();
+    };
+
+    /** The lists as buttons: the element's own, and each condition, dotted where it holds on the element now. */
+    const drawStates = () => {
+      picks.replaceChildren(
+        ...states.map((state) => {
+          const pick = make('button', 'state');
+          const holds = state.at !== undefined && on[state.at]![clicked] === true;
+          if (holds) pick.append(make('span', 'dot'));
+          pick.append(state.at === undefined || others[state.at]!.when !== undefined ? state.label : `always: ${state.label}`);
+          pick.setAttribute('aria-pressed', String(state === current));
+          if (state.at !== undefined) pick.title = holds ? 'On the element now' : 'Not on the element now: shown on it while you edit';
+          pick.addEventListener('click', () => {
+            shut(false);
+            hide();
+            current = state;
+            drawStates();
+            render();
+            input.focus();
+          });
+          return pick;
+        }),
+      );
+      const shared = current.at === undefined ? undefined : others[current.at]!.shared;
+      note.replaceChildren(...(shared === undefined ? [] : ['From ', make('code', '', shared), ': everything that uses it changes too.']));
     };
 
     let opened = 0;
     const drawChips = () => {
       chips.replaceChildren(
-        ...draft.map((c, i) => {
+        ...current.draft.map((c, i) => {
           const chip = make('span', i === editing ? 'chip open' : 'chip');
           const info = known.get(c);
           const name = make(info?.known === true ? 'button' : 'span', 'name');
@@ -275,7 +359,7 @@ export default defineClientPlugin<Model, Op>({
           remove.title = `Remove ${c}`;
           remove.addEventListener('click', () => {
             shut();
-            draft = draft.toSpliced(i, 1);
+            current.draft = current.draft.toSpliced(i, 1);
             render();
           });
           chip.append(name, remove);
@@ -284,7 +368,7 @@ export default defineClientPlugin<Model, Op>({
       );
     };
     const describe = async () => {
-      const shown = [...draft, ...others.flatMap((extra) => split(extra.classes ?? ''))];
+      const shown = [...states.flatMap((state) => state.draft), ...told];
       const missing = [...new Set(shown)].filter((c) => !known.has(c));
       if (plain || missing.length === 0) return;
       const answer = await ask<{ available: boolean; items: ClassInfo[] }>('info', naming(missing));
@@ -319,16 +403,16 @@ export default defineClientPlugin<Model, Op>({
     root.addEventListener('pointerdown', onPress, true);
     /** Puts `name` where the open chip's class is. The same class twice would be one, so that's left. */
     const swap = (name: string, info: ClassInfo) => {
-      if (editing === undefined || draft.includes(name)) return;
+      if (editing === undefined || current.draft.includes(name)) return;
       known.set(name, info);
-      draft = draft.with(editing, name);
+      current.draft = current.draft.with(editing, name);
       render();
     };
     const edit = async (at: number) => {
       const turn = ++opened;
-      const was = draft[at]!;
+      const was = current.draft[at]!;
       const found = await ask<Alternatives | null>(`alternatives?${new URLSearchParams({ class: was })}`);
-      if (turn !== opened || draft[at] !== was || found === undefined || found === null) return;
+      if (turn !== opened || current.draft[at] !== was || found === undefined || found === null) return;
       editing = at;
       drawChips();
 
@@ -341,7 +425,7 @@ export default defineClientPlugin<Model, Op>({
       const alts = make('div', 'alts');
       const buttons = new Map<string, HTMLButtonElement>();
       const press = () => {
-        for (const [name, button] of buttons) button.setAttribute('aria-pressed', String(name === draft[at]));
+        for (const [name, button] of buttons) button.setAttribute('aria-pressed', String(name === current.draft[at]));
       };
       const choice = (item: ClassInfo, bare: boolean) => {
         const button = make('button', '');
@@ -440,7 +524,7 @@ export default defineClientPlugin<Model, Op>({
       editor.hidden = false;
       // Placed as it shows, not a frame later, when it would flash where it was.
       place();
-      const chosen = buttons.get(draft[at]);
+      const chosen = buttons.get(current.draft[at]);
       if (chosen !== undefined) alts.scrollTop = chosen.offsetTop - alts.clientHeight / 2;
       (chosen ?? editor.querySelector('button'))?.focus();
     };
@@ -451,9 +535,14 @@ export default defineClientPlugin<Model, Op>({
     });
 
     const commit = async () => {
-      const next = await context.apply({ classes: draft.join(' ') });
-      if (next.editable) saved = split(next.classes);
-      draft = [...saved];
+      // One change each, in the history too. One the server refuses leaves the rest as they are, still to save.
+      for (const state of states) {
+        if (state.draft.join(' ') === state.saved.join(' ')) continue;
+        const next = await context.apply({ classes: state.draft.join(' '), ...(state.at === undefined ? {} : { at: state.at }) });
+        if (next.editable) state.saved = split(state.at === undefined ? next.classes : (next.others?.[state.at]?.classes ?? ''));
+        state.draft = [...state.saved];
+        committed = true;
+      }
       previewed = false;
       shut();
       render();
@@ -495,17 +584,17 @@ export default defineClientPlugin<Model, Op>({
       if (plain || word === '') return hide();
       const answer = await ask<{ items: ClassInfo[] }>(`complete?${new URLSearchParams({ q: word })}`);
       if (turn !== typed) return;
-      options = (answer?.items ?? []).filter((item) => !draft.includes(item.name));
+      options = (answer?.items ?? []).filter((item) => !current.draft.includes(item.name));
       active = 0;
       drawOptions();
     };
     /** Adds what the field holds. False when it held nothing new. */
     const add = () => {
-      const added = split(input.value).filter((c) => !draft.includes(c));
+      const added = split(input.value).filter((c) => !current.draft.includes(c));
       input.value = '';
       hide();
       if (added.length === 0) return false;
-      draft = [...draft, ...added];
+      current.draft = [...current.draft, ...added];
       render();
       return true;
     };
@@ -549,6 +638,7 @@ export default defineClientPlugin<Model, Op>({
       if (!add()) void commit().catch(() => {});
     });
     save.addEventListener('click', () => void commit().catch(() => {}));
+    drawStates();
     drawExtras();
     render();
     input.focus();
@@ -561,10 +651,11 @@ export default defineClientPlugin<Model, Op>({
       root.removeEventListener('pointerdown', onPress, true);
       editor.remove();
       list.remove();
-      if (!unsaved()) return;
+      if (!previewed) return;
       context.elements.forEach((el, i) => {
-        const was = originals[i];
-        if (was === null || was === undefined) el.removeAttribute('class');
+        // As the page rendered it, or, once something's saved, as the source now has it: never the classes from before.
+        const was = committed ? classesOf(i, (state) => state.saved, false).join(' ') : originals[i];
+        if (was === null || was === undefined || (was === '' && originals[i] === null)) el.removeAttribute('class');
         else el.setAttribute('class', was);
       });
     };

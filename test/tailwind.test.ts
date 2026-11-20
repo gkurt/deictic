@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 
-import { Refusal } from '#src/index.ts';
-import { tailwind } from '#src/plugins/tailwind/index.ts';
+import { Refusal, type TextEdit } from '#src/index.ts';
+import { type Model, tailwind } from '#src/plugins/tailwind/index.ts';
 import { applyEdits, sourceAt } from '#src/tools/source.ts';
 
 import { project } from './fixture.ts';
@@ -39,7 +39,7 @@ test("edits a helper's first argument and shows the rest", () => {
   expect(model).toEqual({
     editable: true,
     classes: 'p-2',
-    others: [{ source: "'ring'", classes: 'ring', when: 'on' }, { source: 'x' }],
+    others: [{ source: "'ring'", classes: 'ring', when: 'on', editable: true }, { source: 'x' }],
   });
   expect(after).toBe(`const a = <div className={cn('p-4', on && 'ring', x)}/>;`);
 });
@@ -54,18 +54,35 @@ test("reads a helper's other arguments as classes and what they wait on", () => 
     editable: true,
     classes: 'p-2',
     others: [
-      { source: 'OUTLINED', classes: 'outline-2 bg-signal/10', when: "active === 'h3'" },
-      { source: "'ring'", classes: 'ring', when: 'on' },
-      { source: "'shadow'", classes: 'shadow', when: '!on' },
-      { source: "'hidden'", classes: 'hidden', when: 'off' },
+      { source: 'OUTLINED', classes: 'outline-2 bg-signal/10', when: "active === 'h3'", editable: true, shared: 'OUTLINED' },
+      { source: "'ring'", classes: 'ring', when: 'on', editable: true },
+      { source: "'shadow'", classes: 'shadow', when: '!on', editable: true },
+      { source: "'hidden'", classes: 'hidden', when: 'off', editable: true },
       { source: 'italic: slanted', classes: 'italic', when: 'slanted' },
-      { source: "'font-bold': true", classes: 'font-bold' },
+      { source: "'font-bold': true", classes: 'font-bold', editable: true },
       { source: '[key]: 1' },
-      { source: 'BASE', classes: 'flex' },
+      { source: 'BASE', classes: 'flex', editable: true, shared: 'BASE' },
       { source: '...more' },
       { source: 'pick(x)' },
     ],
   });
+});
+
+test("edits the classes one of a helper's other arguments adds, where they're a string in the file", () => {
+  const code = [
+    `const OUTLINED = 'outline-2';`,
+    `const a = <div className={cn('p-2', on ? "ring" : 'shadow', active && OUTLINED, x)}/>;`,
+  ].join('\n');
+  const p = project({ 'App.tsx': code });
+  const target = p.target('App.tsx', 'div');
+  const source = sourceAt(p.root, target);
+  const write = (classes: string, at: number) => applyEdits(source, apply(source, target, { classes, at }) as TextEdit[]).get('App.tsx');
+  expect(write('ring-2  ring-red-500', 0)).toBe(code.replace('"ring"', '"ring-2 ring-red-500"'));
+  expect(write('', 1)).toBe(code.replace("'shadow'", "''"));
+  expect(write('outline-4', 2)).toBe(code.replace("'outline-2'", "'outline-4'"));
+  expect(() => write('p-4', 3)).toThrow(Refusal);
+  expect(() => write('p-4', 9)).toThrow(Refusal);
+  expect(plugin.describe!({ classes: 'ring-2', at: 0 }, read(source, target) as Model)).toBe('+ring-2 -ring when on');
 });
 
 test('adds the attribute to an element without one', () => {
