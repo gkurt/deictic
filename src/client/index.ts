@@ -37,10 +37,15 @@ interface Tab {
 
 const ATTRIBUTE = 'data-deictic';
 /** An arrow pointing up and out: the link leaves the page for the editor. */
-const OUT =
-  '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>';
+const OUT = icon('M7 17 17 7M8 7h9v9', 2.25);
+// Drawn, as the arrows and the cross of a system's font differ in size and weight from one to the next.
+const UNDO = icon('M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11');
+const REDO = icon('m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13');
+const CLOSE = icon('M18 6 6 18M6 6l12 12');
 /** Where the tab used last is kept, for deictic's own shortcut to open it again. */
 const LAST = 'deictic:tab';
+/** How long a read may take, in milliseconds, before the popup says it's reading. */
+const SLOW = 200;
 const STARTED = Symbol.for('deictic');
 
 export function targetOf(el: Element): Target | undefined {
@@ -64,6 +69,10 @@ function markedAround(el: Element): Element | undefined {
 }
 
 /** `div.panel > button.tab`: the element as a selector, the deepest classes only, for a person to tell it by. */
+function icon(path: string, width = 2): string {
+  return `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+}
+
 const nameOf = (el: Element) => `${el.localName}${[...el.classList].map((c) => `.${c}`).join('')}`;
 
 /** What the overlay keeps once started, for `popupIn` to show the popup with. */
@@ -173,6 +182,9 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
   const inner = div('box inner');
   root.append(style, box, inner);
   tooltips(root);
+  // What's typed in the popup is the popup's: the page hears a key from in here as one on the host, not in a field,
+  // so its own shortcuts (a "/" to search, a "j" to step) would run on a task's words. Ours listen while capturing.
+  for (const type of ['keydown', 'keypress', 'keyup'] as const) host.addEventListener(type, (e) => e.stopPropagation());
   document.documentElement.append(host);
 
   // Each plugin's API, set up before any panel opens. `use` reads it when asked, so a setup may keep
@@ -420,9 +432,11 @@ function openPanel({
     e.preventDefault();
     void fetch(where.href);
   });
-  const undo = button('↶', 'Undo the last change here');
-  const redo = button('↷', 'Redo');
-  const close = button('×', 'Close (Esc)');
+  // Off until the tab's history is read: there's nothing to take back on most elements.
+  const undo = iconButton(UNDO, 'Undo', 'Nothing to undo');
+  const redo = iconButton(REDO, 'Redo', 'Nothing to redo');
+  undo.disabled = redo.disabled = true;
+  const close = iconButton(CLOSE, 'Close', pinned ? 'Close' : 'Close (Esc)');
   const buttons = tabs.map((tab) => {
     const el = button(tab.plugin.label ?? tab.plugin.name, '');
     el.className = 'tab';
@@ -440,6 +454,7 @@ function openPanel({
   root.append(panel);
   if (pinned) panel.classList.add('pinned');
   const release = pinned ? undefined : keepInView(panel, body, element.getBoundingClientRect());
+  const unmark = pinned ? undefined : outline(root, element);
 
   let cleanup: (() => void) | void;
   const say = (text: string, problem = false) => {
@@ -498,13 +513,18 @@ function openPanel({
   const done = (leaving = false) => {
     unmount();
     release?.();
+    unmark?.();
     panel.remove();
     window.removeEventListener('keydown', onKey, true);
     onClose(current, leaving);
   };
   const onKey = (e: KeyboardEvent) => {
     // A plugin's modal over the popup (one marked `data-deictic-modal`) takes Esc for itself.
-    if (e.key === 'Escape' && root.querySelector('[data-deictic-modal]') === null) done();
+    if (e.key !== 'Escape' || root.querySelector('[data-deictic-modal]') !== null) return;
+    // Esc is the popup's while it's open: a dialog of the page's that it's open in stays open.
+    e.preventDefault();
+    e.stopPropagation();
+    done();
   };
   if (!pinned) window.addEventListener('keydown', onKey, true);
   undo.addEventListener('click', () => void step('undo'));
@@ -517,16 +537,25 @@ function openPanel({
   const load = async () => {
     const { plugin, mount } = current;
     const read = ++reads;
+    // The body keeps its height while it's empty, and "Reading…" waits for a read that takes long: one answered
+    // at once, as most are, would otherwise fold the popup and open it again in a blink.
+    body.style.minHeight = `${body.offsetHeight}px`;
     unmount();
-    say('Reading…');
+    say('');
+    const slow = setTimeout(() => read === reads && say('Reading…'), SLOW);
     let model: unknown;
     try {
       ({ model } = await post<{ model: unknown }>('read', { plugin: plugin.name, target }));
     } catch (e) {
-      if (read === reads) say(messageOf(e), true);
+      if (read !== reads) return;
+      body.style.minHeight = '';
+      say(messageOf(e), true);
       return;
+    } finally {
+      clearTimeout(slow);
     }
     if (read !== reads) return;
+    body.style.minHeight = '';
     say('');
     const back = current === first ? resumed : undefined;
     resumed = undefined;
@@ -575,6 +604,32 @@ function openPanel({
 /** Puts an outline over `r`. */
 function place(el: HTMLElement, r: DOMRect): void {
   Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+}
+
+/**
+ * Outlines the element the popup is open on, for as long as it is: which one it's about, where several look alike
+ * or the popup covers it. With no fill, so a change tried on it shows in its own colours. Read each frame, as the
+ * element moves with the page's scrolling, its layout and what a panel previews on it. Answers what removes it.
+ */
+function outline(root: ShadowRoot, element: Element): () => void {
+  const box = div('box on');
+  root.append(box);
+  let frame = 0;
+  let was = '';
+  const follow = () => {
+    frame = requestAnimationFrame(follow);
+    const r = element.getBoundingClientRect();
+    const now = element.isConnected ? `${r.left},${r.top},${r.width},${r.height}` : '';
+    if (now === was) return;
+    was = now;
+    box.classList.toggle('shown', now !== '');
+    place(box, r);
+  };
+  follow();
+  return () => {
+    cancelAnimationFrame(frame);
+    box.remove();
+  };
 }
 
 const MARGIN = 8;
@@ -649,6 +704,15 @@ function keepInView(panel: HTMLElement, body: HTMLElement, r: DOMRect): () => vo
 function div(className: string): HTMLDivElement {
   const el = document.createElement('div');
   el.className = className;
+  return el;
+}
+
+/** A button that is a drawing: named for what it does, as its title, the tooltip, changes with what it would do. */
+function iconButton(svg: string, name: string, title: string): HTMLButtonElement {
+  const el = button('', title);
+  el.className = 'icon';
+  el.innerHTML = svg;
+  el.setAttribute('aria-label', name);
   return el;
 }
 

@@ -105,9 +105,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
   Outlines the marked element under the pointer while a shortcut's keys are held, and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
-  tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. The popup's head is the tabs and
+  tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. While it's open over the page its element
+  stays outlined (`.box.on`, no fill, followed each frame), keys typed in it stop at the host, so the page's own
+  shortcuts don't run on them, and its Esc is kept from the page. The popup's head is the tabs and
   close, then open-in-editor (an arrow out, and an "Open in editor" tooltip), undo and redo, which are the shown tab's on this element (off when its `history` has nothing to take back or do again, titled with the change they would; read as a tab shows, after a change, and on pointerenter); a tab reads its model when shown (a read another overtook
-  mounts nothing), and after an undo or redo it remounts with the model read again. While an element marked
+  mounts nothing; the body keeps its height meanwhile, and "Reading…" shows only for a slow one), and after an undo or redo it remounts with the model read again. While an element marked
   `data-deictic-modal` is in the root, Esc is that modal's, not the popup's. Pointing goes down through open
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`

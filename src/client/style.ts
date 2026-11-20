@@ -28,6 +28,8 @@ export const STYLE = `
 }
 .box.shown { display: block; }
 .box.inner { outline: 1px dashed var(--deictic-accent); background: none; }
+/* The element the popup is open on: no fill, so what's tried on it shows as it is. */
+.box.on { background: none; }
 .label {
   position: absolute;
   left: -2px;
@@ -55,6 +57,12 @@ export const STYLE = `
   background: var(--deictic-bg);
 }
 .panel.pinned { position: relative; z-index: auto; max-height: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel:not(.pinned) { animation: deictic-in 0.12s ease-out; }
+}
+@keyframes deictic-in {
+  from { opacity: 0; translate: 0 4px; }
+}
 .head {
   display: flex;
   align-items: flex-end;
@@ -71,12 +79,12 @@ export const STYLE = `
 }
 .head .tab:hover { color: var(--deictic-fg); }
 .head .tab[aria-selected='true'] { color: var(--deictic-fg); border-bottom-color: var(--deictic-accent); }
-.head .close { margin: 0 0 4px auto; }
+.head .close { margin: 0 0 3px auto; }
 .bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 2px;
+  padding: 4px 8px;
   border-top: 1px solid var(--deictic-line);
   border-bottom: 1px solid var(--deictic-line);
 }
@@ -195,6 +203,22 @@ button {
 }
 button:hover { border-color: var(--deictic-muted); }
 button:disabled { opacity: 0.5; cursor: default; }
+button:disabled:hover { border-color: var(--deictic-line); }
+/* One ring for whatever the keyboard lands on, in place of each browser's own. */
+button:focus-visible, a:focus-visible { outline: 1px solid var(--deictic-accent); outline-offset: 1px; }
+button.icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  color: var(--deictic-muted);
+}
+button.icon svg { width: 14px; height: 14px; }
+button.icon:hover:not(:disabled) { color: var(--deictic-fg); background: rgb(255 255 255 / 0.08); }
 button.primary { background: var(--deictic-accent); border-color: var(--deictic-accent); color: var(--deictic-on-accent); }
 input, textarea {
   box-sizing: border-box;
@@ -208,7 +232,8 @@ input, textarea {
 }
 input:focus, textarea:focus { outline: 1px solid var(--deictic-accent); }
 code { font: 12px ui-monospace, monospace; }
-.body { padding: 8px; overflow: auto; }
+/* Border-box, as the popup holds the body's height by its whole box while a tab reads. */
+.body { box-sizing: border-box; padding: 8px; overflow: auto; }
 .status { padding: 0 8px 6px; font-size: 12px; color: var(--deictic-muted); }
 .status:empty { display: none; }
 .status.problem { color: var(--deictic-problem); }
