@@ -278,7 +278,7 @@ const clock = (ms: number) => {
 
 /**
  * What was drawn on each shot, and with several, where the element is in each: nothing marks it there. One
- * shot's place is the `deictic.box` label, so a shot with no marks has no line.
+ * shot's place is the `deictic.position` and `deictic.size` labels, so a shot with no marks has no line.
  */
 function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
   const [only] = shots;
@@ -326,8 +326,14 @@ function labelsOf({ code, element }: Source, target: Target, op: Op): Record<str
     ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
     'deictic.count': String(op.count),
-    ...(op.screenshots?.length === 1 && shot !== undefined ? { 'deictic.box': boxOf(shot.box).join(',') } : {}),
+    ...(op.screenshots?.length === 1 && shot !== undefined ? placeOf(shot.box) : {}),
   };
+}
+
+/** Where the element is in the one shot, from its top left, and how big: `87,387` and `138x32`, as the viewport is written. */
+function placeOf(box: Box): Record<string, string> {
+  const [x, y, width, height] = boxOf(box);
+  return { 'deictic.position': `${x},${y}`, 'deictic.size': `${width}x${height}` };
 }
 
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;

@@ -27,9 +27,10 @@ The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
 | `deictic.url`      | The page's whole URL (in the text instead when it's over 256 characters)                                                                      |
 | `deictic.viewport` | `1280x800`, so you can look at the page as they did                                                                                           |
 | `deictic.count`    | How many elements on the page that line renders                                                                                               |
-| `deictic.box`      | `x,y,width,height` of the element in the screenshot, in CSS pixels from its top left                                                          |
+| `deictic.position` | `87,387`: the element's `x,y` in the screenshot, in CSS pixels from its top left                                                              |
+| `deictic.size`     | `138x32`: its width and height there                                                                                                          |
 
-`deictic.box` is there with one screenshot; with several, each one's place is in the text. The source isn't in the
+`deictic.position` and `deictic.size` are there with one screenshot; with several, each one's place is in the text. The source isn't in the
 task: read the file. For the element as it rendered, open the page.
 
 `task.mjs` says whether that line still reads as the task saw it, or where it moved.

@@ -156,7 +156,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text (what was typed, then only what no label
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
-  or the root's `package.json`, `at`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `box` with one shot), under
+  or the root's `package.json`, `at`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
   the user's own `labels`; the source and the rendered HTML aren't sent. `read` lists the element's tasks by that label, and the channel's page
   (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`). Undo cancels the task
   unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `client.ts` is the Task tab. With

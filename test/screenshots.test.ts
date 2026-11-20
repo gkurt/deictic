@@ -73,7 +73,7 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
   });
   const { message } = await team.thread(model.tasks[0]!.id);
   // One shot's place is a label; the text has a line for it only when marks are drawn on it.
-  expect(message.labels['deictic.box']).toBe('10,20,300,24');
+  expect(message.labels).toMatchObject({ 'deictic.position': '10,20', 'deictic.size': '300x24' });
   expect(message.text).not.toContain('The screenshot has');
   expect(message.text).toContain('2 marks on the page, drawn in the screenshot; the notes say: "Make it red"');
   expect(message.attachments).toEqual([expect.objectContaining({ name: `${id}.png`, type: 'image/png', size: PNG.length })]);
@@ -154,6 +154,7 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toContain('In screenshot 1 at x 10, y 20, 300×24, with 2 marks drawn on it; the notes say: "Too close"');
   expect(message.text).toContain('In screenshot 2 at x 0, y 0, 300×24');
-  expect(message.labels['deictic.box']).toBeUndefined();
+  expect(message.labels['deictic.position']).toBeUndefined();
+  expect(message.labels['deictic.size']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
 });

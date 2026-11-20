@@ -26,7 +26,7 @@ const facts = [
   ['deictic.url', (v) => v],
   ['deictic.viewport', (v) => `Viewport ${v}`],
   ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
-  ['deictic.box', (v) => `In the screenshot at x,y,width,height ${v} (CSS pixels from its top left)`],
+  ['deictic.position', (v) => `In the screenshot at x,y ${v}, ${root.labels['deictic.size'] ?? '?'} (CSS pixels from its top left)`],
 ];
 for (const [key, say] of facts) {
   const line = root.labels[key] === undefined ? undefined : say(root.labels[key]);
