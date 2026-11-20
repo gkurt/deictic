@@ -1,9 +1,9 @@
 /**
  * `deictic/tasks`: open its tab on an element to add a task about it to a Vercel Board
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
- * line and tag as the source writes it, the page, and the element as it rendered. Whatever works the
- * board's tasks (a person, or an agent of theirs claiming them) takes it from there; deictic only
- * adds them.
+ * line and tag, and the page. The short facts beside them (viewport, how many, where it is in the shot)
+ * are labels. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
+ * from there; deictic only adds them.
  *
  * Adding one is a change like any other: undo cancels the task, while no one has claimed it, and redo
  * adds it again, as a new task. Each task carries `deictic.at=<file:line:column>`, so the panel
@@ -61,8 +61,6 @@ export interface Op {
   /** The page's URL. */
   page: string;
   viewport: { width: number; height: number };
-  /** The element's HTML as it rendered, cut short. */
-  html: string;
   /**
    * What was under the pointer inside the element, where nothing marked it (a dependency's markup, or a
    * shadow root's): its path from the element, and its HTML, cut short.
@@ -195,11 +193,11 @@ export function tasks(options: TasksOptions = {}) {
       }),
     apply: (source, target, op) => {
       if (op.text.trim() === '') throw new Refusal('say what should change first');
-      const labels = { ...options.labels, [AT]: atOf(target), 'deictic.page': clip(new URL(op.page).pathname, 256) };
+      const labels = { ...options.labels, ...labelsOf(source, target, op) };
       return asked(async () => {
         const attachments = await attach(op);
         return {
-          done: await create({ channel, text: textOf(source, target, op), labels, ...(attachments === undefined ? {} : { attachments }) }),
+          done: await create({ channel, text: textOf(target, op), labels, ...(attachments === undefined ? {} : { attachments }) }),
         };
       });
     },
@@ -264,40 +262,64 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-/** Where the element is in each shot, and what was drawn on it. */
+/**
+ * What was drawn on each shot, and with several, where the element is in each: nothing marks it there. One
+ * shot's place is the `deictic.box` label, so a shot with no marks has no line.
+ */
 function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
+  const [only] = shots;
+  if (shots.length === 1 && only !== undefined) {
+    const { marks } = only;
+    return marks === undefined || marks.count === 0
+      ? []
+      : [`The screenshot has ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`];
+  }
   return shots.map(({ box, marks }, i) => {
-    const name = shots.length === 1 ? 'the screenshot' : `screenshot ${i + 1}`;
     const drawn = marks === undefined || marks.count === 0 ? '' : `, with ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`;
-    return `In ${name} at ${boxOf(box)}${drawn}`;
+    const [x, y, width, height] = boxOf(box);
+    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${drawn}`;
   });
 }
 
-/** A box as `x 12, y 40, 300×24`, in whole CSS pixels. */
-const boxOf = ({ x, y, width, height }: Box) => `x ${Math.round(x)}, y ${Math.round(y)}, ${Math.round(width)}×${Math.round(height)}`;
+/** A box as `x,y,width,height`, in whole CSS pixels from the shot's top left. */
+const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.round);
+
+/** A label's value: a board holds 256 characters. */
+const LABEL = 256;
+
+/**
+ * The facts about the element, as labels: short values a script reads without parsing the text, and a watch
+ * filters by. `deictic.line` is the opening tag's first line as the task saw it, to tell later that it moved.
+ */
+function labelsOf({ code, element }: Source, target: Target, op: Op): Record<string, string> {
+  const [shot] = op.screenshots ?? [];
+  return {
+    [AT]: atOf(target),
+    'deictic.tag': target.tag,
+    'deictic.line': clip(code.slice(element.start, element.end).split('\n', 1)[0]!.trim(), LABEL),
+    'deictic.page': clip(new URL(op.page).pathname, LABEL),
+    'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
+    'deictic.count': String(op.count),
+    ...(op.screenshots?.length === 1 && shot !== undefined ? { 'deictic.box': boxOf(shot.box).join(',') } : {}),
+  };
+}
 
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;
 
-/** The task's text: what was typed, then where, for whoever works it. A board holds 10,000 characters. */
-function textOf({ code, element }: Source, target: Target, op: Op): string {
-  const where = [
-    `\`${atOf(target)}\` · \`<${target.tag}>\`${op.count > 1 ? ` (${op.count} on the page)` : ''}`,
-    `${op.page} at ${op.viewport.width}×${op.viewport.height}`,
-    // Nothing marks the element in the shot, so the text says where it is.
+/**
+ * The task's text: what was typed, then where and what's attached, for a person reading the board. The rest
+ * is in the labels, and the source is in the file. A board holds 10,000 characters.
+ */
+function textOf(target: Target, op: Op): string {
+  const tail = [
+    '',
+    '---',
+    `\`${atOf(target)}\` · \`<${target.tag}>\``,
+    op.page,
     ...shotsOf(op.screenshots ?? []),
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
-  ];
-  const tail = [
-    '',
-    '---',
-    ...where,
-    '',
-    'In the source:',
-    fence(code.slice(element.start, element.end), 'tsx'),
-    'Rendered:',
-    fence(op.html, 'html'),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ].join('\n');
   return clip(op.text.trim(), 10_000 - tail.length) + tail;

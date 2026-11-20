@@ -17,7 +17,6 @@ const op = {
   text: 'The headline wraps on phones\nKeep it on one line down to 360px.',
   page: `${ORIGIN}/pricing?plan=pro`,
   viewport: { width: 390, height: 844 },
-  html: '<h1 class="text-4xl" data-deictic="src/App.tsx:1:26">Pricing</h1>',
   count: 1,
 };
 
@@ -50,11 +49,19 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect(json.model.tasks).toEqual([{ id: expect.any(String), title: 'The headline wraps on phones', state: 'ready' }]);
 
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.labels).toEqual({ team: 'web', 'deictic.at': 'src/App.tsx:1:26', 'deictic.page': '/pricing', 'board.task': 'ready' });
+  expect(message.labels).toEqual({
+    team: 'web',
+    'deictic.at': 'src/App.tsx:1:26',
+    'deictic.tag': 'h1',
+    'deictic.line': '<h1 className="text-4xl">',
+    'deictic.page': '/pricing',
+    'deictic.viewport': '390x844',
+    'deictic.count': '1',
+    'board.task': 'ready',
+  });
   expect(message.text).toStartWith(op.text);
-  expect(message.text).toContain('`src/App.tsx:1:26` · `<h1>`');
-  expect(message.text).toContain(`${op.page} at 390×844`);
-  expect(message.text).toContain('<h1 className="text-4xl">');
+  // The place and the page, and nothing of the source or the rendered HTML after them.
+  expect(message.text).toEndWith(['', '---', '`src/App.tsx:1:26` · `<h1>`', op.page].join('\n'));
   // A task touches no file.
   expect(p.read('src/App.tsx')).toContain('className="text-4xl"');
 });

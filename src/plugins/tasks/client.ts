@@ -452,7 +452,6 @@ export default defineClientPlugin<Model, Op>({
           text: text.value,
           page: location.href,
           viewport: { width: innerWidth, height: innerHeight },
-          html: el.outerHTML.slice(0, 4000),
           ...(context.pointed === undefined
             ? {}
             : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),

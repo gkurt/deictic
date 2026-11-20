@@ -17,13 +17,22 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, by ${root.author?.handle ?? root.by.actor}, ${root.createdAt}`);
 console.log(`\nAsked:\n${asked.trim()}\n`);
-console.log(where.split('\nIn the source:')[0].trim());
 // The part inside the element that was pointed at, where nothing marked it: what the person means.
 const pointed = where.match(/\nPointed at, inside it: `([^`]*)`\n`{3,}\w*\n([\s\S]*?)\n`{3,}/);
+console.log((pointed ? where.slice(0, pointed.index) : where).trim());
+// The short facts are labels: the viewport to look at the page in, and where the element is in the one shot.
+const facts = [
+  ['deictic.viewport', (v) => `Viewport ${v}`],
+  ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
+  ['deictic.box', (v) => `In the screenshot at x,y,width,height ${v} (CSS pixels from its top left)`],
+];
+for (const [key, say] of facts) {
+  const line = root.labels[key] === undefined ? undefined : say(root.labels[key]);
+  if (line !== undefined) console.log(line);
+}
 if (pointed) console.log(`\nPointed at, inside it: ${pointed[1]}\n  ${pointed[2]}`);
 
 // The place as the task saw it, against the file now: the element's opening tag may have moved or changed.
-const then = where.match(/In the source:\n`{3,}\w*\n([\s\S]*?)\n`{3,}/)?.[1];
 if (at !== undefined) {
   const [file, line] = [at.replace(/:\d+:\d+$/, ''), Number(at.split(':').at(-2))];
   // Marks are from the dev server's root: here, above, or a folder with a .deictic/ of its own.
@@ -33,7 +42,7 @@ if (at !== undefined) {
     console.log(`\n${file} isn't under ${roots.join(' or ')}: find the dev server's root.`);
   } else {
     const lines = readFileSync(path, 'utf8').split('\n');
-    const first = then?.split('\n')[0]?.trim();
+    const first = root.labels['deictic.line'];
     const now = lines[line - 1]?.trim();
     if (first === undefined || now?.startsWith(first.slice(0, 40))) {
       console.log(`\nSource: ${path}:${line}, as the task saw it.`);

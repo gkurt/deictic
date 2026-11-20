@@ -79,7 +79,7 @@ test('a task attaches the recording, saying how long it ran and where it replays
       body: JSON.stringify({
         plugin: 'tasks',
         target: p.target('src/App.tsx', 'h1'),
-        op: { text: 'Flickers', page: `${ORIGIN}/`, viewport: { width: 800, height: 600 }, html: '<h1>Pricing</h1>', count: 1, ...op },
+        op: { text: 'Flickers', page: `${ORIGIN}/`, viewport: { width: 800, height: 600 }, count: 1, ...op },
       }),
     }).then(async (r) => (await r.json()) as { model: Model; problem?: string });
   const replay = `${ORIGIN}/__deictic/plugins/recordings/replay/${id}`;

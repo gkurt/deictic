@@ -5,7 +5,7 @@ Point at an element in your running app and leave a task about it, for you, a te
 Hold **Alt** and point: the element is outlined with its tag and the file and line that rendered it. **Alt-click**,
 say what should change, and attach a screenshot to draw on, a screen recording or a voice note. The task goes to a
 [Vercel Board](https://vercel.com/docs/board) with everything an agent needs to find the code: the element's
-`file:line:column`, its source and rendered HTML, the page and the viewport.
+`file:line:column`, the page and the viewport.
 
 It runs in your dev server only. A production build has none of it.
 

@@ -77,7 +77,7 @@ test('a task attaches voice notes, and a recording’s voice, saying what each i
         text: 'Too quiet',
         page: `${ORIGIN}/`,
         viewport: { width: 800, height: 600 },
-        html: '<h1>Pricing</h1>',
+
         count: 1,
         recordings: [{ id: recorded, duration: 9_000, replay, voice: [spoken.id] }],
         voice: [{ id: note.id, duration: 5_400 }],

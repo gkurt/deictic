@@ -59,7 +59,7 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
     ask('apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(
       async (r) => (await r.json()) as { model: Model; problem?: string },
     );
-  const op = { text: 'Too tight', page: `${ORIGIN}/`, viewport: { width: 800, height: 600 }, html: '<h1>Pricing</h1>', count: 1 };
+  const op = { text: 'Too tight', page: `${ORIGIN}/`, viewport: { width: 800, height: 600 }, count: 1 };
   const target = p.target('src/App.tsx', 'h1');
 
   const { model } = await post({
@@ -72,7 +72,9 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
     },
   });
   const { message } = await team.thread(model.tasks[0]!.id);
-  expect(message.text).toContain('In the screenshot at x 10, y 20, 300×24');
+  // One shot's place is a label; the text has a line for it only when marks are drawn on it.
+  expect(message.labels['deictic.box']).toBe('10,20,300,24');
+  expect(message.text).not.toContain('The screenshot has');
   expect(message.text).toContain('2 marks on the page, drawn in the screenshot; the notes say: "Make it red"');
   expect(message.attachments).toEqual([expect.objectContaining({ name: `${id}.png`, type: 'image/png', size: PNG.length })]);
 
@@ -139,7 +141,7 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
         text: 'Too tight',
         page: `${ORIGIN}/`,
         viewport: { width: 800, height: 600 },
-        html: '<h1>Pricing</h1>',
+
         count: 1,
         screenshots: [
           { id: one.id, box: { x: 10, y: 20, width: 300, height: 24 }, marks: { count: 2, notes: ['Too close'] } },
@@ -151,6 +153,7 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
   const { model } = (await res.json()) as { model: Model };
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toContain('In screenshot 1 at x 10, y 20, 300×24, with 2 marks drawn on it; the notes say: "Too close"');
-  expect(message.text).toContain('In screenshot 2 at x 0, y 0, 300×24\n');
+  expect(message.text).toContain('In screenshot 2 at x 0, y 0, 300×24');
+  expect(message.labels['deictic.box']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
 });

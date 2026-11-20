@@ -7,17 +7,31 @@ vb tasks claim 68 --lease 30m
 node <skill>/scripts/task.mjs 68        # --out <dir> downloads the attachments too
 ```
 
-A task's text is what the person typed, then `---` and where:
+A task's text is what the person typed, then `---` and:
 
 - `` `src/pages/home.tsx:42:9` · `<p>` ``: the element's opening tag, from the dev server's root (the folder its
-  `.deictic/` is in), in UTF-16 columns from 1. Also the label `deictic.at`; the page's path is `deictic.page`.
-- The page's URL and viewport size, so you can look at it as they did.
-- Each attachment, described: a screenshot and where the element is in it, how many marks are on it and what the
-  notes say; a recording, its length, its voice clips and its replay URL; a voice note's length.
-- The opening tag as the source wrote it, and the element's HTML as it rendered, with its runtime classes.
+  `.deictic/` is in), in UTF-16 columns from 1.
+- The page's URL.
+- What's attached and needs saying: the marks on a screenshot and what the notes say; a recording, its length, its
+  voice clips and its replay URL; a voice note's length.
 - Sometimes `Pointed at, inside it:` a path and HTML: the person pointed at markup inside the element that no line
   marks (a dependency's, or a shadow root's). That part is what they mean; find it by its classes. On deictic's
   own `/internal/` page it's deictic's popup, so the fix is in deictic's client code, not the page.
+
+The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
+
+| Label              | Value                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| `deictic.at`       | `src/pages/home.tsx:42:9`                                                            |
+| `deictic.tag`      | `p`                                                                                  |
+| `deictic.line`     | The opening tag's first line as the task saw it, up to 256 characters                |
+| `deictic.page`     | The page's path                                                                      |
+| `deictic.viewport` | `1280x800`, so you can look at the page as they did                                  |
+| `deictic.count`    | How many elements on the page that line renders                                      |
+| `deictic.box`      | `x,y,width,height` of the element in the screenshot, in CSS pixels from its top left |
+
+`deictic.box` is there with one screenshot; with several, each one's place is in the text. The source isn't in the
+task: read the file. For the element as it rendered, open the page.
 
 `task.mjs` says whether that line still reads as the task saw it, or where it moved.
 
