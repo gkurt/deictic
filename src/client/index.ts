@@ -549,8 +549,8 @@ function openPanel({
       apply: async (op) => {
         say('Writing…');
         try {
-          const result = await post<{ model: unknown; change: { label: string } }>('apply', { plugin: plugin.name, target, op });
-          say(`Saved: ${result.change.label}`);
+          const result = await post<{ model: unknown }>('apply', { plugin: plugin.name, target, op });
+          say('');
           void steps();
           return result.model;
         } catch (e) {
