@@ -163,6 +163,9 @@ function Demo() {
   }, [pointed, held]);
   const active = pointed ?? TAGS[step % TAGS.length]!;
   const { line, column } = AT[active];
+  // The one outlined in the card, as the overlay would: none while deictic's own popup is open on one, which draws
+  // its own around it and shows the element as it is, with nothing of the demo's on it.
+  const lit = held ? null : active;
   const light = (tag: Tag | null) => {
     if (!held) setPointed(tag);
   };
@@ -172,23 +175,23 @@ function Demo() {
     e.stopPropagation();
     light(tag);
   };
-  const mark = (tag: Tag) => (active === tag ? <Label tag={tag} /> : null);
+  const mark = (tag: Tag) => (lit === tag ? <Label tag={tag} /> : null);
 
   return (
     <figure className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm" onPointerLeave={() => light(null)}>
       <div className="grid sm:grid-cols-2">
         <div className="flex items-center justify-center border-b border-line px-6 py-12 sm:border-r sm:border-b-0">
           <article
-            className={cn('relative w-52 cursor-pointer rounded-md border border-line p-6 font-sans', active === 'article' && OUTLINED)}
+            className={cn('relative w-52 cursor-pointer rounded-md border border-line p-6 font-sans', lit === 'article' && OUTLINED)}
             onClick={openDeictic}
             onPointerOver={point('article')}
           >
             {mark('article')}
-            <h3 className={cn('relative text-lg font-semibold', active === 'h3' && OUTLINED)} onPointerOver={point('h3')}>
+            <h3 className={cn('relative text-lg font-semibold', lit === 'h3' && OUTLINED)} onPointerOver={point('h3')}>
               {mark('h3')}
               Pro
             </h3>
-            <p className={cn('relative mt-6 text-sm text-muted', active === 'p' && OUTLINED)} onPointerOver={point('p')}>
+            <p className={cn('relative mt-6 text-sm text-muted', lit === 'p' && OUTLINED)} onPointerOver={point('p')}>
               {mark('p')}
               $12 / month
             </p>
@@ -196,7 +199,7 @@ function Demo() {
               type="button"
               className={cn(
                 'relative mt-7 w-full rounded bg-fg px-3 py-1.5 text-sm text-bg',
-                active === 'button' && 'outline-2 outline-signal',
+                lit === 'button' && 'outline-2 outline-signal',
               )}
               onPointerOver={point('button')}
             >
