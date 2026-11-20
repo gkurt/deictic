@@ -45,3 +45,10 @@ test('keeps a mark the source already has, and skips member and namespaced tags'
 test('counts columns in UTF-16, as the browser and the parser do', () => {
   expect(locate('const s = "😀"; const a = <i />;', 'x.tsx')?.code).toContain('x.tsx:1:27');
 });
+
+test('reads JSX in a plain .js module, and never parses one with no tag in it', () => {
+  expect(locate('export const a = <b />;', 'x.js')?.code).toBe('export const a = <b data-deictic="x.js:1:18" />;');
+  expect(locate('export const a = 1 < 2;', 'x.js')).toBeUndefined();
+  // A type parameter is JSX's opening tag in `.js`, which doesn't parse: left as it is.
+  expect(locate('const a = <T,>(b: T) => b;', 'x.mjs')).toBeUndefined();
+});

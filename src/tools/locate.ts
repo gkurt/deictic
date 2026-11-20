@@ -14,7 +14,11 @@ import MagicString from 'magic-string';
 import { type JSXOpeningElement, parseSync, Visitor } from 'oxc-parser';
 
 export const ATTRIBUTE = 'data-deictic';
-export const JSX = /\.[cm]?[jt]sx$/;
+/** Modules that may hold JSX: `.jsx` and `.tsx`, and plain `.js`, as many React projects write theirs. */
+export const JSX = /\.[cm]?(?:[jt]sx|js)$/;
+
+/** A module parsed, with JSX read in a `.js` file too, which the parser reads there only when told. */
+export const parse = (file: string, code: string) => parseSync(file, code, /\.[cm]?js$/.test(file) ? { lang: 'jsx' } : undefined);
 
 export interface Located {
   code: string;
@@ -30,7 +34,9 @@ export const isHost = (el: JSXOpeningElement) => el.name.type === 'JSXIdentifier
  * doesn't parse, which the framework's own transform reports better.
  */
 export function locate(code: string, file: string, append = ''): Located | undefined {
-  const { program, errors } = parseSync(file, code);
+  // No tag, no parse: most `.js` modules have none, and every one of the project's comes through here.
+  if (!/<[a-z]/.test(code)) return undefined;
+  const { program, errors } = parse(file, code);
   if (errors.length > 0) return undefined;
   const lines = lineStarts(code);
   const s = new MagicString(code);

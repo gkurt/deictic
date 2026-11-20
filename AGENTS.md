@@ -47,7 +47,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   shortcut only with a `client`, shortcuts with deictic's own) as an integration starts; `setUp` runs every server `setup` at once and
   answers the shared context, whose `use` reads lazily.
 - `src/tools/locate.ts`: the transform. Marks host elements (lowercase JSX tags) with
-  `data-deictic="file:line:column"`, where the opening tag's `<` is, in UTF-16 columns from 1.
+  `data-deictic="file:line:column"`, where the opening tag's `<` is, in UTF-16 columns from 1, in `.jsx`, `.tsx`
+  and plain `.js` modules (`JSX`; `parse` reads JSX in `.js`, and a module with no `<tag` in it isn't parsed).
   Must see the source as written, so integrations run it first. `lineStarts`, `position`, `offsetOf`.
 - `src/tools/source.ts`: `sourceAt`, a target's file parsed and its opening tag found by offset and
   tag (a `Refusal` saying to reload when the file moved on); `resolveFile`, which refuses anything
@@ -82,8 +83,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `next.ts` use: marks, and appends the client's import where `client` is given (the browser's build).
 - `src/webpack.ts`: `DeicticPlugin` for webpack 5 and Rspack, development mode only: the loader as a `pre`
   rule, the endpoints first in `devServer.setupMiddlewares` (browser targets only), or `middleware`.
-- `src/next.ts`: `withDeictic(config, options)`, dev only: Turbopack rules for `*.tsx`/`*.jsx` (browser
-  with the client, the server without, neither for `foreign` code), the endpoints on a port of their own
+- `src/next.ts`: `withDeictic(config, options)`, dev only: Turbopack rules for `*.tsx`/`*.jsx`/`*.js` (browser
+  with the client, the server without, neither for `foreign` code), the same loader as a `pre` rule in the app's
+  `webpack` for `next dev --webpack` (both always set: Next refuses a `webpack` key only with no `turbopack` one), the endpoints on a port of their own
   behind a `beforeFiles` rewrite, `open` redirecting to Next's `__nextjs_launch-editor`. Next loads its
   config with `require`, so the package's exports use `default`, not `import`.
 - `src/bun.ts`: a `[serve.static]` plugin (`onLoad`, skipped in `Bun.build`) whose `routes` the server spreads
@@ -232,7 +234,7 @@ integrations, also from `dist`; `test/integrations.test.ts` covers each integrat
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
 in their output, each scan first shown to find it in a build where deictic runs. With the React Compiler on, marking
 must still see JSX as written: `integrations.test.ts` covers Vite (`react({ compiler: true })`) and Rspack (`babel-loader`
-with `babel-plugin-react-compiler`), and `test/next-dev.test.ts` runs a real `next dev` with `reactCompiler: true`, deictic
+with `babel-plugin-react-compiler`), and `test/next-dev.test.ts` runs a real `next dev` on Turbopack and on webpack with `reactCompiler: true`, deictic
 from `dist` (build first), in a fixture whose `node_modules/deictic` is the manifest and a link to `dist` (a link to the
 repository would loop, as it holds the fixture).
 

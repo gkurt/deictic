@@ -160,6 +160,7 @@ describe('Next', () => {
     basePath?: string;
     turbopack?: { rules?: Record<string, Rule | Rule[]> };
     rewrites?: () => Promise<{ beforeFiles: unknown[] }>;
+    webpack?: (config: { module: { rules: unknown[] } }, context: { isServer: boolean }) => { module: { rules: unknown[] } };
   };
 
   test('in dev, marks JSX on both sides, starts the overlay in the browser, and rewrites to its endpoints', async () => {
@@ -179,6 +180,15 @@ describe('Next', () => {
     expect(inBrowser).toContain('.deictic/client.js');
     expect(readFileSync(browser!.loaders[0]!.options.client!, 'utf8')).toContain('start({ base: "/docs/"');
     expect(load(server!.loaders[0]!.options, page, APP)).not.toContain('.deictic/client.js');
+
+    // For `next dev --webpack`: the same loader, first and `pre`, the client only in the browser's build.
+    const [rule] = next.webpack!({ module: { rules: ['theirs'] } }, { isServer: false }).module.rules as {
+      enforce: string;
+      use: { options: LoaderOptions }[];
+    }[];
+    expect(rule!.enforce).toBe('pre');
+    expect(rule!.use[0]!.options.client).toBe(browser!.loaders[0]!.options.client);
+    expect(next.webpack!({ module: { rules: [] } }, { isServer: true }).module.rules).toHaveLength(1);
 
     const { beforeFiles } = await next.rewrites!();
     const [rewrite] = beforeFiles as { source: string; destination: string }[];

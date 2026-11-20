@@ -22,6 +22,7 @@ import type { BunPlugin } from 'bun';
 
 import { endpoints } from './tools/endpoints.ts';
 import { type DeicticOptions, importOf, mark, prepare, writeClient } from './tools/integration.ts';
+import { JSX } from './tools/locate.ts';
 
 export interface DeicticBunOptions extends DeicticOptions {
   /** The project's root, which marks and edits are from: the working directory by default. */
@@ -65,13 +66,13 @@ export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
       const client = writeClient(root, plugins, '/', shortcut);
       // Bun names the side it loads a module for (undocumented, and not in Bun's types); the dev server's is the browser's.
       const forBrowser = (args: object) => !('side' in args) || args.side === 'client';
-      build.onLoad({ filter: /\.[cm]?[jt]sx$/ }, async (args) => {
+      build.onLoad({ filter: JSX }, async (args) => {
         // A dependency's is left to Bun, unread.
         if (/[\\/]node_modules[\\/]/.test(args.path)) return undefined;
         const code = await Bun.file(args.path).text();
         const marked = mark(code, args.path, root, forBrowser(args) ? importOf(client, args.path) : '');
         if (marked === undefined) return undefined;
-        return { contents: marked.code, loader: args.path.endsWith('ts') || args.path.endsWith('tsx') ? 'tsx' : 'jsx' };
+        return { contents: marked.code, loader: args.path.endsWith('tsx') ? 'tsx' : 'jsx' };
       });
     },
   };

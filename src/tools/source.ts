@@ -5,11 +5,11 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { type JSXOpeningElement, parseSync, Visitor } from 'oxc-parser';
+import { type JSXOpeningElement, Visitor } from 'oxc-parser';
 
 import { Refusal, type Source, type Target, type TextEdit } from '#src/index.ts';
 
-import { isHost, lineStarts, offsetOf } from './locate.ts';
+import { isHost, lineStarts, offsetOf, parse } from './locate.ts';
 
 /** A file from the project's root, as an absolute path; refused anywhere the page has no business writing. */
 export function resolveFile(root: string, file: string): string {
@@ -34,7 +34,7 @@ export function readSource(root: string, file: string): string {
 export function sourceAt(root: string, target: Target): Source {
   const { file, line, column } = target.loc;
   const code = readSource(root, file);
-  const { program, errors } = parseSync(file, code);
+  const { program, errors } = parse(file, code);
   if (errors.length > 0) throw new Refusal(`${file} doesn't parse: fix it first (${errors[0]!.message})`);
   const offset = offsetOf(lineStarts(code), line, column);
   let element: JSXOpeningElement | undefined;
