@@ -6,7 +6,7 @@
  * its shortcut was pressed.
  *
  * Everything drawn sits in one shadow root, so neither the page's styles nor ours cross over. A
- * panel's undo and redo are the whole history's, the latest change first, whichever plugin made it.
+ * panel's undo and redo are its tab's on its element: the latest change that plugin made there.
  */
 import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Target } from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
@@ -400,7 +400,7 @@ function openPanel({
   // Given to the first tab's first mount only: another tab, or a remount after an undo, starts afresh.
   let resumed = coming;
   const panel = div('panel');
-  // The tabs, then the element's place and the history's undo and redo, which are every plugin's.
+  // The tabs, then the element's place and undo and redo, which are the shown tab's on this element.
   const head = div('head');
   head.setAttribute('role', 'tablist');
   const bar = div('bar');
@@ -413,12 +413,14 @@ function openPanel({
   where.insertAdjacentHTML('beforeend', OUT);
   where.title = 'Open in editor';
   where.setAttribute('aria-label', `Open ${file.textContent} in the editor`);
-  where.href = `${base}__deictic/open?${new URLSearchParams({ file: target.loc.file, line: String(target.loc.line), column: String(target.loc.column) })}`;
+  // The element's place, as a request's query names it.
+  const at = { file: target.loc.file, line: String(target.loc.line), column: String(target.loc.column) };
+  where.href = `${base}__deictic/open?${new URLSearchParams(at)}`;
   where.addEventListener('click', (e) => {
     e.preventDefault();
     void fetch(where.href);
   });
-  const undo = button('↶', 'Undo the last change');
+  const undo = button('↶', 'Undo the last change here');
   const redo = button('↷', 'Redo');
   const close = button('×', 'Close (Esc)');
   const buttons = tabs.map((tab) => {
@@ -459,10 +461,9 @@ function openPanel({
     cleanup = undefined;
     body.replaceChildren();
   };
-  // The change undone may be another element's, or this one's from before the panel opened: the
-  // panel reads its model again either way.
+  // The change undone may be this tab's from before the panel opened: the panel reads its model again.
   const step = (route: 'undo' | 'redo') =>
-    post<{ change: { label: string } }>(route)
+    post<{ change: { label: string } }>(route, { plugin: current.plugin.name, target })
       .then(
         async ({ change }) => {
           await load();
@@ -471,13 +472,16 @@ function openPanel({
         (e: unknown) => say(messageOf(e), true),
       )
       .finally(() => void steps());
-  // Undo and redo as the history stands: off with nothing to take back or do again, else saying what they would.
-  // Read on open, after each change made here, and as the pointer comes back, for a change made elsewhere.
+  // Undo and redo as the tab's history on this element stands: off with nothing to take back or do again, else
+  // saying what they would. Read as a tab shows, after each change made here, and as the pointer comes back, for a
+  // change made elsewhere. One a later read overtook (another tab's) sets nothing.
+  let asked = 0;
   const steps = async () => {
+    const ask = ++asked;
     let history: { done: { label: string }[]; undone: { label: string }[] };
     try {
-      const res = await fetch(`${base}__deictic/history`);
-      if (!res.ok) return;
+      const res = await fetch(`${base}__deictic/history?${new URLSearchParams({ plugin: current.plugin.name, ...at })}`);
+      if (!res.ok || ask !== asked) return;
       history = (await res.json()) as typeof history;
     } catch {
       return;
@@ -489,7 +493,6 @@ function openPanel({
     redo.disabled = next === undefined;
     redo.title = next === undefined ? 'Nothing to redo' : `Redo ${next.label}`;
   };
-  void steps();
   panel.addEventListener('pointerenter', () => void steps());
 
   const done = (leaving = false) => {
@@ -562,6 +565,7 @@ function openPanel({
     current = tab;
     for (const b of buttons) b.el.setAttribute('aria-selected', String(b.tab === tab));
     remember(tab);
+    void steps();
     void load();
   };
   show(first);

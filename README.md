@@ -94,8 +94,8 @@ which ignores itself in git.
   element's own tag rather than the component around it.
 - Its endpoints are on the dev server's own origin, `/__deictic/*`, and take writes only as same-origin JSON, so no
   other site can make them and no token reaches the page.
-- Every change goes into one history in `.deictic/history.json`, which undo and redo walk. A plugin's own change, a
-  task, is undone by the plugin.
+- Every change goes into one history in `.deictic/history.json`. The popup's undo and redo walk the part of it that
+  is the open tab's on the element it's open on. A plugin's own change, a task, is undone by the plugin.
 
 ## Writing a plugin
 

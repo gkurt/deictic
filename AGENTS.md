@@ -54,11 +54,15 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/tools/kept.ts`: `keptIn(root, …parts)`, a path under the project's `.deictic/`, made with a
   `.gitignore` of `*` the first time. Every default data path goes through it.
 - `src/tools/history.ts`: every change as each file's whole text before and after, or as a plugin's
-  name and record, in `.deictic/history.json`. Undo and redo refuse when a file isn't
-  as the change left it, and call the plugin for its own (refusing when it isn't loaded). A redone
-  record is replaced by what `redo` answers, and an undone one by what `undo` does, where it answers one. A new change drops the redo stack.
+  name and record, in `.deictic/history.json`, each with its `scope` (the plugin, and the element as
+  `file:line:column`). `undo(scope)`, `redo(scope)` and `list(scope)` are that scope's, the latest of it, and the whole
+  history's with none. A file is put back whole while it's as the change left it; else only the lines the change wrote,
+  where they're still there once (`swapped`), which is what takes a change back from under a later one to the same file.
+  Anything else is refused. They call the plugin for its own (refusing when it isn't loaded). A redone
+  record is replaced by what `redo` answers, and an undone one by what `undo` does, where it answers one. A new change drops its scope's redo stack.
 - `src/tools/endpoints.ts`: `/__deictic/{read,apply,undo,redo}` (same-origin JSON POSTs only),
-  `history` and `open` (GET), and each plugin's `routes` under `plugins/<name>/<route>` (anything but
+  `history` and `open` (GET; `undo`, `redo` and `history` scoped where the request names a plugin and the element's
+  place, as the popup always does), and each plugin's `routes` under `plugins/<name>/<route>` (anything but
   GET and HEAD from the page's origin only, in any content type), over `Request` and `Response`;
   `nodeMiddleware` mounts them on Vite. Every request waits for the plugins' setups. A plugin without
   `read` reads `null` and isn't checked against the source; one without `apply` refuses ops.
@@ -102,7 +106,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   Outlines the marked element under the pointer while a shortcut's keys are held, and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
   tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. The popup's head is the tabs and
-  close, then open-in-editor (an arrow out, and an "Open in editor" tooltip), undo and redo (off when `history` has nothing to take back or do again, titled with the change they would; read on open, after a change, and on pointerenter); a tab reads its model when shown (a read another overtook
+  close, then open-in-editor (an arrow out, and an "Open in editor" tooltip), undo and redo, which are the shown tab's on this element (off when its `history` has nothing to take back or do again, titled with the change they would; read as a tab shows, after a change, and on pointerenter); a tab reads its model when shown (a read another overtook
   mounts nothing), and after an undo or redo it remounts with the model read again. While an element marked
   `data-deictic-modal` is in the root, Esc is that modal's, not the popup's. Pointing goes down through open
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,

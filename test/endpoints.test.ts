@@ -39,6 +39,30 @@ test('reads, applies, undoes and redoes through the plugin', async () => {
   expect(p.read('src/App.tsx')).toContain('className="p-4"');
 });
 
+test("undo, redo and history are a plugin's on an element, where the request names them", async () => {
+  const { p, handle, post, target } = setup();
+  await post('apply', { plugin: 'tailwind', target, op: { classes: 'p-4' } });
+  const { file, line, column } = target.loc;
+  const listed = async (query: Record<string, string>) => {
+    const res = (await handle(new Request(`http://localhost:5173/__deictic/history?${new URLSearchParams(query)}`)))!;
+    return ((await res.json()) as { done: { label: string }[] }).done.map((c) => c.label);
+  };
+  const here = { plugin: 'tailwind', file, line: String(line), column: String(column) };
+  expect(await listed(here)).toEqual(['tailwind src/App.tsx:1: +p-4 -p-2']);
+  expect(await listed({ ...here, plugin: 'tasks' })).toEqual([]);
+  expect(await listed({ ...here, column: '99' })).toEqual([]);
+  expect(await listed({})).toHaveLength(1);
+
+  const elsewhere = { plugin: 'tailwind', target: { ...target, loc: { ...target.loc, column: 99 } } };
+  expect(await (await post('undo', elsewhere))!.json()).toEqual({ problem: 'nothing to undo here' });
+  expect(p.read('src/App.tsx')).toContain('className="p-4"');
+  await post('undo', { plugin: 'tailwind', target });
+  expect(p.read('src/App.tsx')).toContain('className="p-2"');
+  expect(await (await post('redo', elsewhere))!.json()).toEqual({ problem: 'nothing to redo here' });
+  await post('redo', { plugin: 'tailwind', target });
+  expect(p.read('src/App.tsx')).toContain('className="p-4"');
+});
+
 test('takes edits only from the page itself, as JSON', async () => {
   const { post, target } = setup();
   const body = { plugin: 'tailwind', target, op: { classes: 'p-4' } };

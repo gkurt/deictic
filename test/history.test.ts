@@ -97,6 +97,59 @@ test("hands a plugin's own change back to its undo and redo, after a restart too
   );
 });
 
+test("undoes and redoes within a scope: a plugin's changes on one element, whatever came after", async () => {
+  const p = project({ 'a.tsx': 'a1', 'b.tsx': 'b1' });
+  const history = new History(p.root);
+  const [a, b] = [
+    { plugin: 'tailwind', target: 'a.tsx:1:1' },
+    { plugin: 'tailwind', target: 'b.tsx:1:1' },
+  ];
+  history.commit('on a', new Map([['a.tsx', 'a2']]), a);
+  history.commit('on b', new Map([['b.tsx', 'b2']]), b);
+  expect(history.list(a).done.map((c) => c.label)).toEqual(['on a']);
+
+  // Not the latest change, which is b's.
+  expect((await history.undo(a)).label).toBe('on a');
+  expect([p.read('a.tsx'), p.read('b.tsx')]).toEqual(['a1', 'b2']);
+  expect(await refusal(history.undo(a))).toBe('nothing to undo here');
+  expect(await refusal(history.undo({ plugin: 'tasks', target: 'b.tsx:1:1' }))).toBe('nothing to undo here');
+
+  // A new change drops its own scope's redo, and leaves another's.
+  history.commit('on b again', new Map([['b.tsx', 'b3']]), b);
+  expect(history.list(a).undone.map((c) => c.label)).toEqual(['on a']);
+  expect((await history.redo(a)).label).toBe('on a');
+  expect(p.read('a.tsx')).toBe('a2');
+
+  // With no scope, the whole history's latest.
+  expect((await history.undo()).label).toBe('on a');
+  expect((await history.undo()).label).toBe('on b again');
+});
+
+test('takes a change back from under a later one to the same file, by its own lines', async () => {
+  const text = (first: string, second: string) => `<div>\n  <h1 className="${first}">A</h1>\n  <p className="${second}">B</p>\n</div>\n`;
+  const p = project({ 'a.tsx': text('p-2', 'm-2') });
+  const history = new History(p.root);
+  const [h1, para] = [
+    { plugin: 'tailwind', target: 'a.tsx:2:3' },
+    { plugin: 'tailwind', target: 'a.tsx:3:3' },
+  ];
+  history.commit('h1', new Map([['a.tsx', text('p-4', 'm-2')]]), h1);
+  history.commit('p', new Map([['a.tsx', text('p-4', 'm-4')]]), para);
+
+  await history.undo(h1);
+  expect(p.read('a.tsx')).toBe(text('p-2', 'm-4'));
+  await history.redo(h1);
+  expect(p.read('a.tsx')).toBe(text('p-4', 'm-4'));
+
+  // Its line edited since: not there as it wrote it, so it's the editor's to undo.
+  p.write('a.tsx', text('p-4 font-bold', 'm-4'));
+  expect(await refusal(history.undo(h1))).toMatch(/a\.tsx changed since "h1" was made/);
+  // Nor where the line it wrote is there twice.
+  p.write('a.tsx', `${text('p-4', 'm-4')}  <h1 className="p-4">A</h1>\n`);
+  expect(await refusal(history.undo(h1))).toMatch(/a\.tsx changed since "h1" was made/);
+  expect(p.read('a.tsx')).toEndWith('<h1 className="p-4">A</h1>\n');
+});
+
 test("keeps what deictic makes in the project's .deictic, which ignores itself in git", () => {
   const p = project({ 'src/App.tsx': 'export const App = () => <h1 />;\n' });
   expect(keptIn(p.root, 'history.json')).toBe(join(p.root, '.deictic', 'history.json'));

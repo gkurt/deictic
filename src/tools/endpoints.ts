@@ -2,7 +2,9 @@
  * The dev server's half of deictic, under `/__deictic/`: `read` and `apply` an op through a
  * plugin, `undo`, `redo` and `history`, and `open`, which opens a place in the editor. Written over
  * `Request` and `Response`, so each integration mounts them its own way (Vite as middleware), and
- * served from the page's own origin, so no token travels to the page.
+ * served from the page's own origin, so no token travels to the page. `undo`, `redo` and `history` are a
+ * plugin's on an element where the request names them (as the popup does: its tab, its element), and
+ * the whole history's where it doesn't.
  *
  * Everything but `open` and `history` writes or may, so only the page itself may send it: a POST of
  * JSON from the same origin, which a form or a script on another site can't send without asking first.
@@ -15,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { type Loc, Refusal, type ServerPlugin, type Target } from '#src/index.ts';
 
-import { History } from './history.ts';
+import { History, type Scope } from './history.ts';
 import { setUp } from './plugins.ts';
 import { applyEdits, resolveFile, sourceAt } from './source.ts';
 
@@ -34,6 +36,11 @@ interface Body {
   target: Target;
   op?: unknown;
 }
+
+const scopeOf = (plugin: string, { file, line, column }: Loc): Scope => ({ plugin, target: `${file}:${line}:${column}` });
+/** The scope an undo or a redo names, or none for the whole history. */
+const scopeIn = ({ plugin, target }: Partial<Body>) =>
+  plugin === undefined || target === undefined ? undefined : scopeOf(plugin, target.loc);
 
 /** Answers deictic's requests, and nothing for any other path. */
 export function endpoints({ root, plugins, base = '/', open, history = new History(root, { plugins }) }: EndpointOptions) {
@@ -58,11 +65,14 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
       const { file, line } = target.loc;
       const label = `${name} ${file}:${line}: ${plugin.describe?.(op, before) ?? 'edit'}`;
       const result = await plugin.apply(source, target, op);
-      const change = Array.isArray(result) ? history.commit(label, applyEdits(source, result)) : history.record(label, name, result.done);
+      const scope = scopeOf(name, target.loc);
+      const change = Array.isArray(result)
+        ? history.commit(label, applyEdits(source, result), scope)
+        : history.record(label, name, result.done, scope);
       return { model: await readOf(plugin, target), change };
     },
-    undo: async () => ({ change: await history.undo() }),
-    redo: async () => ({ change: await history.redo() }),
+    undo: async (body) => ({ change: await history.undo(scopeIn(body)) }),
+    redo: async (body) => ({ change: await history.redo(scopeIn(body)) }),
   };
   // A plugin without `read` has no model, and no need for its element to be where the page says.
   const readOf = (plugin: ServerPlugin, target: Target) => (plugin.read === undefined ? null : plugin.read(sourceAt(root, target), target));
@@ -91,15 +101,16 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
           return Response.json({ problem: `only the page itself may ${req.method} to ${name}` }, { status: 403 });
         return await handle(req, context);
       }
-      if (route === 'history') return Response.json(history.list());
-      if (route === 'open') {
-        const loc = {
-          file: url.searchParams.get('file') ?? '',
-          line: Number(url.searchParams.get('line')),
-          column: Number(url.searchParams.get('column')),
-        };
-        return await open(resolveFile(root, loc.file), loc);
+      const loc = {
+        file: url.searchParams.get('file') ?? '',
+        line: Number(url.searchParams.get('line')),
+        column: Number(url.searchParams.get('column')),
+      };
+      if (route === 'history') {
+        const plugin = url.searchParams.get('plugin');
+        return Response.json(history.list(plugin === null ? undefined : scopeOf(plugin, loc)));
       }
+      if (route === 'open') return await open(resolveFile(root, loc.file), loc);
       const handler = routes[route];
       if (handler === undefined) return new Response(`no endpoint ${url.pathname}`, { status: 404 });
       if (req.method !== 'POST' || !sameOrigin || req.headers.get('content-type')?.startsWith('application/json') !== true)
