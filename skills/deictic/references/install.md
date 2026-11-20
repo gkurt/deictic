@@ -1,7 +1,7 @@
 # Setting deictic up
 
 Only when the project doesn't have it yet, or the person asks. Check first: a `deictic` dependency and its plugin
-in the bundler config. The package's README has every option.
+in the bundler config. The package's README has the setup; each plugin's options are its factory's types.
 
 ## The package and the bundler
 
