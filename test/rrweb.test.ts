@@ -34,6 +34,9 @@ const server = Bun.serve({
 afterAll(() => server.stop());
 
 const viewport = { width: 640, height: 480 };
+// Linux's Chromium antialiases a few glyph edges differently in the iframe (23 pixels on a CI runner, none on
+// Windows): allow 0.05% of the viewport, far below what a misplaced or missing element would change.
+const ALLOWED = Math.round(viewport.width * viewport.height * 0.0005);
 
 /** The page, open, with what the page half sends for it. */
 async function open(): Promise<{ page: Page; snapshot: (scroll?: number) => Promise<Snapshot> }> {
@@ -100,7 +103,9 @@ test.skipIf(browser === undefined)(
     for (const scroll of [0, 900]) {
       const live = new Uint8Array(await page.evaluate((y) => scrollTo(0, y), scroll).then(() => page.screenshot()));
       const drawn = await render(await snapshot(scroll), {});
-      expect(await differing(page, live, drawn)).toBe(0);
+      const n = await differing(page, live, drawn);
+      expect(n).toBeGreaterThanOrEqual(0);
+      expect(n).toBeLessThanOrEqual(ALLOWED);
     }
     await page.close();
   },
