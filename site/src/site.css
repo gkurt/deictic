@@ -24,6 +24,11 @@
   }
 }
 
+/* Scrollbars: a thumb and no track, on whatever is behind them. Inherited by every scrolling box. */
+html {
+  scrollbar-color: color-mix(in srgb, var(--muted) 50%, transparent) transparent;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);

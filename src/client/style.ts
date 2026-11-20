@@ -12,6 +12,8 @@ export const STYLE = `
   --deictic-line: #3f3f46;
   --deictic-problem: #f87171;
   all: initial;
+  /* Inherited by everything in the root: a thumb and no track, on whatever the panel's background is. */
+  scrollbar-color: var(--deictic-line) transparent;
 }
 .box {
   position: fixed;
