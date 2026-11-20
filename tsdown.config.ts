@@ -36,6 +36,9 @@ export default defineConfig({
   // Shared chunks keep their names from build to build, so a dev server running on `dist` (the site's, the
   // examples') goes on resolving the modules it loaded before a rebuild, rather than failing on a name gone.
   hash: false,
+  // And `dist` isn't emptied first: a running dev server would reload its modules while they're gone and
+  // report each as missing. `prepack` cleans, so nothing stale is published.
+  clean: false,
   dts: true,
   sourcemap: true,
 });

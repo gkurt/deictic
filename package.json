@@ -216,7 +216,7 @@
     "test": "bun test --conditions=deictic@dev",
     "checks": "bun run lint && bun check && bun run test",
     "build": "tsdown",
-    "prepack": "tsdown",
+    "prepack": "tsdown --clean",
     "example": "tsdown && bun run --cwd examples/vite dev",
     "prepare": "husky",
     "tegami": "bun scripts/tegami.mts"
