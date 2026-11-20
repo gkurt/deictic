@@ -180,6 +180,8 @@ have no hash in their names (`hash: false`), so rebuilding under a running dev s
 restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
 integrations, also from `dist`; `test/integrations.test.ts` covers each integration, Rspack with a real compile.
+`test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
+in their output, each scan first shown to find it in a build where deictic runs.
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. `site/board.ts` starts `vb serve` on
