@@ -1,26 +1,34 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### First release\n\nPoint at an element in your running app and leave a task about it on a Vercel Board, with a screenshot to draw on, a screen recording or a voice note, on Vite, webpack, Rspack, Next, Bun and Astro. `recommended()` from `deictic/recommended` sets the task plugins up in one line.\n"
-    filename: initial-release.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### Tasks: a board out of the box\n\nWith no `board` option and no `BOARD_URL`, the tasks plugin now starts a board of the project's own with the dev server (`vb serve`, from `@vercel/board`) and stops it with it: `http://127.0.0.1:4100/api/board`, or a free port where that one's taken, its log in `.deictic/board`. `.deictic/board.json` holds its URL, which the skill's scripts read when `BOARD_URL` isn't set.\n\n`local()` from `deictic/tasks` is that board as the `board` option, whatever `BOARD_URL` says, with its `port`, its `dir`, `inspect: false` and more `args` for `vb serve`: `tasks({ board: local({ port: 4200 }) })`.\n\nBefore, the case with neither went to your team's board through `vercel login`. For that now, pass it: `tasks({ board: board() })`, with `board` from `@vercel/board`.\n"
+    filename: local-board.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `standalone`: deictic on a deployed page, for a demo\n\n`deictic/vite` takes `standalone`, a module of the page's that answers the overlay's requests where there's no dev server: with it, a build is marked and has the overlay. Without it, a build has nothing of deictic, as before. `replayPage()` from `deictic/recordings` is the replay page to publish beside such a build.\n"
+    filename: standalone.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic`'s types are its own again\n\n`import type { ServerPlugin } from 'deictic'` found no such export: the build had put a shared chunk, exported under one-letter names, where the entry's types go.\n"
+    filename: types-of-deictic.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - initial-release.md
+      - local-board.md
+      - standalone.md
+      - types-of-deictic.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
-  - id: npm:example-vite
+  - id: npm:example-rspack
     updated: false
   - id: npm:example-bun
     updated: false
-  - id: npm:example-next
+  - id: npm:example-vite
     updated: false
-  - id: npm:example-rspack
+  - id: npm:example-next
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
-  - id: npm:example-vite
-  - id: npm:example-bun
-  - id: npm:example-next
   - id: npm:example-rspack
+  - id: npm:example-bun
+  - id: npm:example-vite
+  - id: npm:example-next
