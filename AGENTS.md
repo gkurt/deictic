@@ -72,7 +72,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/vite.ts`: `enforce: 'pre'` and its transform `order: 'pre'` (before the React Compiler, also `pre`, compiles the JSX away), `apply: 'serve'`. In the browser each marked module appends
   `import "virtual:deictic/client"`, which starts the overlay with deictic's own shortcut and each plugin that
   has a `client`, and its checked shortcut where it has one. No plugins by default.
-  `open` redirects to Vite's `/__open-in-editor`.
+  `open` redirects to Vite's `/__open-in-editor`. With `standalone` (a module of the page's, from the root) it applies
+  in a build too: elements marked, the overlay bundled, and `start` given that module's default export as `server` (a
+  `Standalone`, in `src/index.ts`), which gets every request the overlay would send (`send`, in `src/client/index.ts`)
+  in the dev server's place. An `add` answer of screenshots, voice or recordings may name its `url`, for what's kept
+  where no route serves it.
 - `src/tools/integration.ts`: what every integration shares: `prepare` (checks plugins and shortcuts as
   it starts), `clientModule` (the code that starts the overlay), `writeClient` (that code as
   `.deictic/client.js`, beside a `package.json` with `sideEffects: true` so no bundler drops it, for
@@ -247,7 +251,9 @@ from `dist` (build first), in a fixture whose `node_modules/deictic` is the mani
 repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
-multi-page app running both plugins on itself, also from `dist`. `site/board.ts` starts `vb serve` on
+multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
+works on the deployed site: `src/standalone.ts` answers it in the page (tasks, shots and clips kept there, class edits
+on the element, no recordings, no editor), and shots are `dom()`'s. `site/board.ts` starts `vb serve` on
 port 4100 (tasks in `site/.board`) unless `BOARD_URL` is set, and gives the page its URL. `site/code.ts` holds the
 homepage's code and highlights it beside the bundler (`@pierre/highlights`, a theme of CSS variables that `site.css`
 sets): the page imports the tokens as `virtual:code`, and no highlighter.

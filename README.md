@@ -87,6 +87,18 @@ blanks an element, `rr-mask` masks its text, `maskAllInputs` masks every field (
 deictic's own UI is in them. What a project keeps (the history, shots, recordings, voice notes) is in `.deictic/`,
 which ignores itself in git.
 
+A build has nothing of deictic. To show it on a deployed page with no dev server (a demo), `deictic/vite` takes
+`standalone`, a module of the page's whose default export answers the overlay's requests there:
+
+```ts
+// vite.config.ts
+deictic({ plugins, standalone: 'src/standalone.ts' });
+
+// src/standalone.ts: a request the dev server would get under `/__deictic/`, and its answer
+import type { Standalone } from 'deictic';
+export default (async (request) => Response.json({ model: null })) satisfies Standalone;
+```
+
 ## How it works
 
 - A transform that runs before the framework's own adds `data-deictic="src/App.tsx:12:5"` to every host element

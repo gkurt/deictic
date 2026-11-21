@@ -60,11 +60,11 @@ function Label({ tag }: { tag: Tag }) {
 const OUTLINED = 'outline-2 outline-signal bg-signal/10';
 
 /**
- * On the dev server deictic runs on this page too: a click in the demo card opens its popup on what was clicked, as
- * Alt-click would. A build has no deictic, and no import of it either.
+ * deictic runs on this page too, on the dev server and deployed (`standalone`, in `vite.config.ts`): a click in the
+ * demo card opens its popup on what was clicked, as Alt-click would.
  */
 function openDeictic(e: MouseEvent<HTMLElement>) {
-  if (!import.meta.env.DEV || !(e.target instanceof Element)) return;
+  if (!(e.target instanceof Element)) return;
   const marked = e.target.closest('[data-deictic]');
   if (marked !== null) void import('deictic/client').then(({ openPopup }) => openPopup(marked));
 }

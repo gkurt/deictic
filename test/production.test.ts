@@ -26,6 +26,8 @@ const APP = [
 ].join('\n');
 const HTML =
   '<!doctype html><html><head><title>App</title></head><body><script type="module" src="/src/main.jsx"></script></body></html>\n';
+// What answers the overlay in a `standalone` build: a module of the page's.
+const SERVER = "export default () => new Response('answered in the page');\n";
 const pin = definePlugin({ name: 'pin', client: 'pin/client' });
 
 /** Every file a build wrote, and what's in it. */
@@ -50,7 +52,7 @@ function traces(dir: string): string[] {
 describe('a production build has nothing of deictic', () => {
   test('Vite', async () => {
     const run = async (outDir: string, plugin: ReturnType<typeof vite>) => {
-      const p = project({ 'index.html': HTML, 'src/main.jsx': APP });
+      const p = project({ 'index.html': HTML, 'src/main.jsx': APP, 'src/server.js': SERVER });
       await build({
         root: p.root,
         configFile: false,
@@ -59,11 +61,20 @@ describe('a production build has nothing of deictic', () => {
         plugins: [plugin],
         build: { outDir, rolldownOptions: { external: [/^pin\//] } },
       });
-      return traces(join(p.root, outDir));
+      return {
+        traces: traces(join(p.root, outDir)),
+        text: output(join(p.root, outDir))
+          .map(({ text }) => text)
+          .join('\n'),
+      };
     };
     // Forced into the build, it marks the element and starts the overlay: the scan finds it.
-    expect(await run('forced', { ...vite({ plugins: [pin] }), apply: 'build' })).not.toEqual([]);
-    expect(await run('dist', vite({ plugins: [pin] }))).toEqual([]);
+    expect((await run('forced', { ...vite({ plugins: [pin] }), apply: 'build' })).traces).not.toEqual([]);
+    expect((await run('dist', vite({ plugins: [pin] }))).traces).toEqual([]);
+    // Asked for, it's in the build: the element marked, and the overlay started with the page's module to answer it.
+    const { text } = await run('standalone', vite({ plugins: [pin], standalone: 'src/server.js' }));
+    expect(text).toContain('src/main.jsx:2:');
+    expect(text).toContain('answered in the page');
   }, 60_000);
 
   test('webpack and Rspack', async () => {

@@ -266,9 +266,10 @@ export default defineClientPlugin<never, never, Recorder>({
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify(kept),
             });
-            const { id, problem } = (await res.json()) as { id?: string; problem?: string };
+            // `url`: where it replays, said by what keeps it with no server to serve it from (a `standalone` build).
+            const { id, url, problem } = (await res.json()) as { id?: string; url?: string; problem?: string };
             if (id === undefined) throw new Error(`recordings: ${problem ?? res.statusText}`);
-            done({ id, url: `${base}__deictic/plugins/recordings/replay/${id}`, duration, ...voiced });
+            done({ id, url: url ?? `${base}__deictic/plugins/recordings/replay/${id}`, duration, ...voiced });
           } catch (e) {
             fail(e);
           }

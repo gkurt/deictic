@@ -8,7 +8,7 @@
  * Everything drawn sits in one shadow root, so neither the page's styles nor ours cross over. A
  * panel's undo and redo are its tab's on its element: the latest change that plugin made there.
  */
-import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Target } from '#src/index.ts';
+import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Standalone, Target } from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { openLightbox } from './lightbox.ts';
@@ -25,7 +25,12 @@ export interface StartOptions {
   shortcut?: Required<Shortcut>;
   /** Each plugin with a half in the page, and its own shortcut as the bundler's plugin checked it, where it has one. */
   plugins: { plugin: ClientPlugin; shortcut?: Required<Shortcut>; options?: unknown }[];
+  /** What answers the requests where there's no dev server to: a `standalone` build's. */
+  server?: Standalone;
 }
+
+/** A request to the endpoints, by its URL: to the dev server, or to what stands in for it. */
+type Send = (url: string, init?: RequestInit) => Promise<Response>;
 
 type Mount = (panel: HTMLElement, context: PanelContext<unknown, unknown>) => (() => void) | void;
 
@@ -78,6 +83,7 @@ const nameOf = (el: Element) => `${el.localName}${[...el.classList].map((c) => `
 /** What the overlay keeps once started, for `popupIn` to show the popup with. */
 interface Started {
   base: string;
+  send: Send;
   contextOf: (name: string) => ClientContext;
   tabs: Tab[];
   /** Opens the popup over the page on an element, at a tab or the one used last: `openPopup`. */
@@ -121,7 +127,7 @@ export function popupIn(container: Element, { tab: name, element }: { tab?: stri
   if (started === undefined) throw new Error('deictic: the overlay has not started, so there is no popup to show');
   const target = targetOf(element);
   if (target === undefined) throw new Error(`deictic: ${nameOf(element)} has no ${ATTRIBUTE} mark to open the popup on`);
-  const { base, contextOf, tabs } = started;
+  const { base, send, contextOf, tabs } = started;
   // A tab shown here isn't one a person chose: the popup over the page keeps opening at theirs.
   const remember = () => {};
   const tab = tabs.find((t) => t.plugin.name === name) ?? tabs[0];
@@ -136,6 +142,7 @@ export function popupIn(container: Element, { tab: name, element }: { tab?: stri
   const open = (at: Tab, resumed?: Resumed) => {
     panel = openPanel({
       base,
+      send,
       root,
       contextOf,
       tabs,
@@ -180,7 +187,7 @@ export function lightboxIn(container: Element, items: LightboxItem[], { at }: { 
 }
 
 /** Starts the overlay, once per page: the client module runs again when a module importing it is replaced. */
-export function start({ base, shortcut: own, plugins: given }: StartOptions): void {
+export function start({ base, shortcut: own, plugins: given, server }: StartOptions): void {
   const page = globalThis as { [STARTED]?: true };
   if (page[STARTED] === true) return;
   page[STARTED] = true;
@@ -204,13 +211,15 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
   // Each plugin's API, set up before any panel opens. `use` reads it when asked, so a setup may keep
   // `use` for later, not call it: the plugin it asks for may not be set up yet.
   const apis = new Map<string, unknown>();
+  const send: Send =
+    server === undefined ? (url, init) => fetch(url, init) : async (url, init) => server(new Request(new URL(url, location.href), init));
   const optionsOf = new Map(given.map(({ plugin, options }) => [plugin.name, options]));
   const contextOf = (name: string): ClientContext => ({
     base,
     root,
     options: optionsOf.get(name),
     use: (other) => apis.get(other) as never,
-    request: (route, init) => fetch(`${base}__deictic/plugins/${name}/${route}`, init),
+    request: (route, init) => send(`${base}__deictic/plugins/${name}/${route}`, init),
     open: (plugin, element) => openAt(plugin, element),
     lightbox: (items, options) => openLightbox(root, items, options),
   });
@@ -226,6 +235,7 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
   const tabs: Tab[] = given.flatMap(({ plugin }) => (plugin.mount === undefined ? [] : [{ plugin, mount: plugin.mount }]));
   started = {
     base,
+    send,
     contextOf,
     tabs,
     // Not over a popup holding something unsaved: the press that asked shook its button (`openPanel`).
@@ -362,6 +372,7 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
     panel?.close();
     panel = openPanel({
       base,
+      send,
       root,
       contextOf,
       tabs,
@@ -395,6 +406,7 @@ export function start({ base, shortcut: own, plugins: given }: StartOptions): vo
 
 interface PanelOptions {
   base: string;
+  send: Send;
   root: ShadowRoot;
   contextOf: (name: string) => ClientContext;
   tabs: Tab[];
@@ -418,6 +430,7 @@ interface PanelOptions {
 
 function openPanel({
   base,
+  send,
   root,
   contextOf,
   tabs,
@@ -452,7 +465,7 @@ function openPanel({
   where.href = `${base}__deictic/open?${new URLSearchParams(at)}`;
   where.addEventListener('click', (e) => {
     e.preventDefault();
-    void fetch(where.href);
+    void send(where.href);
   });
   // Off until the tab's history is read: there's nothing to take back on most elements.
   const undo = iconButton(UNDO, 'Undo', 'Nothing to undo');
@@ -487,7 +500,7 @@ function openPanel({
     status.classList.toggle('problem', problem);
   };
   const post = async <T>(route: string, body?: unknown): Promise<T> => {
-    const res = await fetch(`${base}__deictic/${route}`, {
+    const res = await send(`${base}__deictic/${route}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body ?? {}),
@@ -521,7 +534,7 @@ function openPanel({
     const ask = ++asked;
     let history: { done: { label: string }[]; undone: { label: string }[] };
     try {
-      const res = await fetch(`${base}__deictic/history?${new URLSearchParams({ plugin: current.plugin.name, ...at })}`);
+      const res = await send(`${base}__deictic/history?${new URLSearchParams({ plugin: current.plugin.name, ...at })}`);
       if (!res.ok || ask !== asked) return;
       history = (await res.json()) as typeof history;
     } catch {

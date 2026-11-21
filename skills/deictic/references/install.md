@@ -60,6 +60,11 @@ To fit what they choose instead: a plugin's options go under its name, `false` l
 
 `deictic({ shortcut })` changes Alt-click, or `false` for none. The plugins' order is the tabs' order: keep theirs.
 
+A build has nothing of deictic. Only for a deployed demo with no dev server, `deictic/vite` takes
+`standalone: 'src/standalone.ts'`: deictic is then in the build, and that module's default export (a `Standalone`,
+from `deictic`: `(request: Request) => Response`) answers in the page what the dev server would under `/__deictic/`
+(`read` → `{ model }`, `apply` → `{ model, change: { label } }`, `undo`, `redo`, `history`, each plugin's routes).
+
 ## The board
 
 Tasks go to a Vercel Board. Either one on this machine:

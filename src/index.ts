@@ -59,6 +59,13 @@ export interface Source {
   read(file: string): string;
 }
 
+/**
+ * What answers the overlay's requests in a page with no dev server behind it (`deictic/vite`'s `standalone`): the
+ * default export of a module of the page's. A request is one the endpoints would get, under `<base>__deictic/`;
+ * the answer is theirs too (`{ model }`, `{ model, change }`, `{ problem }` with a status that isn't ok).
+ */
+export type Standalone = (request: Request) => Response | Promise<Response>;
+
 /** An op a plugin won't make. The message says why and what to do instead; the panel shows it. */
 export class Refusal extends Error {
   override name = 'Refusal';

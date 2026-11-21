@@ -36,9 +36,10 @@ export function prepare(options: DeicticOptions): { plugins: ServerPlugin[]; sho
 
 /**
  * The client module: the overlay, started with deictic's own shortcut and each plugin that has a half
- * in the page, with its shortcut, checked.
+ * in the page, with its shortcut, checked; and with `server`, a module of the page's that answers its requests
+ * where no dev server does.
  */
-export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortcut | false) => {
+export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortcut | false, server?: string) => {
   const [shortcut, ...shortcuts] = checkShortcuts([{ name: OWN, shortcut: ownShortcut(own) }, ...plugins]);
   const paged = plugins.flatMap((p, i) =>
     p.client === undefined ? [] : [{ client: p.client, rest: { shortcut: shortcuts[i], options: p.clientOptions } }],
@@ -46,8 +47,9 @@ export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortc
   return [
     `import { start } from 'deictic/client';`,
     ...paged.map((p, i) => `import p${i} from ${JSON.stringify(p.client)};`),
+    ...(server === undefined ? [] : [`import server from ${JSON.stringify(server)};`]),
     // Its shortcut and options as JSON, where it has them: `JSON.stringify` leaves out what's undefined.
-    `start({ base: ${JSON.stringify(base)}, shortcut: ${JSON.stringify(shortcut) ?? 'undefined'}, plugins: [${paged.map((p, i) => `{ plugin: p${i}, ...${JSON.stringify(p.rest)} }`).join(', ')}] });`,
+    `start({ base: ${JSON.stringify(base)}, shortcut: ${JSON.stringify(shortcut) ?? 'undefined'}, plugins: [${paged.map((p, i) => `{ plugin: p${i}, ...${JSON.stringify(p.rest)} }`).join(', ')}]${server === undefined ? '' : ', server'} });`,
   ].join('\n');
 };
 

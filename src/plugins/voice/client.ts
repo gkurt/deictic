@@ -47,9 +47,10 @@ export default defineClientPlugin<never, never, Voice>({
           const duration = Date.now() - started;
           const type = (recorder.mimeType || mimeType || 'audio/webm').split(';')[0]!;
           const res = await request('add', { method: 'POST', headers: { 'content-type': type }, body: new Blob(chunks, { type }) });
-          const { id, problem } = (await res.json()) as { id?: string; problem?: string };
+          // `url`: where the clip is, said by what keeps it with no server to serve it from (a `standalone` build).
+          const { id, url, problem } = (await res.json()) as { id?: string; url?: string; problem?: string };
           if (id === undefined) throw new Error(`voice: ${problem ?? res.statusText}`);
-          return { id, url: `${base}__deictic/plugins/voice/clip/${id}`, duration, type };
+          return { id, url: url ?? `${base}__deictic/plugins/voice/clip/${id}`, duration, type };
         },
       };
     },
