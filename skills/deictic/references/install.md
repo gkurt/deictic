@@ -83,7 +83,9 @@ is there only while the dev server runs.
 
 For another board, set `BOARD_URL` for the dev server and for `vb` alike. For the team's, through `vercel login`,
 with no `BOARD_URL`: `tasks({ board: board() })` in the bundler config (`board` from `@vercel/board`), or
-`recommended({ tasks: { board: board() } })`.
+`recommended({ tasks: { board: board() } })`. `board: local({ port, dir, inspect, args })`, with `local` from
+`deictic/tasks`, is the board on this machine with those options (its port, its folder from the root, `false` for
+none of its pages, more of `vb serve`'s arguments), and whatever `BOARD_URL` says.
 
 ## This skill
 

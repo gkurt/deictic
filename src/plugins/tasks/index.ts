@@ -10,7 +10,7 @@
  * lists the ones about the element clicked, until its line moves.
  */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import type { Board } from '@vercel/board';
 
@@ -20,7 +20,9 @@ import type { Recordings } from '#src/plugins/recordings/index.ts';
 import type { Box } from '#src/plugins/screenshots/index.ts';
 import type { Clips } from '#src/plugins/voice/index.ts';
 
-import { localBoard } from './local.ts';
+import { type LocalBoard, localBoard } from './local.ts';
+
+export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
 export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit'>;
@@ -30,9 +32,10 @@ export interface TasksOptions {
    * The board, as `@vercel/board`'s `board()` answers it. By default the one `BOARD_URL` names, and with none,
    * one of the project's own on this machine: `vb serve`, started with the dev server and stopped with it, at
    * `http://127.0.0.1:4100/api/board` (or the port `.deictic/board.json` says, where that one's taken), its log
-   * in `.deictic/board`. For your team's board, through `vercel login`, pass `board()`.
+   * in `.deictic/board`. For your team's board, through `vercel login`, pass `board()`. `local()`, from here, is
+   * that board of the project's own whatever `BOARD_URL` says, with its port, its folder and the rest as options.
    */
-  board?: TaskBoard;
+  board?: TaskBoard | LocalBoard;
   /** The channel tasks go to: `deictic` by default. */
   channel?: string;
   /**
@@ -170,18 +173,29 @@ export function tasks(options: TasksOptions = {}) {
   const channel = options.channel ?? 'deictic';
   let team: Promise<TaskBoard> | undefined;
   let root: string | undefined;
+  const own = options.board !== undefined && 'local' in options.board ? options.board.local : undefined;
   const found = async (): Promise<TaskBoard> => {
-    if (options.board) return options.board;
+    if (options.board !== undefined && !('local' in options.board)) return options.board;
     // Loaded when first used, so a project that doesn't add this plugin needn't install the SDK.
     const { board } = await import('@vercel/board');
-    if (process.env.BOARD_URL === undefined && root !== undefined) {
-      const { url } = await localBoard(root);
-      // `board()` takes a URL from the environment only. It stays set, so a dev server that restarts in this
-      // process finds the same board, and what it runs (an agent's `vb`) does too.
-      process.env.BOARD_URL = url;
-      console.log(`deictic/tasks: tasks go to a board on this machine, ${url.replace(/\/api\/board$/, '/')} (kept in .deictic/board)`);
+    if (own === undefined && process.env.BOARD_URL !== undefined) return board();
+
+    const base = root ?? process.cwd();
+    const { url, fresh, dir } = await localBoard(base, own);
+    if (fresh) {
+      const kept = relative(base, dir).replaceAll('\\', '/');
+      console.log(`deictic/tasks: tasks go to a board on this machine, ${url.replace(/\/api\/board$/, '/')} (kept in ${kept})`);
     }
-    return board();
+    // `board()` takes a URL from the environment only, as it's called: so it's set for the call, and what the
+    // environment said is left as it was.
+    const before = process.env.BOARD_URL;
+    process.env.BOARD_URL = url;
+    try {
+      return board();
+    } finally {
+      if (before === undefined) delete process.env.BOARD_URL;
+      else process.env.BOARD_URL = before;
+    }
   };
   // Asked again after a failure: a board that didn't start may the next time.
   const boardOf = () =>
@@ -192,7 +206,11 @@ export function tasks(options: TasksOptions = {}) {
   let link: Promise<string | undefined> | undefined;
   // Asked once, unless asking failed: no link is no reason to keep the panel from showing the tasks.
   const linkOf = () =>
-    (link ??= (options.link ? Promise.resolve(options.link(channel)) : boardOf().then((b) => localPage(b, channel))).catch(() => {
+    (link ??= (
+      options.link
+        ? Promise.resolve(options.link(channel))
+        : boardOf().then((b) => (own?.inspect === false ? undefined : localPage(b, channel)))
+    ).catch(() => {
       link = undefined;
       return undefined;
     }));

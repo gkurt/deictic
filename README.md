@@ -49,7 +49,11 @@ BOARD_URL=https://team.example/api/board vite  # any board, by its URL
 
 ```ts
 recommended({ tasks: { board: board() } }); // your team's, from `@vercel/board`, after `vercel login`
+recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your machine, from `deictic/tasks`
 ```
+
+`local()` is the default board whatever `BOARD_URL` says, with options: `port`, `dir` (its folder, from the root),
+`inspect: false` for none of its own pages, and `args`, more of `vb serve`'s.
 
 Whoever works the channel (`deictic` by default) takes it from there. For an agent, deictic comes with a skill that
 watches the channel and works each task as it arrives, with scripts that read a task, turn a recording into a

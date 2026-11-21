@@ -231,8 +231,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
   project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
   in `.deictic/board`, and writes `.deictic/board.json` (`url`, `pid`), which the skill's `lib.mjs` reads (`boardUrl`).
-  One that file names, alive and answering, is used as it is. `BOARD_URL` is then set for the process, as `board()`
-  takes a URL from nowhere else. The team's board is now `tasks({ board: board() })`.
+  One that file names, alive and answering, is used as it is. `BOARD_URL` is then set, as `board()`
+  takes a URL from nowhere else, for the `board()` call only. The team's board is `tasks({ board: board() })`.
+  `local(options)`, exported from `deictic/tasks`, is that board as the `board` option, whatever `BOARD_URL` says:
+  `port` (the only one tried), `dir` (from the root), `inspect: false` (`--no-inspect`, and no links in the panel)
+  and `args` (more of `vb serve`'s). The file keeps the options too (`as`): one running with others is stopped first.
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add ./node_modules/deictic`):
 `SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed.
