@@ -8,7 +8,6 @@ import { tailwind } from 'deictic/tailwind';
 import { deictic } from 'deictic/vite';
 import { defineConfig } from 'vite';
 
-import { localBoard } from './board.ts';
 import { highlighted } from './code.ts';
 import { replay } from './replay.ts';
 
@@ -27,7 +26,6 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react({ compiler: true }),
     tailwindcss(),
-    localBoard(),
     highlighted(),
     replay(),
     deictic(command === 'build' ? deployed : { plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),

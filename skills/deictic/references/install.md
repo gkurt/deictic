@@ -69,15 +69,21 @@ page the build publishes: `replayPage({ player, source })` from `deictic/recordi
 
 ## The board
 
-Tasks go to a Vercel Board. Either one on this machine:
+Tasks go to a Vercel Board. With nothing set, the dev server starts one on this machine and stops it as it stops:
+`http://127.0.0.1:4100/api/board` (another port where that one's taken), its log in `.deictic/board`. It prints the
+URL as it starts and keeps it in `.deictic/board.json`:
 
 ```bash
-npx vb serve                                      # http://127.0.0.1:4100/api/board, kept in .board/
-BOARD_URL=http://127.0.0.1:4100/api/board <the dev command>
+export BOARD_URL=$(node -p "require('./.deictic/board.json').url")   # where you run vb
+vb whoami
 ```
 
-or the team's board, with no `BOARD_URL`, after `vercel login`. Whatever the dev server uses, the agent's `vb` must
-use too: export the same `BOARD_URL` where you run `vb`, and check with `vb whoami`.
+The scripts here read that file themselves when `BOARD_URL` isn't set; a `vb` you run needs the variable. The board
+is there only while the dev server runs.
+
+For another board, set `BOARD_URL` for the dev server and for `vb` alike. For the team's, through `vercel login`,
+with no `BOARD_URL`: `tasks({ board: board() })` in the bundler config (`board` from `@vercel/board`), or
+`recommended({ tasks: { board: board() } })`.
 
 ## This skill
 

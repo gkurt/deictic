@@ -20,13 +20,17 @@ import type { Recordings } from '#src/plugins/recordings/index.ts';
 import type { Box } from '#src/plugins/screenshots/index.ts';
 import type { Clips } from '#src/plugins/voice/index.ts';
 
+import { localBoard } from './local.ts';
+
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
 export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit'>;
 
 export interface TasksOptions {
   /**
-   * The board, as `@vercel/board`'s `board()` answers it: by default the one `BOARD_URL` names (`npx vb serve`
-   * runs one on this machine), or your team's default board, through `vercel login`.
+   * The board, as `@vercel/board`'s `board()` answers it. By default the one `BOARD_URL` names, and with none,
+   * one of the project's own on this machine: `vb serve`, started with the dev server and stopped with it, at
+   * `http://127.0.0.1:4100/api/board` (or the port `.deictic/board.json` says, where that one's taken), its log
+   * in `.deictic/board`. For your team's board, through `vercel login`, pass `board()`.
    */
   board?: TaskBoard;
   /** The channel tasks go to: `deictic` by default. */
@@ -165,8 +169,26 @@ const OPEN = new Set(['waiting', 'ready', 'blocked']);
 export function tasks(options: TasksOptions = {}) {
   const channel = options.channel ?? 'deictic';
   let team: Promise<TaskBoard> | undefined;
-  // Loaded when first used, so a project that doesn't add this plugin needn't install the SDK.
-  const boardOf = () => (team ??= options.board ? Promise.resolve(options.board) : import('@vercel/board').then((m) => m.board()));
+  let root: string | undefined;
+  const found = async (): Promise<TaskBoard> => {
+    if (options.board) return options.board;
+    // Loaded when first used, so a project that doesn't add this plugin needn't install the SDK.
+    const { board } = await import('@vercel/board');
+    if (process.env.BOARD_URL === undefined && root !== undefined) {
+      const { url } = await localBoard(root);
+      // `board()` takes a URL from the environment only. It stays set, so a dev server that restarts in this
+      // process finds the same board, and what it runs (an agent's `vb`) does too.
+      process.env.BOARD_URL = url;
+      console.log(`deictic/tasks: tasks go to a board on this machine, ${url.replace(/\/api\/board$/, '/')} (kept in .deictic/board)`);
+    }
+    return board();
+  };
+  // Asked again after a failure: a board that didn't start may the next time.
+  const boardOf = () =>
+    (team ??= found().catch((e: unknown) => {
+      team = undefined;
+      throw e;
+    }));
   let link: Promise<string | undefined> | undefined;
   // Asked once, unless asking failed: no link is no reason to keep the panel from showing the tasks.
   const linkOf = () =>
@@ -254,7 +276,11 @@ export function tasks(options: TasksOptions = {}) {
     shortcut: options.shortcut,
     setup: (given) => {
       context = given;
+      root = given.root;
       project ??= nameOf(given.root);
+      // Started with the dev server, not at the first task, so whoever works the tasks can watch from the start.
+      // Not waited for: a failure is the first request's to tell.
+      void boardOf().catch(() => {});
     },
     read: (_source, target) =>
       asked(async () => {
@@ -504,7 +530,7 @@ async function asked<T>(ask: () => Promise<T>): Promise<T> {
     const { code, message, hint } = e as { code?: unknown; message?: string; hint?: string };
     if (typeof code === 'string') throw new Refusal(`the board says: ${message}${hint === undefined ? '' : ` (${hint})`}`, { cause: e });
     throw new Refusal(
-      `can't reach the board (${message ?? String(e)}): run \`npx vb serve\` and set BOARD_URL for the dev server, or \`vercel login\``,
+      `can't reach the board (${message ?? String(e)}): restart the dev server, which starts its own, or check the BOARD_URL or \`board\` it was given`,
       { cause: e },
     );
   }

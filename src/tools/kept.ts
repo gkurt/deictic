@@ -1,7 +1,7 @@
 /**
  * Where deictic keeps what it makes for a project: `.deictic/` at its root, beside `.board/` and the like,
- * rather than in `node_modules`, which an install may clear. The history is there, and the shots,
- * recordings and voice clips plugins keep. It ignores itself in git: the history holds whole files, and
+ * rather than in `node_modules`, which an install may clear. The history is there, the shots,
+ * recordings and voice clips plugins keep, and the tasks plugin's own board. It ignores itself in git: the history holds whole files, and
  * the rest is the page as it looked, neither of which belongs in a commit.
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

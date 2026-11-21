@@ -40,11 +40,15 @@ Native isn't supported: there's no DOM to point at.
 
 ## Tasks
 
-Tasks go to a board on your machine or your team's:
+Tasks go to a board the dev server starts on your machine, with nothing to set up: `http://127.0.0.1:4100/`, kept
+in `.deictic/board`. For a board of your own, name it, or pass your team's:
 
 ```bash
-npx vb serve                                   # a board on this machine, kept in .board/
-BOARD_URL=http://127.0.0.1:4100/api/board vite # or no BOARD_URL for your team's board, after `vercel login`
+BOARD_URL=https://team.example/api/board vite  # any board, by its URL
+```
+
+```ts
+recommended({ tasks: { board: board() } }); // your team's, from `@vercel/board`, after `vercel login`
 ```
 
 Whoever works the channel (`deictic` by default) takes it from there. For an agent, deictic comes with a skill that

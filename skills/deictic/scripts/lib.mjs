@@ -55,12 +55,30 @@ export function deicticDirs() {
 }
 
 /**
- * How to run the board's CLI: `vb` from the project's dependencies or the PATH, with the environment's board,
- * as `spawn`'s command, arguments and options.
+ * The board's URL: `BOARD_URL`, or with none, the board the dev server started for the project, which
+ * `.deictic/board.json` names. Nothing where there's neither: `vb` then finds the team's board.
+ */
+export function boardUrl() {
+  if (process.env.BOARD_URL) return process.env.BOARD_URL;
+  for (const dir of deicticDirs()) {
+    try {
+      const { url } = JSON.parse(readFileSync(join(dir, 'board.json'), 'utf8'));
+      if (typeof url === 'string') return url;
+    } catch {
+      // No board of this project's own: the next one's, or the team's.
+    }
+  }
+  return undefined;
+}
+
+/**
+ * How to run the board's CLI: `vb` from the project's dependencies or the PATH, with the environment's board
+ * or the project's own, as `spawn`'s command, arguments and options.
  */
 export function vbCommand(args) {
   const bins = [...upFrom()].map((d) => join(d, 'node_modules', '.bin'));
-  const env = { ...process.env, PATH: [...bins, process.env.PATH].join(delimiter) };
+  const url = boardUrl();
+  const env = { ...process.env, ...(url === undefined ? {} : { BOARD_URL: url }), PATH: [...bins, process.env.PATH].join(delimiter) };
   // npm's shims on Windows are .cmd files, which only a shell runs; the arguments here are IDs and names.
   if (process.platform === 'win32') return [`vb ${args.map((a) => `"${a}"`).join(' ')}`, [], { env, shell: true }];
   return ['vb', args, { env }];

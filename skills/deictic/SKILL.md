@@ -13,7 +13,7 @@ and viewport, and can carry screenshots (with marks drawn on them), rrweb record
 Assume deictic is installed and the person wants its tasks worked as they come, while they keep using the app:
 
 1. **Reach the board.** `vb whoami` (from `@vercel/board`) must reach the board the dev server uses: the same
-   `BOARD_URL` (a local `vb serve` is `http://127.0.0.1:4100/api/board`), or the team's through `vercel login`.
+   `BOARD_URL`. With none set, the dev server runs its own while it's up, and `.deictic/board.json` has its URL.
    Not installed or not set up: [references/install.md](references/install.md).
 2. **Watch.** Start a watch that wakes you on each new task, so no one has to prompt you:
    [references/watch.md](references/watch.md).

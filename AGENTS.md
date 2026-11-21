@@ -228,6 +228,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
   `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached), which the playground lists as a board.
   With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
+  `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
+  project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
+  in `.deictic/board`, and writes `.deictic/board.json` (`url`, `pid`), which the skill's `lib.mjs` reads (`boardUrl`).
+  One that file names, alive and answering, is used as it is. `BOARD_URL` is then set for the process, as `board()`
+  takes a URL from nowhere else. The team's board is now `tasks({ board: board() })`.
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add ./node_modules/deictic`):
 `SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed.
@@ -257,8 +262,8 @@ multi-page app running both plugins on itself, also from `dist`. Its build has d
 works on the deployed site: `src/standalone.ts` answers it in the page (tasks, shots and clips kept there, class edits
 on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
 publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a
-`BroadcastChannel`. `site/board.ts` starts `vb serve` on
-port 4100 (tasks in `site/.board`) unless `BOARD_URL` is set, and gives the page its URL. `site/code.ts` holds the
+`BroadcastChannel`. Its tasks go to the tasks plugin's own board (`site/.deictic/board`, port 4100) unless
+`BOARD_URL` is set. `site/code.ts` holds the
 homepage's code and highlights it beside the bundler (`@pierre/highlights`, a theme of CSS variables that `site.css`
 sets): the page imports the tokens as `virtual:code`, and no highlighter.
 

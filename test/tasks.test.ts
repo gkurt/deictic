@@ -213,7 +213,7 @@ test('refuses an empty task, and says how to reach a board when there is none', 
     }),
   ))!;
   expect(res.status).toBe(422);
-  expect(((await res.json()) as { problem: string }).problem).toContain('run `npx vb serve` and set BOARD_URL');
+  expect(((await res.json()) as { problem: string }).problem).toContain('restart the dev server, which starts its own');
 });
 
 test("links the channel to a local board's page, to the page `link` names, or nowhere", async () => {
