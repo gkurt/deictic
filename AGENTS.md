@@ -234,7 +234,7 @@ without it the script refuses and says what to ask the person, as the skill has 
 for them. Change them with the task format, the replay page or the marks event.
 
 `examples/vite` is React + Tailwind v4 and imports deictic from `dist`, so build first. `dist`'s shared chunks
-have no hash in their names (`hash: false`) and a build doesn't empty `dist` first (`clean: false`; `prepack` does, with
+have no hash in their names (`hash: false`; they go in `dist/shared/`, where none can take an entry's name) and a build doesn't empty `dist` first (`clean: false`; `prepack` does, with
 `--clean`), so rebuilding under a running dev server doesn't break its imports;
 restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
