@@ -15,9 +15,10 @@ import { definePlugin } from '#src/index.ts';
 import type { Masking, ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 import { keptIn } from '#src/tools/kept.ts';
 
-import { REPLAY } from './replay.ts';
+import { replayPage } from './replay.ts';
 
 export { MARKS } from './marks.ts';
+export { replayPage, type ReplaySources } from './replay.ts';
 
 /** A recording as the page knows it: its ID, where it plays back, and how long it ran, in milliseconds. */
 export interface Recording {
@@ -164,7 +165,7 @@ export function recordings(options: RecordingsOptions = {}) {
         return new Response(found.data, { headers: { 'content-type': found.type, 'cache-control': 'no-store' } });
       },
       // `replay/<id>`: a page that plays it back.
-      replay: () => new Response(REPLAY, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      replay: () => new Response(replayPage(), { headers: { 'content-type': 'text/html; charset=utf-8' } }),
       'player.js': () => file(player('rrweb-player.umd.min.cjs'), 'text/javascript'),
       'player.css': () => file(player('style.css'), 'text/css'),
     },

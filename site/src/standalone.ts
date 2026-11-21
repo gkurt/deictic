@@ -2,9 +2,10 @@
  * The dev server's stand-in on the deployed site, which has none: `deictic/vite`'s `standalone` (in
  * `vite.config.ts`, for a build) hands the overlay's requests to this, in the page, so Alt-click works there as a demo.
  *
- * Nothing is written anywhere. Tasks, shots and voice notes are kept in the page and gone with it; a class edit
- * changes the element, not a file, and without Tailwind to ask the Tailwind tab is its plain one. Undo and redo
- * work on what was done here. There's no editor to open, and no recordings (their replay is a page the server makes).
+ * Nothing is written anywhere. Tasks, shots, recordings and voice notes are kept in the page and gone with it; a
+ * class edit changes the element, not a file, and without Tailwind to ask the Tailwind tab is its plain one. Undo and
+ * redo work on what was done here. There's no editor to open. A recording replays in `replay.html`, which the build
+ * publishes (`replay.ts`, beside `vite.config.ts`) and which asks this page for it.
  */
 import type { Standalone, Target } from 'deictic';
 import type { Model as Classes, Op as ClassOp } from 'deictic/tailwind';
@@ -28,6 +29,9 @@ const PREFIX = '__deictic/';
 const tasks = new Map<string, Task[]>();
 /** Each plugin's changes on each element, as the dev server's history keeps them by scope. */
 const history = new Map<string, { done: Step[]; undone: Step[] }>();
+/** The recordings made here, and the voice clips, for the replay page to ask for. */
+const recordings = new Map<string, unknown>();
+const clips = new Map<string, Blob>();
 let made = 0;
 let added = 0;
 
@@ -90,14 +94,32 @@ async function keep(request: Request, kind: string): Promise<Response> {
   const type = request.headers.get('content-type') ?? '';
   if (kind === 'shot' && type !== 'image/png') return refuse('send the shot as image/png: the `dom()` renderer does', 415);
   const blob = new Blob([await request.arrayBuffer()], { type });
-  return Response.json({ id: `${kind}-${++made}`, url: URL.createObjectURL(blob) });
+  const id = idOf(kind);
+  if (kind === 'clip') clips.set(id, blob);
+  return Response.json({ id, url: URL.createObjectURL(blob) });
 }
+
+/** Unlike any other tab's, as a replay asks every page of the site for a recording by it. */
+const idOf = (kind: string) => `${kind}-${++made}-${crypto.randomUUID().slice(0, 8)}`;
+
+// A replay is a document of its own, a frame of this page or another tab: it asks for its recording, and each
+// of its voice clips, on this channel (`CHANNEL`, in `replay.ts`), and the page that has it answers.
+const channel = new BroadcastChannel('deictic-demo');
+channel.addEventListener('message', ({ data }: MessageEvent<{ ask?: string; id: string }>) => {
+  const found = data.ask === 'recording' ? recordings.get(data.id) : data.ask === 'clip' ? clips.get(data.id) : undefined;
+  if (found !== undefined) channel.postMessage({ answer: data.ask, id: data.id, found });
+});
 
 const standalone: Standalone = async (request) => {
   const url = new URL(request.url);
   const route = url.pathname.slice(url.pathname.indexOf(PREFIX) + PREFIX.length);
   if (route === 'plugins/screenshots/add') return keep(request, 'shot');
   if (route === 'plugins/voice/add') return keep(request, 'clip');
+  if (route === 'plugins/recordings/add') {
+    const id = idOf('recording');
+    recordings.set(id, await request.json());
+    return Response.json({ id, url: `${import.meta.env.BASE_URL}replay.html?id=${id}` });
+  }
   if (route === 'open') return refuse('this is the deployed demo: there is no editor to open here', 404);
   if (route === 'history') {
     const place = `${url.searchParams.get('file')}:${url.searchParams.get('line')}:${url.searchParams.get('column')}`;

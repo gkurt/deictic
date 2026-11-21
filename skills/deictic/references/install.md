@@ -64,6 +64,8 @@ A build has nothing of deictic. Only for a deployed demo with no dev server, `de
 `standalone: 'src/standalone.ts'`: deictic is then in the build, and that module's default export (a `Standalone`,
 from `deictic`: `(request: Request) => Response`) answers in the page what the dev server would under `/__deictic/`
 (`read` → `{ model }`, `apply` → `{ model, change: { label } }`, `undo`, `redo`, `history`, each plugin's routes).
+An `add` answer of screenshots, voice or recordings may name the `url` it's kept at. For a recording that's a replay
+page the build publishes: `replayPage({ player, source })` from `deictic/recordings` is its HTML.
 
 ## The board
 

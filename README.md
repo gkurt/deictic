@@ -99,6 +99,9 @@ import type { Standalone } from 'deictic';
 export default (async (request) => Response.json({ model: null })) satisfies Standalone;
 ```
 
+What a plugin's `add` route would keep, the module keeps, and answers with the `url` it's at. A recording's is a
+replay page for the build to publish: `replayPage({ player, source })` from `deictic/recordings` is its HTML.
+
 ## How it works
 
 - A transform that runs before the framework's own adds `data-deictic="src/App.tsx:12:5"` to every host element

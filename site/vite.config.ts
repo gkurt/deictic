@@ -10,13 +10,14 @@ import { defineConfig } from 'vite';
 
 import { localBoard } from './board.ts';
 import { highlighted } from './code.ts';
+import { replay } from './replay.ts';
 
 // The deployed site has no dev server, and deictic all the same, to try: `standalone` puts it in the build, and
 // `src/standalone.ts` answers it in the page. Shots are drawn in the page (`dom()`), as there's no server to render
-// one, and there are no recordings, whose replay is a page the server makes.
+// one, and a recording's replay is a page the build publishes (`replay.ts`).
 const deployed = {
   standalone: 'src/standalone.ts',
-  plugins: [...recommended({ recordings: false, screenshots: { renderer: dom() } }), tailwind({ css: 'src/site.css' })],
+  plugins: [...recommended({ screenshots: { renderer: dom() } }), tailwind({ css: 'src/site.css' })],
 };
 
 // The homepage, and a playground to try the plugins on. deictic runs on both.
@@ -28,6 +29,7 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
     localBoard(),
     highlighted(),
+    replay(),
     deictic(command === 'build' ? deployed : { plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
   ],
   // Its own port, so it runs beside the examples' dev servers on Vite's default.

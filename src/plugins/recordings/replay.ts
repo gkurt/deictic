@@ -14,15 +14,31 @@
  * `?t=<seconds>` opens it paused there, and `&bare` without the controls at the recorded size, 1:1, for a
  * screenshot; `?embed` is it filling a frame, with no header of its own (the lightbox's); `body[data-ready]` says
  * it's in place.
+ *
+ * The plugin's routes serve it, the player and what it plays. A page with no server behind it (a `standalone` build)
+ * publishes it as a file instead, `replayPage(sources)`: which recording is `?id=`, and a script of its own says
+ * where one is.
  */
 import { MARKS } from './marks.ts';
 
-export const REPLAY = `<!doctype html>
+/** Where the replay page finds what the plugin's routes would serve it, for a page published as a file. */
+export interface ReplaySources {
+  /** The folder `player.js` and `player.css` are in (`rrweb-player`'s `rrweb-player.umd.min.cjs` and `style.css`), from the page: `..`, the routes', by default. */
+  player?: string;
+  /**
+   * A script, from the page, that sets `globalThis.deicticReplay` before the page asks: `recording(id)` answers the
+   * recording (a `Kept`) and `clip(id)` a voice clip's URL, either as a promise. The routes by default.
+   */
+  source?: string;
+}
+
+/** The replay page's HTML: the routes' as it is, or one for a page published as a file. */
+export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recording · deictic</title>
-<link rel="stylesheet" href="../player.css">
+<link rel="stylesheet" href="${player}/player.css">
 <style>
   :root { color-scheme: dark; --accent: #12b358; }
   body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: #18181b; color: #fafafa; font: 13px/1.4 system-ui, sans-serif; }
@@ -62,15 +78,25 @@ export const REPLAY = `<!doctype html>
   <a id="page" target="_blank" rel="noreferrer"></a>
 </header>
 <main id="main"></main>
-<script src="../player.js"></script>
+<script src="${player}/player.js"></script>${
+  source === undefined
+    ? ''
+    : `
+<script src="${source}"></script>`
+}
 <script>
   const params = new URLSearchParams(location.search);
   const bare = params.has('bare');
   const embed = params.has('embed');
   if (bare) document.body.classList.add('bare');
   if (embed) document.body.classList.add('embed');
-  const id = location.pathname.split('/').at(-1);
-  fetch('../recording/' + id).then((r) => (r.ok ? r.json() : r.text().then((t) => Promise.reject(new Error(t))))).then((kept) => {
+  const id = params.get('id') ?? location.pathname.split('/').at(-1);
+  // The plugin's routes, unless the page was given a source of its own (\`replayPage\`).
+  const from = globalThis.deicticReplay ?? {
+    recording: (id) => fetch('../recording/' + id).then((r) => (r.ok ? r.json() : r.text().then((t) => Promise.reject(new Error(t))))),
+    clip: (id) => '../../voice/clip/' + id,
+  };
+  Promise.resolve(from.recording(id)).then(async (kept) => {
     const scheme = kept.colorScheme ?? 'light';
     const events = JSON.parse(
       JSON.stringify(kept.events).replace(/\\(\\s*prefers-color-scheme\\s*:\\s*(light|dark)\\s*\\)/g, (_, s) =>
@@ -81,7 +107,7 @@ export const REPLAY = `<!doctype html>
     page.href = kept.page;
 
     // A recording with the mic starts paused: a browser plays sound only after a click, which Play is.
-    const clips = (kept.voice ?? []).map((c) => ({ ...c, audio: Object.assign(new Audio('../../voice/clip/' + c.id), { preload: 'auto' }) }));
+    const clips = await Promise.all((kept.voice ?? []).map(async (c) => ({ ...c, audio: Object.assign(new Audio(await from.clip(c.id)), { preload: 'auto' }) })));
     const t = Number.parseFloat(params.get('t') ?? '');
     // The player's frame, at most the window's room, the controls (80px) under it; 1:1 when bare.
     const size = () => bare

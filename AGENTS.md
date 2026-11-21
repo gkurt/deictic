@@ -187,7 +187,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `read(id)`, and routes `add`, `recording/<id>`, `replay/<id>` (`replay.ts`, `rrweb-player` sized to the window,
   restyled dark under `#main`, the marks drawn in its replayer's wrapper and moved with its scroll, a timeline
   marker per marks event, voice in step at its speed; `?t=`, `&bare`) and `player.js`/`player.css`
-  (`rrweb-player`'s build, an optional peer).
+  (`rrweb-player`'s build, an optional peer). `replayPage(sources)`, exported, is that page for one published as a
+  file where there are no routes: `player` is the folder its two files are in, `source` a script that sets
+  `globalThis.deicticReplay` (`recording(id)`, `clip(id)`), and the recording is `?id=`.
   `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots', and
   shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;
   the marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each change.
@@ -253,7 +255,9 @@ repository would loop, as it holds the fixture).
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
 works on the deployed site: `src/standalone.ts` answers it in the page (tasks, shots and clips kept there, class edits
-on the element, no recordings, no editor), and shots are `dom()`'s. `site/board.ts` starts `vb serve` on
+on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
+publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a
+`BroadcastChannel`. `site/board.ts` starts `vb serve` on
 port 4100 (tasks in `site/.board`) unless `BOARD_URL` is set, and gives the page its URL. `site/code.ts` holds the
 homepage's code and highlights it beside the bundler (`@pierre/highlights`, a theme of CSS variables that `site.css`
 sets): the page imports the tokens as `virtual:code`, and no highlighter.

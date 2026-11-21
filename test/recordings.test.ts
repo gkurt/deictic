@@ -3,7 +3,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
-import { type Kept, recordings } from '#src/plugins/recordings/index.ts';
+import { type Kept, recordings, replayPage } from '#src/plugins/recordings/index.ts';
 import { dropOurs } from '#src/plugins/recordings/ours.ts';
 import { type Model, tasks } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
@@ -52,6 +52,10 @@ test('keeps what the page recorded, serves it back, and a page to replay it with
   const html = await replay.text();
   expect(html).toContain('<script src="../player.js"></script>');
   expect(html).toContain('"deictic.annotations"');
+  // Published as a file, with no routes: the player from where it's put, and a script of the page's to say where a recording is.
+  const published = replayPage({ player: './replay', source: './replay/source.js' });
+  expect(published).toContain('<script src="./replay/player.js"></script>\n<script src="./replay/source.js"></script>');
+  expect(published).toContain('href="./replay/player.css"');
   const player = await ask('plugins/recordings/player.js');
   expect(player.headers.get('content-type')).toBe('text/javascript');
   expect(await player.text()).toContain('"rrweb"');
