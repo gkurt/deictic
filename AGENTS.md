@@ -248,7 +248,9 @@ repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. `site/board.ts` starts `vb serve` on
-port 4100 (tasks in `site/.board`) unless `BOARD_URL` is set, and gives the page its URL.
+port 4100 (tasks in `site/.board`) unless `BOARD_URL` is set, and gives the page its URL. `site/code.ts` holds the
+homepage's code and highlights it beside the bundler (`@pierre/highlights`, a theme of CSS variables that `site.css`
+sets): the page imports the tokens as `virtual:code`, and no highlighter.
 
 `site/internal/` (`/internal/`, `src/pages/internal.tsx`) is the dogfood page: each tab of the popup pinned with
 `popupIn` beside a button, to Alt-click inside and leave tasks about deictic's own UI. Dev only: not linked, not

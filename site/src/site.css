@@ -11,6 +11,11 @@
   --line: #dde1d9;
   /* The signal as text: the fill is too light to read on paper. */
   --signal-text: #0a7f3f;
+  --code-keyword: #7c3aed;
+  --code-string: #96580a;
+  --code-function: #0b62c4;
+  --code-value: #b3401e;
+  --code-type: #0f766e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,7 +26,35 @@
     --muted: #8a938c;
     --line: #232a25;
     --signal-text: #3ddc7c;
+    --code-keyword: #b79cff;
+    --code-string: #e5b567;
+    --code-function: #6cb6ff;
+    --code-value: #ff9d76;
+    --code-type: #5fd3c4;
   }
+}
+
+/* Code: the highlighter (`code.ts`) colours a token `var(--hls-<its kind>)`. A kind not set here is plain text. */
+:root {
+  --hls-comment: var(--muted);
+  --hls-punctuation-bracket: var(--muted);
+  --hls-punctuation-delimiter: var(--muted);
+  --hls-operator: var(--muted);
+  --hls-keyword: var(--code-keyword);
+  --hls-keyword-import: var(--code-keyword);
+  --hls-keyword-control: var(--code-keyword);
+  --hls-keyword-declaration: var(--code-keyword);
+  --hls-keyword-operator: var(--code-keyword);
+  --hls-string: var(--code-string);
+  --hls-function: var(--code-function);
+  --hls-function-method: var(--code-function);
+  --hls-number: var(--code-value);
+  --hls-boolean: var(--code-value);
+  --hls-type: var(--code-type);
+  --hls-type-class: var(--code-type);
+  /* A JSX tag is what deictic marks: the signal's. */
+  --hls-tag-jsx: var(--signal-text);
+  --hls-punctuation-bracket-jsx: var(--signal-text);
 }
 
 /* Scrollbars: a thumb and no track, on whatever is behind them. Inherited by every scrolling box. */

@@ -1,4 +1,5 @@
-import { type MouseEvent, type PointerEvent, type ReactNode, useEffect, useState } from 'react';
+import { type MouseEvent, type PointerEvent, useEffect, useState } from 'react';
+import code, { type Line } from 'virtual:code';
 
 import { cn } from '#src/cn.ts';
 
@@ -6,19 +7,9 @@ import { Kbd, Shell } from '#src/shell.tsx';
 
 const base = import.meta.env.BASE_URL;
 
-// The demo's file, and where each of its tags opens in it: what the transform writes to `data-deictic`.
+// The demo's file (its text is `code.source`, from `site/code.ts`), and where each of its tags opens in it: what the
+// transform writes to `data-deictic`.
 const FILE = 'src/Plan.tsx';
-const SOURCE = [
-  'export function Plan() {',
-  '  return (',
-  '    <article>',
-  '      <h3>Pro</h3>',
-  '      <p>$12 / month</p>',
-  '      <button>Upgrade</button>',
-  '    </article>',
-  '  );',
-  '}',
-];
 const TAGS = ['h3', 'p', 'button', 'article'] as const;
 type Tag = (typeof TAGS)[number];
 const AT: Record<Tag, { line: number; column: number }> = {
@@ -40,63 +31,6 @@ const plugins = [
 ];
 
 const PEERS = 'npm i -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core';
-
-const setups = [
-  [
-    'Vite',
-    `// vite.config.ts
-import { recommended } from 'deictic/recommended';
-import { deictic } from 'deictic/vite';
-
-export default defineConfig({
-  plugins: [react(), deictic({ plugins: recommended() })],
-});`,
-  ],
-  [
-    'Next.js',
-    `// next.config.ts
-import { withDeictic } from 'deictic/next';
-import { recommended } from 'deictic/recommended';
-
-export default withDeictic(nextConfig, { plugins: recommended() });`,
-  ],
-  [
-    'webpack · Rspack',
-    `// webpack.config.ts, rspack.config.ts
-import { recommended } from 'deictic/recommended';
-import { DeicticPlugin } from 'deictic/webpack';
-
-export default {
-  mode: 'development',
-  plugins: [new DeicticPlugin({ plugins: recommended() })],
-};`,
-  ],
-  [
-    'Bun',
-    `// deictic.plugin.ts
-import { deictic } from 'deictic/bun';
-import { recommended } from 'deictic/recommended';
-export default deictic({ plugins: recommended() });
-
-// server.ts
-import tools from './deictic.plugin.ts';
-Bun.serve({ routes: { ...tools.routes, '/*': index }, development: true });
-
-# bunfig.toml
-[serve.static]
-plugins = ["./deictic.plugin.ts"]`,
-  ],
-  [
-    'Astro',
-    `// astro.config.ts
-import { deictic } from 'deictic/astro';
-import { recommended } from 'deictic/recommended';
-
-export default defineConfig({
-  integrations: [deictic({ plugins: recommended() })],
-});`,
-  ],
-] as const;
 
 function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -209,16 +143,18 @@ function Demo() {
           </article>
         </div>
         <pre className="overflow-x-auto py-4 leading-6">
-          {SOURCE.map((text, i) => {
+          {code.source.map((tokens, i) => {
             const tag = LINES[i + 1];
             return (
               <div
-                key={text}
+                // The lines of one file never reorder.
+                // oxlint-disable-next-line react/no-array-index-key
+                key={i}
                 className={cn('border-l-2 border-transparent px-4', tag === active && i + 1 === line && 'border-signal bg-signal/10')}
                 onPointerEnter={() => light(tag ?? null)}
               >
                 <span className="mr-4 text-muted select-none">{i + 1}</span>
-                {paint(text)}
+                <Tokens line={tokens} />
               </div>
             );
           })}
@@ -235,24 +171,19 @@ function Demo() {
   );
 }
 
-/** A source line with its tags in the signal colour. */
-function paint(text: string): ReactNode {
-  return text.split(/(<\/?[a-z0-9]+>)/).map((part, i) =>
-    part.startsWith('<') ? (
-      // The parts of one line never reorder.
-      // oxlint-disable-next-line react/no-array-index-key
-      <span key={i} className="text-signal-text">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
+/** A line of code in its colours, each a variable `site.css` sets. */
+function Tokens({ line }: { line: Line }) {
+  return line.map((token, i) => (
+    // The tokens of one line never reorder.
+    // oxlint-disable-next-line react/no-array-index-key
+    <span key={i} style={{ color: token.color }}>
+      {token.text}
+    </span>
+  ));
 }
 
 function Setup() {
   const [chosen, setChosen] = useState(0);
-  const code = setups[chosen]![1];
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm">
       <div className="flex items-center gap-4 border-b border-line px-4 py-2.5 text-xs">
@@ -260,7 +191,7 @@ function Setup() {
         <Copy text={PEERS} />
       </div>
       <div role="tablist" className="flex overflow-x-auto overflow-y-hidden border-b border-line text-xs">
-        {setups.map(([name], i) => (
+        {code.setups.map(({ name }, i) => (
           <button
             key={name}
             type="button"
@@ -277,12 +208,10 @@ function Setup() {
         ))}
       </div>
       <pre role="tabpanel" className="overflow-x-auto p-4 leading-6">
-        {code.split('\n').map((text, i) => (
+        {code.setups[chosen]!.lines.map((line, i) => (
           // The lines of one snippet never reorder.
           // oxlint-disable-next-line react/no-array-index-key
-          <div key={i} className={cn(/^(\/\/|#) /.test(text) && 'text-muted')}>
-            {text || ' '}
-          </div>
+          <div key={i}>{line.length === 0 ? ' ' : <Tokens line={line} />}</div>
         ))}
       </pre>
     </div>

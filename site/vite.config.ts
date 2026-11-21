@@ -8,6 +8,7 @@ import { deictic } from 'deictic/vite';
 import { defineConfig } from 'vite';
 
 import { localBoard } from './board.ts';
+import { highlighted } from './code.ts';
 
 // The homepage, and a playground to try the plugins on. deictic runs on both.
 export default defineConfig({
@@ -17,6 +18,7 @@ export default defineConfig({
     react({ compiler: true }),
     tailwindcss(),
     localBoard(),
+    highlighted(),
     deictic({ plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
   ],
   // Its own port, so it runs beside the examples' dev servers on Vite's default.
