@@ -201,7 +201,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   plays sound only after a click.
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
   recordings and voice, in their tabs' order, each with its options under its name or left out with `false`. Server
-  halves only, like every factory. The README, homepage and skill show it. The README is short and about tasks: no class editing (Tailwind) in it.
+  halves only, like every factory. The README, homepage and skill show it. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text (what was typed, or `See the recording` and the like where
   only something attached says it, then only what no label
@@ -284,7 +284,7 @@ the lightbox is pinned there too (`lightboxIn`), with a drawn capture, the playg
 - Early returns over nested conditionals; no dead code; LF line endings. Scripts that write files write LF too.
 - Check for existing utilities before creating new ones. Moved code leaves no re-export behind: update every importer.
 - Don't edit `version` in `package.json`: a Tegami changelog entry is the bump (the `changelog` skill).
-- When changing user-facing APIs, update README.md, AGENTS.md and the skill (`skills/deictic/`) in the same change.
+- When changing user-facing APIs, update README.md, API.md, AGENTS.md and the skill (`skills/deictic/`) in the same change.
 
 ## Commits
 
