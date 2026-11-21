@@ -1,7 +1,4 @@
----
-packages:
-  'deictic': minor
----
+## deictic@0.1.0
 
 ### First release
 
