@@ -12,6 +12,7 @@
   <a href="https://www.npmjs.com/package/deictic"><img src="https://img.shields.io/npm/v/deictic?color=12b358" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/deictic"><img src="https://img.shields.io/npm/dm/deictic?color=12b358" alt="npm downloads"></a>
   <a href="https://github.com/gkurt/deictic/actions/workflows/ci.yml"><img src="https://github.com/gkurt/deictic/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://skills.sh/gkurt/deictic"><img src="https://skills.sh/b/gkurt/deictic" alt="skills.sh installs"></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/deictic?color=12b358" alt="MIT license"></a>
 </p>
 
@@ -63,7 +64,7 @@ Next.js, webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers).
 Start your dev server and Alt-click something. Tasks go to a board the dev server starts on your machine, with
 nothing to set up: `http://127.0.0.1:4100/`.
 
-To have your agent work them, add the skill:
+To have your agent work them, add the skill and mention `/deictic`:
 
 ```bash
 npx skills add gkurt/deictic
