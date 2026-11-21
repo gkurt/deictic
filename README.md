@@ -58,15 +58,7 @@ export default defineConfig({
 });
 ```
 
-```ts
-// next.config.ts
-import { withDeictic } from 'deictic/next';
-import { recommended } from 'deictic/recommended';
-
-export default withDeictic(nextConfig, { plugins: recommended() });
-```
-
-webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers).
+Next.js, webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers).
 
 Start your dev server and Alt-click something. Tasks go to a board the dev server starts on your machine, with
 nothing to set up: `http://127.0.0.1:4100/`.
@@ -74,7 +66,7 @@ nothing to set up: `http://127.0.0.1:4100/`.
 To have your agent work them, add the skill:
 
 ```bash
-npx skills add ./node_modules/deictic
+npx skills add gkurt/deictic
 ```
 
 ### Options

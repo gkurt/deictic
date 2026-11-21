@@ -90,7 +90,7 @@ none of its pages, more of `vb serve`'s arguments), and whatever `BOARD_URL` say
 ## This skill
 
 ```bash
-npx skills add ./node_modules/deictic     # from the installed package; -a <agent> to pick agents, -g for global
+npx skills add gkurt/deictic     # or ./node_modules/deictic, the installed package's; -a <agent> to pick agents, -g for global
 ```
 
 Then restart the agent if it only reads skills as it starts.

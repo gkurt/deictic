@@ -237,7 +237,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `port` (the only one tried), `dir` (from the root), `inspect: false` (`--no-inspect`, and no links in the panel)
   and `args` (more of `vb serve`'s). The file keeps the options too (`as`): one running with others is stopped first.
 
-`skills/deictic/` is the agent skill, published with the package (`npx skills add ./node_modules/deictic`):
+`skills/deictic/` is the agent skill, published with the package (`npx skills add gkurt/deictic`, or `./node_modules/deictic` for the installed one):
 `SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed.
 `scripts/` are plain `.mjs` for Node 20+ or Bun with no dependencies (`lib.mjs` shared: `vb`, `.deictic/` folders,
 finding a recording or clip by task, URL, ID or path): `watch.mjs` (a line per task event, over `vb tail`),

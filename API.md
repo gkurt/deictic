@@ -132,7 +132,7 @@ deictic ships a skill that watches the channel and works each task as it arrives
 turn a recording into a timeline, screenshot it at any moment and transcribe its voice notes:
 
 ```bash
-npx skills add ./node_modules/deictic
+npx skills add gkurt/deictic
 ```
 
 ## Screenshots, recordings and voice
