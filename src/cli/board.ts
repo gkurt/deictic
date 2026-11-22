@@ -7,9 +7,13 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 import { runningAt, vbScript } from '#src/plugins/tasks/local.ts';
+import { execOf, packageManager } from '#src/tools/packages.ts';
 
-/** How the commands name each other in what they print, for an agent to run. */
-export const ME = 'npx deictic';
+/**
+ * How the commands name each other in what they print, for an agent to run: with the project's own runner, as npm
+ * adds notices of its own to what each command prints, which an agent's monitor takes for the command's.
+ */
+export const ME = `${execOf(packageManager(process.cwd()))} deictic`;
 
 export function fail(message: string): never {
   console.error(message);
@@ -181,7 +185,7 @@ export interface Message {
   createdAt: string;
   by: { actor: string };
   author?: { handle?: string };
-  task?: { state: string; claim?: { actor: string; until: string }; result?: string; reason?: string };
+  task?: { state: string; claim?: { actor: string; until: string }; result?: string | null; reason?: string | null };
 }
 
 /** A task's root message and its replies, by its ID (`68` or `#68`). */

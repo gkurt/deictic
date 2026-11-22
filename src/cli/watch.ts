@@ -16,7 +16,7 @@ import { createInterface } from 'node:readline';
 
 import { watcherAt } from '#src/plugins/tasks/watchers.ts';
 
-import { answers, boardIn, boardUrl, deicticDirs, duration, vb, vbCommand, whoami } from './board.ts';
+import { answers, boardIn, boardUrl, deicticDirs, duration, ME, vb, vbCommand, whoami } from './board.ts';
 
 /** What `vb tail --json` prints, one per line. */
 interface Tailed {
@@ -87,6 +87,13 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
   const say = (line: string) => console.log(line.replace(/\s+/g, ' ').trim());
   const first = (text: string) => (text.split('\n---')[0] ?? '').trim().slice(0, 160);
 
+  // A board nothing has posted to yet has no channel, and won't list or follow one it hasn't: made here, as the first
+  // task would make it. One that's there stays as it is; where the board won't let this make one, `vb tasks` says so.
+  const made = () => {
+    const [command, argv, options] = vbCommand(['channels', 'create', channel]);
+    spawnSync(command, argv, options);
+  };
+  made();
   const ready = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
   const me = whoami();
   // In the `.deictic/` whose board this is, or in each one near here where the board is the environment's.
@@ -165,7 +172,7 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
       const project = label('deictic.project');
       roots.set(p.thread, `"${first(p.text ?? '')}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`);
     }
-    if (e.type === 'task.created') event(`new task #${p.id}: ${roots.get(p.thread ?? -1) ?? ''}. Read it: npx deictic task ${p.id}`);
+    if (e.type === 'task.created') event(`new task #${p.id}: ${roots.get(p.thread ?? -1) ?? ''}. Read it: ${ME} task ${p.id}`);
     if (e.type === 'message.posted' && p.re !== null && p.re !== undefined) {
       if (me.profile !== null && p.by?.actor === me.actor) return;
       const by = e.message?.author?.handle ?? p.by?.actor ?? 'someone';
@@ -196,6 +203,8 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
         // Asked anew each time: a board started again may be at another URL, and the CLI gets itself a new token for it.
         if (answers()) {
           say(`the board is back on ${boardUrl() ?? "the team's board"}: watching ${channel} again`);
+          // A board started anew (its folder cleaned) has no channel again.
+          made();
           // With nothing heard before it went, what's ready is all there is to go by.
           if (cursor === undefined) {
             const now = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();

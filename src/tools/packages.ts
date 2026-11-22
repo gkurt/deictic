@@ -77,6 +77,9 @@ export function installCommand(manager: PackageManager, names: readonly string[]
 /** What runs a package's CLI without installing it, for the manager: `npx`, `bunx`. */
 export const runnerOf = (manager: PackageManager) => ({ npm: 'npx', pnpm: 'pnpm dlx', yarn: 'npx', bun: 'bunx' })[manager];
 
+/** What runs a CLI the project installed, for the manager: `npx`, `bunx`, each the project's own version. */
+export const execOf = (manager: PackageManager) => ({ npm: 'npx', pnpm: 'pnpm exec', yarn: 'yarn', bun: 'bunx' })[manager];
+
 /** Whether the project can import `name`: it's found from the root, as the bundler and deictic's own imports find it. */
 export function installed(root: string, name: string): boolean {
   try {

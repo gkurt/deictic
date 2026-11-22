@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { profileOf } from '#src/cli/board.ts';
 import type { Kept } from '#src/plugins/recordings/index.ts';
 import { type Model, tasks } from '#src/plugins/tasks/index.ts';
+import { localBoard } from '#src/plugins/tasks/local.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
 import { project } from './fixture.ts';
@@ -22,9 +23,13 @@ function deictic(cwd: string, ...args: string[]) {
   return as({ CLAUDECODE: '1' }, cwd, ...args);
 }
 
+/** The environment with nothing of its own that says who runs it, and `who`. */
+function agent(who: Record<string, string> = { CLAUDECODE: '1' }) {
+  return { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !WHO.test(name))), ...who };
+}
+
 function as(who: Record<string, string>, cwd: string, ...args: string[]) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !WHO.test(name)));
-  const run = Bun.spawnSync([process.execPath, CLI, ...args], { cwd, env: { ...env, ...who } });
+  const run = Bun.spawnSync([process.execPath, CLI, ...args], { cwd, env: agent(who) });
   return { code: run.exitCode, out: run.stdout.toString(), err: run.stderr.toString() };
 }
 
@@ -46,6 +51,7 @@ test('says its commands, and refuses one it has not', () => {
   expect(help.code).toBe(0);
   for (const name of ['init', 'clean', 'vb', 'watch', 'task', 'recording', 'frame', 'voice', 'transcribe'])
     expect(help.out).toContain(`  ${name} `);
+  expect(deictic(root, 'help', 'task').out).toContain('Usage: deictic task [options] <id>');
   const wrong = deictic(root, 'nope');
   expect(wrong.code).toBe(1);
   expect(wrong.err).toContain("unknown command 'nope'");
@@ -89,6 +95,35 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(JSON.parse(deictic(p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: 'claude' });
   expect(JSON.parse(as({}, p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: null });
   expect(as({}, p.root, 'watch', 'cli', '--once').out).toContain('set BOARD_PROFILE=<your name>');
+}, 60_000);
+
+test('a watch on a fresh board waits for its first task, and a task not over says no result', async () => {
+  const p = project({ 'package.json': '{}' });
+  // The board the dev server starts, with nothing posted yet: no channel.
+  const board = await localBoard(p.root, { inspect: false });
+  try {
+    const idle = deictic(p.root, 'watch', 'fresh', '--once', '--idle', '3s');
+    expect(idle.err).toBe('');
+    expect(idle.out).toContain('watching fresh on http://127.0.0.1:');
+    expect(idle.code).toBe(2);
+
+    // The first task, while one watches: what it waited for.
+    const watch = Bun.spawn([process.execPath, CLI, 'watch', 'fresh', '--once'], { cwd: p.root, env: agent(), stderr: 'pipe' });
+    const out = new Response(watch.stdout).text();
+    await Bun.sleep(3000);
+    const { task: made } = JSON.parse(deictic(p.root, 'vb', 'tasks', 'create', 'fresh', 'Make it bolder', '--json').out) as {
+      task: { id: string };
+    };
+    expect(await watch.exited).toBe(0);
+    // Named with the project's runner: this one's is the repository's, Bun.
+    expect(await out).toContain(`new task #${made.id}: "Make it bolder". Read it: bunx deictic task ${made.id}`);
+
+    const task = deictic(p.root, 'task', made.id);
+    expect(task.err).toBe('');
+    expect(task.out).not.toContain('null');
+  } finally {
+    board.stop();
+  }
 }, 60_000);
 
 test('a recording kept in the project as a timeline, and the part of it asked for', () => {
@@ -154,6 +189,8 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
 test('cleans what deictic kept after saying what and how big, and leaves the history and board to a stopped dev server', () => {
   const p = project({
     'package.json': '{}',
+    // An npm project's: the commands it names are npx's.
+    'package-lock.json': '{}',
     '.deictic/screenshots/a.png': 'png',
     '.deictic/recordings/b.json': '{}',
     '.deictic/recordings/c.part': '[]',

@@ -16,11 +16,13 @@ const CLIP = 'a task, a replay URL, a recording ID, an audio file or a clip ID';
 const program = new Command('deictic')
   .usage('<command> [options]')
   .enablePositionalOptions()
-  .helpCommand(false)
+  .helpOption('-h, --help', 'says what a command takes')
   .showHelpAfterError('(add --help for what it takes)')
-  .addHelpText('after', '\nRun in the project. deictic <command> --help says what a command takes.');
+  .addHelpText('after', '\nRun in the project. deictic help <command>, or <command> --help, says what it takes.');
 
 program.commandsGroup('Setting up and cleaning up:');
+// Here, not under a heading of its own, which a lone `help` would get.
+program.helpCommand('help [command]', 'says what a command takes');
 
 program
   .command('init')

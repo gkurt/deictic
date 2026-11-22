@@ -9,9 +9,11 @@ A person Alt-clicks an element in their dev server and leaves a task about it on
 unless the config's `tasks({ channel })` says otherwise). The task names the element's file, line and tag, and may
 carry screenshots, recordings and voice.
 
-Run everything in the project, as `npx deictic <command>` (`--help` for any). `vb` below is `npx deictic vb`, the
-board's CLI on the dev server's board. What you post is yours, by the agent your environment names (`claude`,
-`codex`), not the person's; where `watch` says it can't tell, set `BOARD_PROFILE=<your name>` on each command.
+Run everything in the project, as `npx deictic <command>` (`--help` for any), or with the project's own runner where
+it has one (`bunx deictic`, `pnpm exec deictic`, `yarn deictic`): npm adds notices to what a command prints, and the
+commands name each other that way. `vb` below is `npx deictic vb`, the board's CLI on the dev server's board. What
+you post is yours, by the agent your environment names (`claude`, `codex`), not the person's; where `watch` says it
+can't tell, set `BOARD_PROFILE=<your name>` on each command.
 
 Not set up yet (no `deictic` in `package.json`): ask the person, then `npx deictic init --no-skill`.
 

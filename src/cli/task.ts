@@ -20,8 +20,9 @@ export function run(id: string, values: { out?: string }): void {
   console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, asked by ${root.author?.handle ?? root.by.actor}, ${root.createdAt}`);
   const claim = root.task?.claim;
   if (claim) console.log(`Claimed by ${nameOf(claim.actor)} until ${claim.until}`);
-  if (root.task?.result !== undefined) console.log(`Result: ${root.task.result}`);
-  if (root.task?.reason !== undefined) console.log(`Reason: ${root.task.reason}`);
+  // A task not over yet has them, as null.
+  if (root.task?.result != null) console.log(`Result: ${root.task.result}`);
+  if (root.task?.reason != null) console.log(`Reason: ${root.task.reason}`);
   console.log(`\nAsked:\n${asked.trim()}\n`);
   // The part inside the element that was pointed at, where nothing marked it: what the person means.
   const pointed = /\nPointed at, inside it: `([^`]*)`\n`{3,}\w*\n([\s\S]*?)\n`{3,}/.exec(where);
