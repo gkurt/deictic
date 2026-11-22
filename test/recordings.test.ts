@@ -63,6 +63,13 @@ test('keeps what the page recorded, serves it back, and a page to replay it with
   const html = await replay.text();
   expect(html).toContain('<script src="../player.js"></script>');
   expect(html).toContain('"deictic.annotations"');
+  // What the page logged and asked for, listed beside it, and a recorded canvas drawn.
+  expect(html).toContain('<aside id="log"');
+  expect(html).toContain("'rrweb/console@1'");
+  expect(html).toContain("'rrweb/network@1'");
+  expect(html).toContain('UNSAFE_replayCanvas');
+  // The page's script is a string here: a line break in it must still be an escape there.
+  expect(html).toContain(String.raw`row.more.join('\n')`);
   // Published as a file, with no routes: the player from where it's put, and a script of the page's to say where a recording is.
   const published = replayPage({ player: './replay', source: './replay/source.js' });
   expect(published).toContain('<script src="./replay/player.js"></script>\n<script src="./replay/source.js"></script>');
@@ -157,7 +164,7 @@ test('a task attaches the recording, saying how long it ran and where it replays
 
 test('masks as rrweb does, by its names and defaults, in the page', () => {
   expect(clientModule([recordings({ maskAllInputs: true })], '/')).toContain(
-    `{ plugin: p0, ...{"options":{"masking":{"blockClass":"rr-block","maskTextClass":"rr-mask","maskAllInputs":true}}} }`,
+    `{ plugin: p0, ...{"options":{"masking":{"blockClass":"rr-block","maskTextClass":"rr-mask","maskAllInputs":true},"canvas":{"fps":2}}} }`,
   );
 });
 

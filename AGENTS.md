@@ -195,11 +195,15 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `read(id)`, and routes `begin`, `part/<id>?seq=<n>`, `end/<id>` and `discard/<id>` (a recording comes as it goes: its
   parts are lines of `<id>.part`, put in order and kept as `<id>.json` at `end`; one nobody ended goes a day on), `recording/<id>`, `replay/<id>` (`replay.ts`, `rrweb-player` sized to the window,
   restyled dark under `#main`, the marks drawn in its replayer's wrapper and moved with its scroll, a timeline
-  marker per marks event, voice in step at its speed; `?t=`, `&bare`) and `player.js`/`player.css`
+  marker per marks event, voice in step at its speed, the `rrweb/console@1` and `rrweb/network@1` events as a list beside it (`#log`: the row
+  it's at lit, a click goes there and opens the row, errors and failed requests marked on the timeline; not in `&bare`),
+  `UNSAFE_replayCanvas` for a recording with canvas events; `?t=`, `&bare`) and `player.js`/`player.css`
   (`rrweb-player`'s build, an optional peer). `replayPage(sources)`, exported, is that page for one published as a
   file where there are no routes: `player` is the folder its two files are in, `source` a script that sets
   `globalThis.deicticReplay` (`recording(id)`, `clip(id)`), and the recording is `?id=`.
-  `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots', sends the
+  `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots' (and each canvas
+  as pictures, `sampling.canvas` at the `canvas` option's `fps`, 2, or not with `false`: never rrweb's other way, which
+  wraps every drawing method), sends the
   events each second, and keeps what the next page needs in session storage (`deictic:recording`: the ID, the start, the
   next part's place, the clips, the mic, the toolbar's marks and their page). So a load doesn't end it: `setup` on the
   next page carries on under the same ID (rrweb's own `Meta` and snapshot per page, and for an address that changes with no load, a router's, a custom event,

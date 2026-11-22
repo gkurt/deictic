@@ -108,6 +108,11 @@ export interface RecordingsOptions extends Masking {
   keep?: number;
   /** Where they're kept, from the project's root: `.deictic/recordings` by default. */
   dir?: string;
+  /**
+   * What a `<canvas>` draws (a chart, a map, WebGL), which is no part of the page's markup: a picture of each
+   * canvas that changed, `fps` times a second, 2 by default. `false` for none, and a canvas replays blank.
+   */
+  canvas?: boolean | { fps?: number };
 }
 
 const ID = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -191,6 +196,7 @@ export function recordings(options: RecordingsOptions = {}) {
         maskTextSelector: options.maskTextSelector,
         maskAllInputs: options.maskAllInputs ?? false,
       } satisfies ResolvedMasking,
+      canvas: options.canvas === false ? false : { fps: (options.canvas === true ? undefined : options.canvas?.fps) ?? 2 },
     },
     setup: ({ root }) => {
       dir = options.dir === undefined ? keptIn(root, 'recordings') : resolve(root, options.dir);

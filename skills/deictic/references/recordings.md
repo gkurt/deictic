@@ -19,7 +19,8 @@ Where the project loads the `logs` and `network` plugins, the recording has rrwe
   the project asked for them `method`, headers and bodies). `request` lines in the timeline, as each ended. Secrets
   were blanked to `***` before it was kept, so a `***` is not what the page sent. `--json` has the whole request.
 
-Both only from when the recording started. A route change with no load (a router's) is a `page` line too, from a
+Both only from when the recording started. The replay page lists them beside the page, for a person; `&bare` (what
+`frame.mjs` opens) is the page alone. A `<canvas>` is recorded as pictures of it, a few a second. A route change with no load (a router's) is a `page` line too, from a
 custom event tagged `deictic.page` (`href`).
 
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps

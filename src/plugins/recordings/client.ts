@@ -172,7 +172,7 @@ function draggable(bar: HTMLElement, grip: HTMLElement, docked: (dock: Dock) => 
 export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
   setup: ({ base, root, options, use, request }) => {
-    const { masking } = options as { masking: ResolvedMasking };
+    const { masking, canvas } = options as { masking: ResolvedMasking; canvas?: false | { fps: number } };
     let going: Promise<Recording | undefined> | undefined;
 
     const post = async (route: string, body: unknown, keepalive = false) => {
@@ -249,6 +249,11 @@ export default defineClientPlugin<never, never, Recorder>({
         maskAllInputs: masking.maskAllInputs,
         maskInputOptions: { password: true },
         inlineStylesheet: true,
+        // A canvas as pictures of it, a few a second and only when it changed: rrweb's other way keeps every call
+        // drawn on it, for which it wraps each drawing method of every canvas.
+        ...(canvas === false || canvas === undefined
+          ? {}
+          : { recordCanvas: true, sampling: { canvas: canvas.fps }, dataURLOptions: { type: 'image/webp', quality: 0.6 } }),
       });
 
       // The marks, now and at each change: an SVG whose view is the page from its top left, at 1:1.

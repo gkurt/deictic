@@ -155,7 +155,7 @@ npx skills add gkurt/deictic
 | --------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
 | `deictic/screenshots` | `rrweb-snapshot` and `playwright-core`, or `modern-screenshot` | `renderer`, `keep` (100), `dir`, masking          |
 | `deictic/annotations` | nothing                                                        | `color`, `shortcut`                               |
-| `deictic/recordings`  | `rrweb`, `rrweb-player`                                        | `keep` (20), `dir`, masking                       |
+| `deictic/recordings`  | `rrweb`, `rrweb-player`                                        | `keep` (20), `dir`, `canvas`, masking             |
 | `deictic/voice`       | nothing                                                        | `keep` (50), `dir`                                |
 | `deictic/logs`        | `@rrweb/rrweb-plugin-console-record`                           | `levels`                                          |
 | `deictic/network`     | `@rrweb/rrweb-plugin-network-record`                           | `headers`, `body`, `mask`, `ignore`, `initiators` |
@@ -176,7 +176,12 @@ Masking follows [rrweb](https://github.com/rrweb-io/rrweb)'s names and defaults:
 (`blockClass`, `blockSelector`), `rr-mask` masks its text (`maskTextClass`, `maskTextSelector`), and `maskAllInputs`
 masks every field. Passwords always are. Nothing of deictic's own UI is in a shot or a recording.
 
-With logs and network, a recording has more than the page, each at its moment. Both are rrweb's own plugins, which
+A recording has what a `<canvas>` drew, as a picture of each canvas that changed, twice a second:
+`recordings: { canvas: { fps: 4 } }` for more, `canvas: false` for none (it then replays blank).
+
+With logs and network, a recording has more than the page, each at its moment. The replay lists them beside the
+page: the row it's at is lit, a click on one goes to its moment and shows the rest of it, and each error and failed
+request is a mark on the timeline. Both are rrweb's own plugins, which
 listen only while a recording is going, and each is left out with `false`.
 
 - **`logs`** keeps what the page logged and the errors nothing caught. `levels: ['warn', 'error']` keeps less. rrweb
