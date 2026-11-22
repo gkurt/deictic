@@ -40,7 +40,14 @@ The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a tea
 
 ## How
 
-Install it with what its plugins use:
+In your project:
+
+```bash
+npx deictic init
+```
+
+It installs deictic and what its plugins use with your package manager, adds it to your bundler's config, and offers
+to add the agent skill. Or by hand, install it with what its plugins use:
 
 ```bash
 npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core \
@@ -59,12 +66,13 @@ export default defineConfig({
 });
 ```
 
-Next.js, webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers).
+Next.js, webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers). A plugin whose packages aren't installed
+says so as the dev server starts, with the command that installs them.
 
 Start your dev server and Alt-click something. Tasks go to a board the dev server starts on your machine, with
 nothing to set up: `http://127.0.0.1:4100/`.
 
-To have your agent work them, add the skill and mention `/deictic`:
+To have your agent work them, add the skill (if `init` didn't) and mention `/deictic`:
 
 ```bash
 npx skills add gkurt/deictic

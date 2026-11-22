@@ -27,7 +27,7 @@ one (`src/plugins/` are subpath exports a user adds). Two halves that share only
 must stay small and dependency-free, and the tools, which run beside the bundler in Node or Bun.
 
 - `src/index.ts`: the plugin API, every part optional but `name`. `ServerPlugin` (`client`, `clientOptions` → the page's `context.options`, `shortcut`,
-  `needs`, `setup` → its API, `routes`, `read`, `apply` → `TextEdit[]` or `Done`, `undo`, `redo`,
+  `needs`, `packages`, `setup` → its API, `routes`, `read`, `apply` → `TextEdit[]` or `Done`, `undo`, `redo`,
   `describe`; any of them may be async) and `ClientPlugin` (`label`, `setup` → its API, `mount`), tied by
   `name`, sharing a `Model` and an `Op`. `ServerContext`/`ClientContext` carry `use(name)`, another
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
@@ -56,6 +56,18 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/tools/source.ts`: `sourceAt`, a target's file parsed (a JSX module, or an `.astro` component, whose `program`
   is its frontmatter's) and its opening tag found by offset and tag (a `Refusal` saying to reload when the file moved on); `resolveFile`, which refuses anything
   outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text.
+- `src/tools/packages.ts`: a plugin's `packages`, what it imports that the project installs (deictic's optional peers):
+  `missingMessage(root, plugins)`, found from the root as the bundler finds them, which `endpoints` warns as it starts,
+  with the install command; `packageManager(root)` (the `packageManager` field, the nearest lockfile, then the running
+  one's `npm_config_user_agent`), `installCommand` (deictic's own peer ranges, quoted, from `package.json`, inlined by
+  the build). The screenshots renderer has `packages` too.
+- `src/cli.ts`: the `deictic` bin (`dist/cli.js`), `deictic init` (`--dry-run`, `--no-install`, `--skill`/`--no-skill`).
+  `src/tools/init.ts` is it: installs `deictic` and the recommended plugins' `packages` (and `launch-editor` for webpack
+  and Rspack) the project lacks, as its own dev dependencies, since deictic's imports, the page's bundle and the skill
+  all look in the project; `bundlerOf` from the dependencies; `addToConfig` adds deictic to Vite's or Astro's list or
+  webpack's and Rspack's `plugins`, or wraps Next's export, with oxc and `magic-string` (through `defineConfig`, a
+  function, a `const`, `satisfies`; ESM or CommonJS; the config's quotes, semicolons and line endings), and nothing
+  where it can't tell, where it prints the snippet; it offers the skill on a terminal. `test/init.test.ts`.
 - `src/tools/kept.ts`: `keptIn(root, …parts)`, a path under the project's `.deictic/`, made with a
   `.gitignore` of `*` the first time. Every default data path goes through it.
 - `src/tools/history.ts`: every change as each file's whole text before and after, or as a plugin's

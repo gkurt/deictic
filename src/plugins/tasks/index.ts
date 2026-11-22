@@ -341,6 +341,7 @@ export function tasks(options: TasksOptions = {}) {
   return definePlugin<Model, Change, Kept>({
     name: 'tasks',
     client: 'deictic/tasks/client',
+    packages: ['@vercel/board'],
     // Only where it's turned off: the page half sends the HTML unless told not to.
     ...(options.html === false ? { clientOptions: { html: false } } : {}),
     shortcut: options.shortcut,

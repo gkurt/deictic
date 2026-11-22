@@ -15,6 +15,12 @@ types are the full reference: every option is documented where it's declared.
 
 ## Bundlers
 
+`npx deictic init` (or `pnpm dlx`, `bunx`) sets a project up: it installs deictic and what the recommended plugins
+use with the project's package manager, as its own dev dependencies, adds deictic to the config of Vite, Next.js,
+Astro, webpack or Rspack where it can tell where (it says what to add where it can't, and for Bun), and offers the
+agent skill. `--dry-run` says what it would do, `--no-install` only says the command, `--skill` and `--no-skill`
+answer the skill's question.
+
 Every integration takes the same options and runs in the dev server only.
 
 ```ts
@@ -285,6 +291,8 @@ export default defineClientPlugin<Model, Op>({
 ```
 
 - `routes` adds routes to the dev server, which the page half reaches with `request(route)`.
+- `packages` names what it imports that the project installs itself (its optional peers): as the dev server starts,
+  one that's missing is said, with the command that installs it.
 - `setup` answers an API for other plugins, which reach it with `context.use(name)`. That's how tasks attaches
   screenshots and recordings.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.

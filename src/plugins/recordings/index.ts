@@ -188,6 +188,7 @@ export function recordings(options: RecordingsOptions = {}) {
   return definePlugin<never, never, never, Recordings>({
     name: 'recordings',
     client: 'deictic/recordings/client',
+    packages: ['rrweb', 'rrweb-player'],
     clientOptions: {
       masking: {
         blockClass: options.blockClass ?? 'rr-block',

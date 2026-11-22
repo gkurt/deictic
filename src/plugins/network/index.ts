@@ -56,6 +56,7 @@ export function network(options: NetworkOptions = {}) {
   return definePlugin<never, never>({
     name: 'network',
     client: 'deictic/network/client',
+    packages: ['@rrweb/rrweb-plugin-network-record'],
     clientOptions: {
       initiators: options.initiators ?? ['fetch', 'xmlhttprequest'],
       headers: options.headers ?? false,

@@ -48,6 +48,7 @@ export function logs(options: LogsOptions = {}) {
   return definePlugin<never, never>({
     name: 'logs',
     client: 'deictic/logs/client',
+    packages: ['@rrweb/rrweb-plugin-console-record'],
     clientOptions: { levels: options.levels },
   });
 }

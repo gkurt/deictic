@@ -49,6 +49,9 @@
     "LICENSE"
   ],
   "type": "module",
+  "bin": {
+    "deictic": "./dist/cli.js"
+  },
   "sideEffects": false,
   "imports": {
     "#*": "./*"

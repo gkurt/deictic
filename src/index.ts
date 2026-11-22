@@ -122,6 +122,11 @@ export interface ServerPlugin<Model = unknown, Op = unknown, Record = unknown, A
   shortcut?: Shortcut;
   /** The plugins it can't do without, by name: the dev server won't start without them. */
   needs?: string[];
+  /**
+   * The packages it imports that the project installs itself (optional peers), by name: as the dev server starts,
+   * it says how to install any that's missing, rather than failing when first used.
+   */
+  packages?: string[];
   /** Runs once, as the dev server starts and before it answers anything. Answers the plugin's API to the others. */
   setup?(context: ServerContext): Maybe<Api>;
   /** Routes of its own, by their first segment under `/__deictic/plugins/<name>/`. */

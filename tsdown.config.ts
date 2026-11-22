@@ -10,6 +10,7 @@ export default defineConfig({
     bun: 'src/bun.ts',
     astro: 'src/astro.ts',
     loader: 'src/loader.ts',
+    cli: 'src/cli.ts',
     'client/index': 'src/client/index.ts',
     'tailwind/index': 'src/plugins/tailwind/index.ts',
     'tailwind/client': 'src/plugins/tailwind/client.ts',

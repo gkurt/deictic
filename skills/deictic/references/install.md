@@ -17,7 +17,8 @@ same options:
 | Bun (`Bun.serve` with HTML imports)  | `deictic/bun`: a plugin module named in `bunfig.toml`'s `[serve.static] plugins`, its `routes` spread into `Bun.serve` |
 | Astro                                | `integrations: [deictic({ plugins })]`, from `deictic/astro`; `.astro` components are marked with Astro 7 or later     |
 
-React Native isn't supported. With no plugins deictic loads nothing; `.deictic/` (kept data) ignores itself in git.
+React Native isn't supported. With no plugins deictic loads nothing; `.deictic/` (kept data) ignores itself in git. A
+plugin whose packages are missing says so as the dev server starts, with the command that installs them: run it.
 
 ## Which plugins: ask first
 
@@ -32,7 +33,9 @@ other options so they can add or drop some:
 > needed), screenshots drawn in the page instead of a headless browser (`dom()`, for a page with no server to
 > render on), a channel or labels for the tasks, and a shortcut other than Alt. Go with the recommended setup?
 
-On yes, the recommended setup:
+On yes, the recommended setup, in one step: `npx deictic init --no-skill` (`pnpm dlx`, `bunx` for those managers)
+installs it all with the project's package manager and adds deictic to the bundler's config, or says what to add where
+it can't tell where. By hand instead:
 
 ```bash
 npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core \

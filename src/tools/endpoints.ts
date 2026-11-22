@@ -18,6 +18,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { type Loc, Refusal, type ServerPlugin, type Target } from '#src/index.ts';
 
 import { History, type Scope } from './history.ts';
+import { missingMessage } from './packages.ts';
 import { setUp } from './plugins.ts';
 import { applyEdits, resolveFile, sourceAt } from './source.ts';
 
@@ -48,6 +49,8 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
   const prefix = `${base}__deictic/`;
   // Started now, awaited by every request: a plugin's API is there before anything asks for it.
   const ready = setUp(root, plugins);
+  const gone = missingMessage(root, plugins);
+  if (gone !== undefined) console.warn(gone);
 
   const pluginOf = (name: string) => {
     const plugin = byName.get(name);

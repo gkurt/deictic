@@ -92,6 +92,8 @@ export interface Renderer {
   client: string;
   /** What the page half gets, besides the masking. */
   clientOptions?: unknown;
+  /** The packages it imports that the project installs, as a plugin's `packages`. */
+  packages?: string[];
   /** The PNG, or with it the element's `box` in it, where it's not where the page said (the page was drawn again elsewhere). */
   render?(input: unknown): Promise<Uint8Array | { png: Uint8Array; box?: Box }>;
 }
@@ -105,7 +107,7 @@ export interface BrowserOptions {
 }
 
 /** Draws the page in the page, from its DOM (`modern-screenshot`): no server needed, but text may lay out a little differently. */
-export const dom = (): Renderer => ({ client: 'deictic/screenshots/dom' });
+export const dom = (): Renderer => ({ client: 'deictic/screenshots/dom', packages: ['modern-screenshot'] });
 
 /**
  * Snapshots the page's DOM in the page (`rrweb-snapshot`, masking as rrweb does) and renders it in a
@@ -113,6 +115,7 @@ export const dom = (): Renderer => ({ client: 'deictic/screenshots/dom' });
  */
 export const rrweb = (options: BrowserOptions = {}): Renderer => ({
   client: 'deictic/screenshots/rrweb',
+  packages: ['rrweb-snapshot', 'playwright-core'],
   // Loaded on the first shot, so a project rendering in the page needn't install Playwright.
   render: async (input) => (await import('./playwright.ts')).render(input, options),
 });
@@ -155,6 +158,7 @@ export function screenshots(options: ScreenshotsOptions = {}) {
   return definePlugin<never, never, never, Screenshots>({
     name: 'screenshots',
     client: renderer.client,
+    packages: renderer.packages,
     clientOptions: {
       masking: {
         blockClass: options.blockClass ?? 'rr-block',
