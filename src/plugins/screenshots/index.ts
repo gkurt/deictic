@@ -92,7 +92,8 @@ export interface Renderer {
   client: string;
   /** What the page half gets, besides the masking. */
   clientOptions?: unknown;
-  render?(input: unknown): Promise<Uint8Array>;
+  /** The PNG, or with it the element's `box` in it, where it's not where the page said (the page was drawn again elsewhere). */
+  render?(input: unknown): Promise<Uint8Array | { png: Uint8Array; box?: Box }>;
 }
 
 /** Where `rrweb()` finds a browser: any Chromium renders the snapshot as the page's own would. */
@@ -178,7 +179,9 @@ export function screenshots(options: ScreenshotsOptions = {}) {
         if (renderer.render === undefined || !type.startsWith('application/json'))
           return Response.json({ problem: 'send the shot as image/png' }, { status: 415 });
         try {
-          return Response.json({ id: keepShot(await renderer.render(JSON.parse(new TextDecoder().decode(body)))) });
+          const made = await renderer.render(JSON.parse(new TextDecoder().decode(body)));
+          if (made instanceof Uint8Array) return Response.json({ id: keepShot(made) });
+          return Response.json({ id: keepShot(made.png), ...(made.box === undefined ? {} : { box: made.box }) });
         } catch (e) {
           return Response.json({ problem: e instanceof Error ? e.message : String(e) }, { status: 500 });
         }

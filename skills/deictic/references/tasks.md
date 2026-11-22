@@ -15,10 +15,13 @@ A task's text is what the person typed. Where there's more that no label holds, 
 - What's attached and needs saying: the marks on a screenshot and what the notes say; a recording, its length, its
   voice clips and its replay URL; a voice note's length.
 - `Source:` the chain of source it rendered through, from its own line out:
-  `src/ui/label.tsx:6 ← src/ParticipantsField.tsx:20 ← src/WorkflowPanel.tsx:880`. Each place after the first is
-  where the file before it is used: the line of the element around that use, so the component's own tag is at or
-  just under it. When `deictic.at` is a shared component (`ui/label.tsx`, seven of them on the page), the change
-  is rarely there: it's at the next place, or the one after. No line when it all came from one file.
+  `src/ui/label.tsx:6 ← ParticipantsField (src/ParticipantsField.tsx:20) ← WorkflowPanel`. Each one after the first
+  is the component whose JSX has the one before, three at most: its line is the element of its own around that
+  use, so the component's tag is at or just under it, and a name alone (`WorkflowPanel`) is a component with no
+  element of its own around it: find its file by the name. When `deictic.at` is a shared component
+  (`ui/label.tsx`, seven of them on the page), the change is rarely there: it's at the next one, or the one after.
+  Where the page isn't React in development, the chain is `file:line`s only: the files of the elements around it,
+  which miss a component that wraps what it uses only in other components. No line when it all came from one file.
 - Sometimes `Pointed at, inside it:` a path and HTML: the person pointed at markup inside the element that no line
   marks (a dependency's, or a shadow root's). That part is what they mean; find it by its classes. On deictic's
   own `/internal/` page it's deictic's popup, so the fix is in deictic's client code, not the page.
@@ -97,7 +100,9 @@ others the change answers.
 vb tasks complete 68 "Bolded the card titles: src/pages/home.tsx:58 (font-semibold), all three cards"
 ```
 
-The result is what the person reads first: what changed, where, and anything you decided for them. Other endings:
+The result is what the person reads first: what changed, where, and anything you decided for them. A board's
+record of a task names who asked for it and, while it's claimed, who holds it, but not who completed it (that's
+only in its events), so `vb read` shows the person's name beside your result. Other endings:
 
 - `vb tasks release 68`: you can't work it after all; it's ready again for someone else.
 - `vb tasks fail 68 "<why>"`: it can't be done as asked; say what would make it possible.

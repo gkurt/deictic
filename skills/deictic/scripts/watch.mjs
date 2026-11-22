@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Watches the board for deictic's tasks and prints one line per thing to act on: the tasks ready now as it
 // starts, then each new task, a reply on one, and one canceled (undone in the page, say). Made for an agent's
-// monitor (each line an event). It says so if the board goes away, and ends by itself once nothing has happened
+// monitor (each line an event). A board that goes away (the dev server restarted, and its board with it) is
+// waited for and followed again from where it was left; it says so, and ends only if none comes back. It ends by itself once nothing has happened
 // on the channel for `--idle` (20m): a watch nobody feeds isn't started again, so no agent watches for ever.
 // With `--once` it ends at the first thing to act on, for a harness that's woken only when a command exits.
 // It ends, too, when the process that started it does: nobody reads its lines then.
@@ -12,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
-import { boardUrl, duration, parseArgs, vb, vbCommand, watching, whoami } from './lib.mjs';
+import { answers, boardUrl, duration, parseArgs, vb, vbCommand, watching, whoami } from './lib.mjs';
 
 const { options, rest } = parseArgs(process.argv.slice(2), ['once']);
 const channel = rest[0] ?? 'deictic';
@@ -81,15 +82,16 @@ heard();
 
 // What the board says about each thread: its root's first line and where, to name it when a task is made.
 const roots = new Map();
-const [command, argv, spawnOptions] = vbCommand(['tail', channel, ...labels, '--json']);
-tail = spawn(command, argv, { ...spawnOptions, stdio: ['ignore', 'pipe', 'inherit'] });
-createInterface({ input: tail.stdout }).on('line', (line) => {
+// The last event heard, which a tail started again follows from: nothing left while the board was away is missed.
+let cursor;
+const heardOf = (line) => {
   let e;
   try {
     e = JSON.parse(line);
   } catch {
     return;
   }
+  if (e.cursor !== undefined) cursor = e.cursor;
   heard();
   const p = e.payload ?? {};
   if (e.type === 'message.posted' && p.re === null) {
@@ -107,9 +109,44 @@ createInterface({ input: tail.stdout }).on('line', (line) => {
     event(`reply on #${p.re} by ${by}: ${first(p.text ?? '')}`);
   }
   if (e.type === 'task.canceled') event(`task #${p.id} canceled: ${p.reason ?? ''}. Stop work on it.`);
-});
-tail.on('exit', (code) => {
+};
+
+/** How long a board that went away is waited for: a dev server's restart takes a few seconds. */
+const BACK = 60_000;
+/** A tail that ends sooner than this after it's started again isn't started a third time: the board isn't the trouble. */
+const SOON = 10_000;
+
+const over = (code) => {
   say(`watch ended (vb tail exited ${code}): start it again`);
-  unseen();
-  process.exit(1);
-});
+  end(1);
+};
+
+/** Follows the channel, from `cursor` on where there is one, and again when the board comes back after going away. */
+const follow = (again) => {
+  const started = Date.now();
+  const from = cursor === undefined ? [] : ['--after', cursor];
+  const [command, argv, spawnOptions] = vbCommand(['tail', channel, ...labels, ...from, '--json']);
+  tail = spawn(command, argv, { ...spawnOptions, stdio: ['ignore', 'pipe', 'inherit'] });
+  createInterface({ input: tail.stdout }).on('line', heardOf);
+  tail.on('exit', (code) => {
+    if (again && Date.now() - started < SOON) return over(code);
+    say(`the board went away (vb tail exited ${code}): waiting for it to come back`);
+    const until = Date.now() + BACK;
+    const tried = () => {
+      // Asked anew each time: a board started again may be at another URL, and the CLI gets itself a new token for it.
+      if (answers()) {
+        say(`the board is back on ${boardUrl() ?? "the team's board"}: watching ${channel} again`);
+        // With nothing heard before it went, what's ready is all there is to go by.
+        if (cursor === undefined) {
+          const now = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
+          for (const line of now.split('\n').filter((l) => /^#\d+/.test(l) && !waiting.includes(l))) event(`ready: ${line}`);
+        }
+        return follow(true);
+      }
+      if (Date.now() > until) return over(code);
+      setTimeout(tried, 2000);
+    };
+    setTimeout(tried, 2000);
+  });
+};
+follow(false);

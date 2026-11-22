@@ -18,7 +18,14 @@ const [asked = '', where = ''] = root.text.split(/\n---\n/);
 const at = root.labels['deictic.at'];
 const here = dirname(fileURLToPath(import.meta.url));
 
-console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, by ${root.author?.handle ?? root.by.actor}, ${root.createdAt}`);
+// Who asked, said as that: the line's state is beside it, and a board's record names no one for a task's end.
+console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, asked by ${root.author?.handle ?? root.by.actor}, ${root.createdAt}`);
+// Who holds it, by the profile its actor's ID ends in (`…+claude`), or the ID of one that writes as itself.
+const claim = root.task?.claim;
+const holder = claim?.actor.includes('+') ? claim.actor.slice(claim.actor.lastIndexOf('+') + 1) : claim?.actor;
+if (claim) console.log(`Claimed by ${holder} until ${claim.until}`);
+if (root.task?.result) console.log(`Result: ${root.task.result}`);
+if (root.task?.reason) console.log(`Reason: ${root.task.reason}`);
 console.log(`\nAsked:\n${asked.trim()}\n`);
 // The part inside the element that was pointed at, where nothing marked it: what the person means.
 const pointed = where.match(/\nPointed at, inside it: `([^`]*)`\n`{3,}\w*\n([\s\S]*?)\n`{3,}/);

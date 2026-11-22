@@ -31,7 +31,9 @@ export interface Snapshot {
   window?: { width: number; height: number };
   scroll: { x: number; y: number };
   scale: number;
-  /** The part of the viewport to keep, for a shot of an element alone. */
+  /** The element the shot is of, as the snapshot numbers its nodes: found again in the rebuilt page, for where it is there. */
+  element?: number;
+  /** The part of the viewport to keep, for a shot of an element alone: where the element was in the page. */
   clip?: Box;
   /** An SVG the viewport's size, drawn over the page: the annotations, where there are any. */
   overlay?: string;
@@ -79,7 +81,12 @@ async function launch({ executablePath, channel }: BrowserOptions): Promise<Brow
 /** The rrweb-snapshot bundle that defines `rrwebSnapshot` in a page: its CommonJS entry is that bundle. */
 const bundle = () => createRequire(import.meta.url).resolve('rrweb-snapshot');
 
-export async function render(input: unknown, options: BrowserOptions): Promise<Uint8Array> {
+/**
+ * The PNG, and where the element is in it. That's measured in the rebuilt page, not taken from the live one: the
+ * two can lay out a few pixels apart (a font that loaded differently, a panel's own scroll), and an outline drawn
+ * at the live page's box would then cross the element.
+ */
+export async function render(input: unknown, options: BrowserOptions): Promise<{ png: Uint8Array; box?: Box }> {
   const shot = input as Snapshot;
   if (typeof shot?.url !== 'string' || typeof shot.snapshot !== 'object' || typeof shot.viewport?.width !== 'number')
     throw new Error('screenshots: that is not a snapshot the rrweb() renderer took');
@@ -91,13 +98,14 @@ export async function render(input: unknown, options: BrowserOptions): Promise<U
     await page.route(host, (route) => route.fulfill({ contentType: 'text/html', body: HOST }));
     await page.goto(host);
     await page.addScriptTag({ path: bundle() });
-    await page.evaluate(async ({ snapshot, scroll, overlay }) => {
+    const found = await page.evaluate(async ({ snapshot, scroll, overlay, element }) => {
       const { rebuildIntoSandboxedIframe, createCache, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb })
         .rrwebSnapshot;
+      const mirror = createMirror();
       const { iframe } = rebuildIntoSandboxedIframe(snapshot, {
         root: document.body,
         cache: createCache(),
-        mirror: createMirror(),
+        mirror,
         iframeAttributes: { style: 'border:0;position:fixed;inset:0;width:100vw;height:100vh' },
       });
       const doc = iframe.contentDocument;
@@ -105,16 +113,35 @@ export async function render(input: unknown, options: BrowserOptions): Promise<U
       await doc.fonts.ready;
       await Promise.all([...doc.images].map((img) => img.decode().catch(() => {})));
       iframe.contentWindow?.scrollTo(scroll.x, scroll.y);
-      if (overlay === undefined) return;
+      // rrweb scrolled each element as it built it, before the fonts and images gave its content its height:
+      // one that couldn't scroll that far yet is scrolled again now.
+      // By its kind: the iframe's elements aren't instances of this page's `Element`.
+      const isElement = (node: Node | null): node is Element => node?.nodeType === 1;
+      for (const id of mirror.getIds()) {
+        const node = mirror.getNode(id);
+        const meta = node === null ? null : mirror.getMeta(node);
+        if (!isElement(node) || meta === null || !('attributes' in meta)) continue;
+        const { rr_scrollTop: top, rr_scrollLeft: left } = meta.attributes;
+        if (typeof top === 'number') node.scrollTop = top;
+        if (typeof left === 'number') node.scrollLeft = left;
+      }
+      const node = element === undefined ? null : mirror.getNode(element);
+      // The iframe fills the page from its top left, so a box in it is one in the shot.
+      const rect = isElement(node) ? node.getBoundingClientRect() : undefined;
+      const box = rect === undefined ? undefined : { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      if (overlay === undefined) return box;
       // Over the page and its scroll: the SVG is the viewport's, already where it scrolled to.
       const marks = document.createElement('div');
       marks.style.cssText = 'position:fixed;inset:0;z-index:1;pointer-events:none';
       marks.innerHTML = overlay;
       document.body.append(marks);
+      return box;
     }, shot);
     // Without the scrollbars: a shot is what the page is drawn in, which is what an element's box is from.
-    const clip = clamp(shot.clip ?? { x: 0, y: 0, ...shot.viewport }, shot.viewport);
-    return new Uint8Array(await page.screenshot({ type: 'png', ...(clip === undefined ? {} : { clip }) }));
+    // A shot of the element alone is cut where the element is here.
+    const clip = clamp(shot.clip === undefined ? { x: 0, y: 0, ...shot.viewport } : (found ?? shot.clip), shot.viewport);
+    const png = new Uint8Array(await page.screenshot({ type: 'png', ...(clip === undefined ? {} : { clip }) }));
+    return { png, ...(found === undefined || shot.clip !== undefined ? {} : { box: found }) };
   } finally {
     await context.close();
   }

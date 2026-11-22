@@ -130,8 +130,10 @@ export interface Op {
   /** How many elements on the page come from the same place in the source. */
   count: number;
   /**
-   * The source it rendered through, after its own place, nearest first, each a `file:line`: where the file
-   * before it is used. A shared component's line says nothing of which use of it this is, and these do.
+   * The source it rendered through, after its own place, nearest first: where the one before it is used. With
+   * React in development, the components that wrote it, `Field (src/Field.tsx:20)` or a name alone; without, the
+   * files around it, each a `file:line`. A shared component's line says nothing of which use of it this is, and
+   * these do.
    */
   chain?: string[];
   /** The element's HTML as it rendered, to attach: cut short, and masked where the screenshots plugin is loaded. */
@@ -537,14 +539,17 @@ function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
   });
 }
 
-/** `Source: src/ui/label.tsx:6 ← src/Field.tsx:20 ← src/Panel.tsx:880`: from the element's line out, as the page said it. */
+/**
+ * `Source: src/ui/label.tsx:6 ← Field (src/Field.tsx:20) ← Panel`: from the element's line out, as the page said
+ * it: the components that use it, where the page knows them, or the files around it.
+ */
 function chainOf({ loc }: Target, chain: NonNullable<Op['chain']>): string[] {
   const places = chain.slice(0, CHAIN).map((place) => clip(String(place), LABEL));
   return places.length === 0 ? [] : [`Source: ${[`${loc.file}:${loc.line}`, ...places].join(' ← ')}`];
 }
 
 /** How many places a chain names after the element's own: the first few say which use of a component it is. */
-const CHAIN = 5;
+const CHAIN = 3;
 
 /** A box as `x,y,width,height`, in whole CSS pixels from the shot's top left. */
 const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.round);

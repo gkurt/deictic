@@ -189,17 +189,72 @@ const parentOf = (el: Element): Element | undefined => {
   return root instanceof ShadowRoot ? root.host : undefined;
 };
 
-/** How many places a chain names after the element's own. */
-const CHAIN = 5;
+/** How many places a chain names after the element's own: who uses it, and who uses that. Further out is the app's shell. */
+const CHAIN = 3;
 
 /**
- * The source `el` rendered through, after its own file, nearest first, each a `file:line`: a shared component's
- * own line is the same wherever it's used, and what uses it is the next file out (or a component between them,
- * which is why there are several). Read off the marks around it, the only trace of source the page has: each
- * place is the nearest element the next file wrote, which is where, in that file, the one before is used.
+ * What React keeps, in development, of who wrote an element: a fiber (its `type` the component), or for a server
+ * component its `name`. Each has the one that wrote it in turn.
+ */
+interface Owner {
+  name?: unknown;
+  type?: unknown;
+  alternate?: Owner | null;
+  owner?: Owner | null;
+  _debugOwner?: Owner | null;
+}
+
+/** React's fiber of an element it rendered, which it keeps on the element under a key of its own. */
+const fiberOf = (el: Element): Owner | undefined => {
+  const key = Object.keys(el).find((k) => k.startsWith('__reactFiber$'));
+  return key === undefined ? undefined : (el as unknown as Record<string, Owner>)[key];
+};
+
+const ownerOf = (of: Owner | undefined): Owner | undefined => of?._debugOwner ?? of?.owner ?? undefined;
+
+/** A component's name, through `memo` and `forwardRef`, or nothing for one written without. */
+function componentOf(owner: Owner): string | undefined {
+  if (typeof owner.name === 'string') return owner.name === '' ? undefined : owner.name;
+  let type = owner.type as { displayName?: unknown; name?: unknown; render?: unknown; type?: unknown } | null | undefined;
+  for (let depth = 0; depth < 4 && type !== null && type !== undefined; depth++) {
+    // A function's own name, where it has no `displayName`; a `memo` or `forwardRef` object has neither.
+    const name = type.displayName ?? type.name;
+    if (typeof name === 'string' && name !== '') return name;
+    type = (type.render ?? type.type) as typeof type;
+  }
+  return undefined;
+}
+
+/**
+ * The source `el` rendered through, after its own place, nearest first: a shared component's own line is the same
+ * wherever it's used, and the change is most often in what uses it, or in what uses that.
+ *
+ * With React in development, those are the components that wrote it, each the one whose JSX has the one before:
+ * `Field (src/Field.tsx:20)`, its line the nearest element around `el` that the component wrote, or the name alone
+ * for one with no element of its own around it (it wraps what it uses only in other components), which the marks
+ * can't show at all. A layout component the element was only passed through isn't among them.
+ *
+ * Without (another framework, a production build) it's read off the marks around it, each a `file:line`: the
+ * nearest element each next file wrote.
  */
 function chainOf(el: Element, file: string): NonNullable<Op['chain']> {
   const found: NonNullable<Op['chain']> = [];
+  const wrote = ownerOf(fiberOf(el));
+  if (wrote !== undefined) {
+    for (let owner = ownerOf(wrote); owner !== undefined && found.length < CHAIN; owner = ownerOf(owner)) {
+      const name = componentOf(owner);
+      let place: string | undefined;
+      for (let at = parentOf(el); at !== undefined && place === undefined; at = parentOf(at)) {
+        const by = ownerOf(fiberOf(at));
+        // A component's fiber is one of two, by turns: an element may name either.
+        if (by === undefined || (by !== owner && by !== owner.alternate)) continue;
+        place = at.getAttribute('data-deictic')?.replace(/:\d+$/, '');
+      }
+      if (name !== undefined) found.push(place === undefined ? name : `${name} (${place})`);
+      else if (place !== undefined) found.push(place);
+    }
+    if (found.length > 0) return found;
+  }
   let last = file;
   for (let at = parentOf(el); at !== undefined && found.length < CHAIN; at = parentOf(at)) {
     const mark = at.getAttribute('data-deictic');

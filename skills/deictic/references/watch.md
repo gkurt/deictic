@@ -35,7 +35,9 @@ minutes), and start it again when the monitor expires, unless the watch said `id
   it says so as it starts;
 - `task #71 canceled: …`: the person undid it in the page; stop, and put back what you changed for it;
 - `idle: …`: nothing in 20 minutes, the watch is over (above);
-- `watch ended …`: the board went away; check `vb whoami`, then start it again.
+- `the board went away …`, then `the board is back …`: the dev server was restarted, and its board with it. The
+  watch waits up to a minute and carries on from where it was, so there's nothing for you to do;
+- `watch ended …`: the board didn't come back; check `vb whoami`, then start it again.
 
 On an event, work the task ([tasks.md](tasks.md)) while the monitor keeps running.
 

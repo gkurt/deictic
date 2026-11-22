@@ -76,9 +76,10 @@ export function screenshotsClient(capture: PageCapture) {
       const add = async (body: Blob | string, type: string, { box, size }: Pick<Shot, 'box' | 'size'>): Promise<Shot> => {
         const res = await request('add', { method: 'POST', headers: { 'content-type': type }, body });
         // `url`: where the shot is, said by what keeps it with no server to serve it from (a `standalone` build).
-        const { id, url, problem } = (await res.json()) as { id?: string; url?: string; problem?: string };
+        // `box`: where the element is in a shot drawn again elsewhere, which is what's true of the PNG.
+        const { id, url, problem, box: drawn } = (await res.json()) as { id?: string; url?: string; problem?: string; box?: Box };
         if (id === undefined) throw new Error(`screenshots: ${problem ?? res.statusText}`);
-        return { id, url: url ?? `${base}__deictic/plugins/screenshots/shot/${id}`, box, size };
+        return { id, url: url ?? `${base}__deictic/plugins/screenshots/shot/${id}`, box: drawn ?? box, size };
       };
       return {
         capture: async (element, { area = 'viewport' } = {}) => {

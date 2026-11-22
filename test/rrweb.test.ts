@@ -22,11 +22,14 @@ const server = Bun.serve({
         body { margin: 24px; font: 16px system-ui, sans-serif; }
         code { display: inline-block; padding: 8px 12px; border: 1px solid #ddd; font: 14px ui-monospace, monospace; }
         .tall { height: 1600px; }
+        .panel { height: 120px; overflow: auto; }
+        .panel label { display: block; margin-top: 300px; width: 120px; height: 20px; background: #0000ff; }
         /* The window is right on this breakpoint, and the page narrower by its scrollbar: it still applies. */
         @media (min-width: 640px) { h1 { margin-left: 200px; } }
       </style></head><body>
         <h1>Pricing</h1><code>npm install -D deictic</code>
         <p>Signed in as <span class="rr-mask">Ada Lovelace</span></p>
+        <div class="panel"><label></label><div class="tall"></div></div>
         <div class="tall"></div><p id="below">Further down</p>
         <deictic-overlay><div style="position:fixed;inset:0;background:red"></div></deictic-overlay>
       </body></html>`,
@@ -41,19 +44,19 @@ const viewport = { width: 640, height: 480 };
 const ALLOWED = Math.round(viewport.width * viewport.height * 0.0005);
 
 /** The page, open, with what the page half sends for it. */
-async function open(): Promise<{ page: Page; snapshot: (scroll?: number) => Promise<Snapshot> }> {
+async function open(): Promise<{ page: Page; snapshot: (scroll?: number, element?: string) => Promise<Snapshot> }> {
   const page = await browser!.newPage({ viewport, deviceScaleFactor: 1 });
   await page.goto(server.url.href);
   await page.addScriptTag({ path: bundle });
-  const snapshot = async (scroll = 0) => {
+  const snapshot = async (scroll = 0, element?: string) => {
     await page.evaluate((y) => scrollTo(0, y), scroll);
     // As the page half takes it: masked as rrweb masks, without deictic's overlay.
-    const taken = await page.evaluate(() =>
-      (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot.snapshot(document, {
-        inlineStylesheet: true,
-        maskTextClass: 'rr-mask',
-      }),
-    );
+    const { taken, id } = await page.evaluate((selector) => {
+      const { snapshot, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot;
+      const mirror = createMirror();
+      const taken = snapshot(document, { mirror, inlineStylesheet: true, maskTextClass: 'rr-mask' });
+      return { taken, id: selector === undefined ? undefined : mirror.getId(document.querySelector(selector)) };
+    }, element);
     const strip = (node: Snapshot['snapshot']): Snapshot['snapshot'] =>
       'childNodes' in node
         ? {
@@ -68,7 +71,15 @@ async function open(): Promise<{ page: Page; snapshot: (scroll?: number) => Prom
       width: document.documentElement.clientWidth,
       height: document.documentElement.clientHeight,
     }));
-    return { snapshot: strip(taken!), url: server.url.href, viewport: inside, window: viewport, scroll: { x: 0, y: scroll }, scale: 1 };
+    return {
+      snapshot: strip(taken!),
+      url: server.url.href,
+      viewport: inside,
+      window: viewport,
+      scroll: { x: 0, y: scroll },
+      scale: 1,
+      ...(id === undefined ? {} : { element: id }),
+    };
   };
   return { page, snapshot };
 }
@@ -112,7 +123,7 @@ test.skipIf(browser === undefined)(
       // The page is tall, so it has a scrollbar, which a shot leaves out.
       expect(shot.viewport.width).toBeLessThan(viewport.width);
       const live = new Uint8Array(await page.screenshot({ clip: { x: 0, y: 0, ...shot.viewport } }));
-      const drawn = await render(shot, {});
+      const { png: drawn } = await render(shot, {});
       const n = await differing(page, live, drawn);
       expect(n).toBeGreaterThanOrEqual(0);
       expect(n).toBeLessThanOrEqual(ALLOWED);
@@ -132,7 +143,7 @@ test.skipIf(browser === undefined)(
     expect(text).not.toContain('Ada Lovelace');
     expect(text).not.toContain('deictic-overlay');
     // Rendered, the page isn't covered by the overlay's red.
-    const png = await render(shot, {});
+    const { png } = await render(shot, {});
     const red = await page.evaluate(
       async (bytes) => {
         const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
@@ -154,7 +165,7 @@ test.skipIf(browser === undefined)(
   async () => {
     const { page, snapshot } = await open();
     const box = await page.evaluate(() => document.querySelector('code')!.getBoundingClientRect().toJSON() as Snapshot['clip']);
-    const png = await render({ ...(await snapshot()), clip: box }, {});
+    const { png } = await render({ ...(await snapshot()), clip: box }, {});
     const size = await page.evaluate(
       async (bytes) => {
         const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
@@ -177,7 +188,7 @@ test.skipIf(browser === undefined)(
   async () => {
     const { page, snapshot } = await open();
     const overlay = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect x="300" y="300" width="40" height="40" fill="#0000ff"/></svg>`;
-    const png = await render({ ...(await snapshot()), overlay }, {});
+    const { png } = await render({ ...(await snapshot()), overlay }, {});
     const blue = await page.evaluate(
       async (bytes) => {
         const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
@@ -189,6 +200,38 @@ test.skipIf(browser === undefined)(
       [...png],
     );
     expect(blue).toBe(true);
+    await page.close();
+  },
+  30_000,
+);
+
+test.skipIf(browser === undefined)(
+  'says where the element is in what it drew, in a panel scrolled by itself',
+  async () => {
+    const { page, snapshot } = await open();
+    const live = await page.evaluate(() => {
+      document.querySelector('.panel')!.scrollTop = 260;
+      return document.querySelector('.panel label')!.getBoundingClientRect().toJSON() as NonNullable<Snapshot['clip']>;
+    });
+    const { png, box } = await render(await snapshot(0, '.panel label'), {});
+    // The panel is scrolled in the shot as in the page, so the element is where the page had it.
+    expect(box).toEqual({ x: live.x, y: live.y, width: live.width, height: live.height });
+    // And that's where it's drawn: its blue is inside the box, and not just above or below it.
+    const blue = await page.evaluate(
+      async ({ bytes, at }) => {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+        const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        const is = (x: number, y: number) => {
+          const [r, g, b] = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+          return r! < 30 && g! < 30 && b! > 220;
+        };
+        const x = at.x + at.width / 2;
+        return [is(x, at.y - 2), is(x, at.y + 2), is(x, at.y + at.height - 2), is(x, at.y + at.height + 2)];
+      },
+      { bytes: [...png], at: box! },
+    );
+    expect(blue).toEqual([false, true, true, false]);
     await page.close();
   },
   30_000,

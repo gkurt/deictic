@@ -157,6 +157,12 @@ export function vb(args, { json = false } = {}) {
   return json ? JSON.parse(run.stdout) : run.stdout;
 }
 
+/** Whether the board answers now, as whoever the CLI writes as: asked of one that may be starting again. */
+export function answers() {
+  const [command, argv, options] = vbCommand(['whoami', '--json']);
+  return spawnSync(command, argv, { ...options, encoding: 'utf8' }).status === 0;
+}
+
 /**
  * Who the CLI writes as: `{ actor, handle, profile }`. `profile` is the name `BOARD_PROFILE` (or `--as`) gave, and
  * `null` without one: then what's written is the person's own, as the board sees it.

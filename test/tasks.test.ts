@@ -110,11 +110,14 @@ test('says what was pointed at inside the element, where nothing marked it', asy
 
 test('says the source it rendered through, and attaches its HTML as it rendered', async () => {
   const { post, target } = setup('around');
-  const chain = ['src/ParticipantsField.tsx:20', 'src/WorkflowPanel.tsx:880'];
+  // A component with no element of its own around this one has only its name; past the third is the app's shell.
+  const chain = ['ParticipantsField (src/ParticipantsField.tsx:20)', 'WorkflowPanel', 'src/SidePanel.tsx:12', 'src/App.tsx:40'];
   const html = '<h1 class="text-4xl" data-deictic="src/App.tsx:1:26">Pricing</h1>';
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, chain, html } });
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.text).toBe(`${op.text}\n---\nSource: src/App.tsx:1 ← src/ParticipantsField.tsx:20 ← src/WorkflowPanel.tsx:880`);
+  expect(message.text).toBe(
+    `${op.text}\n---\nSource: src/App.tsx:1 ← ParticipantsField (src/ParticipantsField.tsx:20) ← WorkflowPanel ← src/SidePanel.tsx:12`,
+  );
   // The HTML is a file, for whoever looks into it: the task's words stay short.
   expect(message.attachments).toEqual([expect.objectContaining({ name: 'element.html', type: 'text/html', size: html.length })]);
   // What was typed is all the panel lists.

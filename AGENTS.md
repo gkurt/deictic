@@ -174,7 +174,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `Shot` with the element's `box`; nothing of deictic's is ever drawn. Its API has `masked(element)` too, a copy with
   what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. `dom.ts` draws in the page with
   `modern-screenshot`, masking the copy. `rrweb.ts` sends an `rrweb-snapshot` (masked by rrweb, the overlay cut
-  out) with viewport, window, scroll and density; `playwright.ts` rebuilds it in a sandboxed iframe on a blank page of
+  out) with viewport, window, scroll and density, and which node the element is; `playwright.ts` answers the PNG and the element's
+  `box` as it's drawn there (measured in the rebuilt page, as the two can lay out a few pixels apart, and what the `Shot` then has; a `render` may answer `{ png, box }`): it rebuilds it in a sandboxed iframe on a blank page of
   the page's origin (Playwright answers it) in a browser launched once (Playwright's Chromium, then Chrome, then
   Edge), and screenshots it. The browser is the window's size and shows its scrollbars (media queries ask the window's
   width, the layout has what the scrollbar leaves), and the shot is cut to the viewport. Masking options follow rrweb's names and defaults. Optional peers, each imported on
@@ -240,8 +241,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
   the user's own `labels`; the source isn't sent. After the words, what the page says and no label holds: `Source:`,
-  the chain of source it rendered through, as `file:line`s from its own out (`Op.chain`, read off the marks around it,
-  the nearest of each file in turn, five at most: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is never in the text, which stays short: it's attached as `element.html`
+  the chain of source it rendered through, from its own line out (`Op.chain`, three at most: with React in development the
+  components that wrote it, read off the fibers' owners, each `Name (file:line)` with the line of its nearest element around
+  this one, or its name alone where it has none; otherwise `file:line`s read off the marks around it, the nearest of each file
+  in turn: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is never in the text, which stays short: it's attached as `element.html`
   (`Op.html`, masked by `screenshots.masked` where that's loaded; sent while the panel's Attach HTML snapshot box is ticked,
   as it is by default, and the `html: false` option, a `clientOptions`, takes the box away), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`, the
   rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
@@ -290,7 +293,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 own `@vercel/board` script on the dev server's board, `.deictic/` folders,
 finding a recording or clip by task, URL, ID or path): `vb.mjs` (that CLI, for the agent's own commands), `watch.mjs` (a line per task event, over `vb tail`,
 without the replies of the watcher's own profile; it ends, exit 2, once the channel's had no event for `--idle`, 20m, and the agent then stops watching
-and says so, so none watches for ever; `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process does, so one a session left behind isn't watching; while it runs it's in `.deictic/watchers`, `watching` in `lib.mjs`), `task.mjs` (the task, and the page's other open ones), `recording.mjs` (a timeline, or the part of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
+and says so, so none watches for ever; `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process does, so one a session left behind isn't watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the last event's cursor; while it runs it's in `.deictic/watchers`, `watching` in `lib.mjs`), `task.mjs` (the task, and the page's other open ones), `recording.mjs` (a timeline, or the part of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
 Playwright), `voice.mjs` (speech times, with ffmpeg) and `transcribe.mjs` (Whisper through a pinned
 transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
 without it the script refuses and says what to ask the person, as the skill has the agent ask first). The recording's marks event carries `annotations` as data
@@ -299,7 +302,7 @@ for them. Change them with the task format, the replay page or the marks event.
 `examples/vite` is React + Tailwind v4 and imports deictic from `dist`, so build first. `dist`'s shared chunks
 have no hash in their names (`hash: false`; they go in `dist/shared/`, where none can take an entry's name) and a build doesn't empty `dist` first (`clean: false`; `prepack` does, with
 `--clean`), so rebuilding under a running dev server doesn't break its imports;
-restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`). `examples/next`
+restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`: `watch.mjs` waits for the board and follows it again). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
 integrations, also from `dist`; `test/integrations.test.ts` covers each integration, Rspack with a real compile.
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
