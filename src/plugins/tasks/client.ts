@@ -34,14 +34,23 @@ const STYLE = `
 /* A task's words being changed need the room. */
 .tasks:has(.editing) { max-height: none; }
 .tasks li { position: relative; display: flex; gap: 6px; align-items: baseline; }
-.tasks .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tasks .state { font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
-.tasks .state.completed { color: #4ade80; }
-.tasks .state.failed { color: var(--deictic-problem); }
+.tasks .title { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Clicked, a task reads whole, as it was typed. */
+.tasks li.whole .title { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The state is a dot, named by its tooltip: a ring while no one has it, filled once someone does or it's over. */
+.tasks .state { flex: none; align-self: center; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
+/* Room for Edit and Delete, which would lie over the first line's end. */
+.tasks li.whole:has(.acts) .title { padding-right: 40px; }
+.tasks li.whole .state { align-self: baseline; }
+.tasks .state.waiting { border-style: dotted; }
+.tasks .state.claimed { border-color: #60a5fa; background: #60a5fa; }
+.tasks .state.blocked { border-color: #fbbf24; background: #fbbf24; }
+.tasks .state.completed { border-color: #4ade80; background: #4ade80; }
+.tasks .state.failed { border-color: var(--deictic-problem); background: var(--deictic-problem); }
 .tasks a { color: inherit; text-decoration: none; }
 .tasks a:hover { text-decoration: underline; }
 /* Over the row's end, and only while the row is pointed at or focused in: the title keeps the width. */
-.tasks .acts { position: absolute; inset: 0 0 0 auto; display: none; align-items: center; padding-left: 14px; background: linear-gradient(to right, transparent, var(--deictic-bg) 12px); }
+.tasks .acts { position: absolute; inset: 0 0 auto auto; min-height: 18px; display: none; align-items: center; padding-left: 14px; background: linear-gradient(to right, transparent, var(--deictic-bg) 12px); }
 .tasks li:hover .acts, .tasks li:focus-within .acts { display: flex; }
 .tasks .act { display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
 .tasks .act:hover { color: var(--deictic-fg); }
@@ -437,6 +446,8 @@ export default defineClientPlugin<Model, Change>({
 
     // The task whose words are open to change, by ID, and the tasks as last read.
     let editing: string | undefined;
+    // The tasks shown whole, by ID: kept over a change, which draws the list again.
+    const whole = new Set<string>();
     // The Save of a listed task whose words were changed and not kept yet.
     let edited: HTMLElement | undefined;
     /** Tells the popup what leaving now would lose: a listed task's changed words, or a new one's, typed, attached or being spoken. */
@@ -504,18 +515,32 @@ export default defineClientPlugin<Model, Change>({
           : element('a', { href: link, target: '_blank', rel: 'noreferrer', title: 'Open the channel on the board' });
       name.textContent = `#${channel}`;
       hint.replaceChildren('to ', name);
-      /** A task's row: its ID, a link where it has a page, its title, where it's from when that's said, and its state. */
+      /** A task's row: its state, its ID, a link where it has a page, its title, and where it's from when that's said. */
       const rowOf = (t: Task, from?: HTMLElement) => {
         const item = element('li');
+        const state = element('span', { className: `state ${t.state}`, title: t.state });
+        state.role = 'img';
         const id = element('code', { textContent: `#${t.id}` });
-        const title = element('span', { className: 'title', textContent: t.title, title: t.title });
-        const state = element('span', { className: `state ${t.state}`, textContent: t.state });
+        const title = element('button', { type: 'button', className: 'title' });
+        // In place, not by drawing the list again: that would take a task's words being changed with it.
+        const show = () => {
+          const all = whole.has(t.id);
+          item.classList.toggle('whole', all);
+          title.textContent = all ? t.text : t.title;
+          title.title = all ? 'Show its first line only' : 'Show all of it';
+          title.ariaExpanded = String(all);
+        };
+        title.addEventListener('click', () => {
+          if (!whole.delete(t.id)) whole.add(t.id);
+          show();
+        });
+        show();
         const to =
           t.link === undefined
             ? id
             : element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
         if (to !== id) to.append(id);
-        item.append(to, title, ...(from === undefined ? [] : [from]), state);
+        item.append(state, to, title, ...(from === undefined ? [] : [from]));
         return item;
       };
       const { file } = context.target.loc;
