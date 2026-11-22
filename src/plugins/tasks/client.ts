@@ -29,14 +29,21 @@ import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
 const STYLE = `
 /* The column is no wider than the panel: an \`auto\` one grows to a long title, which then never truncates. */
 .tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.tasks li { display: flex; gap: 6px; align-items: baseline; }
+/* Five rows, and the rest scrolled to: the field stays where it is however many there are. */
+.tasks { max-height: 112px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--deictic-line) transparent; }
+/* A task's words being changed need the room. */
+.tasks:has(.editing) { max-height: none; }
+.tasks li { position: relative; display: flex; gap: 6px; align-items: baseline; }
 .tasks .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tasks .state { font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
 .tasks .state.completed { color: #4ade80; }
 .tasks .state.failed { color: var(--deictic-problem); }
 .tasks a { color: inherit; text-decoration: none; }
 .tasks a:hover { text-decoration: underline; }
-.tasks .act { align-self: center; display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
+/* Over the row's end, and only while the row is pointed at or focused in: the title keeps the width. */
+.tasks .acts { position: absolute; inset: 0 0 0 auto; display: none; align-items: center; padding-left: 14px; background: linear-gradient(to right, transparent, var(--deictic-bg) 12px); }
+.tasks li:hover .acts, .tasks li:focus-within .acts { display: flex; }
+.tasks .act { display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
 .tasks .act:hover { color: var(--deictic-fg); }
 .tasks .act svg { width: 12px; height: 12px; }
 .tasks .place { flex: none; padding: 0; border: 0; font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
@@ -78,6 +85,8 @@ const ICON = (path: string) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`;
 const EDIT = ICON('M4 20h4L19 9l-4-4L4 16z');
 const DELETE = ICON('M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13');
+/** The states of a task that's over, as a board names them: nothing more happens to it. */
+const OVER = new Set(['completed', 'failed']);
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
 
 /** Marks as a task tells of them: how many, and what the notes say. */
@@ -190,7 +199,12 @@ export default defineClientPlugin<Model, Change>({
     const count = element('summary');
     const others = element('ul', { className: 'tasks' });
     fold.append(count, others);
-    panel.append(style, list, fold, text);
+    // The element's tasks that are over, folded away too: what's still to do is what's read first.
+    const closed = element('details', { className: 'more' });
+    const closedCount = element('summary');
+    const ended = element('ul', { className: 'tasks' });
+    closed.append(closedCount, ended);
+    panel.append(style, list, closed, fold, text);
 
     const shots = context.use('screenshots');
     const notes = context.use('annotations');
@@ -522,8 +536,15 @@ export default defineClientPlugin<Model, Change>({
           return rowOf(t, go);
         }),
       );
+      const over = tasks.filter((t) => OVER.has(t.state));
+      closed.hidden = over.length === 0;
+      closedCount.textContent = `${over.length} closed`;
+      ended.replaceChildren(...over.map((t) => rowOf(t)));
+      const live = tasks.filter((t) => !OVER.has(t.state));
+      // The latest is the last, which a list longer than its room would keep out of sight: as it opens, and after one is added.
+      const grew = live.length > list.childElementCount;
       list.replaceChildren(
-        ...tasks.map((t) => {
+        ...live.map((t) => {
           if (t.id === editing && t.open) return editor(t);
           const item = rowOf(
             t,
@@ -546,10 +567,13 @@ export default defineClientPlugin<Model, Change>({
             remove.disabled = true;
             void change({ remove: t.id });
           });
-          item.append(edit, remove);
+          const acts = element('span', { className: 'acts' });
+          acts.append(edit, remove);
+          item.append(acts);
           return item;
         }),
       );
+      if (grew) list.scrollTop = list.scrollHeight;
       able();
       mark();
     };

@@ -218,7 +218,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   unless it was edited since) or `{ remove: id }` (canceled, which a board never reopens, so the record keeps the task
   whole and undo adds it again under a new ID). Both only for an open task of the channel's with `deictic.at`.
   `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
-  `data-deictic-modal` so Esc is its) and Delete. With
+  `data-deictic-modal` so Esc is its) and Delete, drawn over the row's end while it's pointed at or focused in. The list
+  is five rows high and scrolls, at its latest; completed and failed tasks are folded under "N closed". With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. With annotations
