@@ -1,60 +1,37 @@
 #!/usr/bin/env node
 /**
- * The `deictic` command: `deictic init` sets a project up (`tools/init.ts`). Run as `npx deictic init`, or with the
- * project's own runner (`pnpm dlx`, `bunx`), before deictic is installed.
+ * The `deictic` command. `init` sets a project up, for the person; the rest are for the agent that works the tasks,
+ * as the skill says: the board, a watch, a task, and what a task carries. Each in `cli/`, loaded when it's run, so
+ * `deictic task` doesn't load the parser `init` edits configs with. Run in the project, where its board and
+ * `.deictic/` are: `npx deictic <command>`.
  */
-import { createInterface } from 'node:readline/promises';
-import { parseArgs } from 'node:util';
+const COMMANDS = {
+  init: () => import('./cli/init.ts'),
+  vb: () => import('./cli/vb.ts'),
+  watch: () => import('./cli/watch.ts'),
+  task: () => import('./cli/task.ts'),
+  recording: () => import('./cli/recording.ts'),
+  frame: () => import('./cli/frame.ts'),
+  voice: () => import('./cli/voice.ts'),
+  transcribe: () => import('./cli/transcribe.ts'),
+};
 
-import { init } from './tools/init.ts';
+type Name = keyof typeof COMMANDS;
+const isName = (name: string | undefined): name is Name => name !== undefined && Object.hasOwn(COMMANDS, name);
 
-const USAGE = `Usage: deictic init [options]
-
-Installs deictic and what its recommended plugins use, adds it to your bundler's config, and offers the agent skill.
-
-Options:
-  --dry-run     say what it would do, and do none of it
-  --no-install  don't install: say the command instead
-  --skill       add the skill without asking
-  --no-skill    don't add the skill: say the command instead
-  -h, --help    this
-`;
-
-/** Asks a yes-or-no question on the terminal, yes by default. */
-async function ask(question: string): Promise<boolean> {
-  const lines = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return !/^n/i.test((await lines.question(`${question} (Y/n) `)).trim());
-  } finally {
-    lines.close();
-  }
+async function help(): Promise<string> {
+  const lines = await Promise.all(Object.values(COMMANDS).map(async (load) => `  ${(await load()).usage}`));
+  return `Usage: deictic <command>\n\nSetting up:\n${lines[0]}\n\nFor the agent that works the tasks (the skill):\n${lines.slice(1).join('\n')}\n`;
 }
 
-const { values, positionals } = parseArgs({
-  allowPositionals: true,
-  allowNegative: true,
-  options: {
-    'dry-run': { type: 'boolean' },
-    install: { type: 'boolean' },
-    skill: { type: 'boolean' },
-    help: { type: 'boolean', short: 'h' },
-  },
-});
-
-if (values.help || positionals[0] !== 'init') {
-  process.stdout.write(USAGE);
-  process.exit(values.help ? 0 : 1);
+const [name, ...args] = process.argv.slice(2);
+if (!isName(name)) {
+  const asked = name === undefined || name === '-h' || name === '--help' || name === 'help';
+  (asked ? process.stdout : process.stderr).write(`${asked ? '' : `deictic: no command "${name}"\n\n`}${await help()}`);
+  process.exit(asked ? 0 : 1);
 }
-
-try {
-  await init({
-    cwd: process.cwd(),
-    install: values.install,
-    skill: values.skill,
-    dryRun: values['dry-run'],
-    ask: process.stdin.isTTY && process.stdout.isTTY ? ask : undefined,
-  });
-} catch (e) {
-  console.error(e instanceof Error ? e.message : String(e));
-  process.exit(1);
+if (name !== 'vb' && (args.includes('-h') || args.includes('--help'))) {
+  process.stdout.write(`Usage: deictic ${(await COMMANDS[name]()).usage}\n`);
+  process.exit(0);
 }
+await (await COMMANDS[name]()).run(args);

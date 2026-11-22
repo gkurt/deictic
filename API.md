@@ -155,9 +155,12 @@ In the Task tab:
 
 ### The agent skill
 
-deictic ships a skill that watches the channel and works each task as it arrives, with scripts that read a task,
-turn a recording into a timeline, screenshot it at any moment and transcribe its voice notes. Its watch ends once
-the channel has been quiet for 20 minutes, and the agent then stops and says so, so none watches for ever:
+deictic ships a skill that watches the channel and works each task as it arrives. What it runs is the package's own
+`deictic` command, so it reads tasks and recordings with the version that wrote them: `deictic watch`, `deictic task`,
+`deictic recording` (a timeline), `deictic frame` (a screenshot at any moment), `deictic voice` and
+`deictic transcribe`, and `deictic vb`, the board's CLI on the dev server's board (`npx deictic --help` lists them).
+Its watch ends once the channel has been quiet for 20 minutes, and the agent then stops and says so, so none watches
+for ever:
 
 ```bash
 npx skills add gkurt/deictic

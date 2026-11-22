@@ -1,13 +1,13 @@
 # Working a task
 
-`vb` is `node <skill>/scripts/vb.mjs` (the project's own CLI, on the dev server's board), with `BOARD_PROFILE` set
+`vb` is `npx deictic vb` (the project's own CLI, on the dev server's board), with `BOARD_PROFILE` set
 to your name.
 
 ## 1. Claim and read
 
 ```bash
 vb tasks claim 68 --lease 30m
-node <skill>/scripts/task.mjs 68        # --out <dir> downloads the attachments too
+npx deictic task 68  # --out <dir> downloads the attachments too
 ```
 
 A task's text is what the person typed. Where there's more that no label holds, a `---` and:
@@ -26,7 +26,7 @@ A task's text is what the person typed. Where there's more that no label holds, 
   marks (a dependency's, or a shadow root's). That part is what they mean; find it by its classes. On deictic's
   own `/internal/` page it's deictic's popup, so the fix is in deictic's client code, not the page.
 
-The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
+The short facts are labels, which `deictic task` prints (or `vb read 68 --json`):
 
 | Label              | Value                                                                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -52,7 +52,7 @@ screenshot don't settle which of several alike is meant, or you can't open the p
 and classes say what the page showed, and a child's `data-deictic` is the line that wrote it. Not there when the
 person unticked it, or the config says `tasks({ html: false })`.
 
-`task.mjs` says whether that line still reads as the task saw it, or where it moved, and lists the other open tasks
+`deictic task` says whether that line still reads as the task saw it, or where it moved, and lists the other open tasks
 about the same page: tasks left within a minute of each other are often one change (three about one page's
 layout). Read them all before you start; claim and work them one after another, and say in each one's result which
 others the change answers.
@@ -62,7 +62,7 @@ others the change answers.
 - The typed text is the request. When it's short ("fix this", "solve it") or stands in for none typed ("See the
   recording"), the attachments carry it: look at every screenshot, and for a recording, its timeline, frames and voice ([recordings.md](recordings.md)).
 - A screenshot is a PNG: download it to a file's path, not a folder's (`vb download <attachment> shot.png`, or
-  all of a task's with `task.mjs 68 --out <dir>`), and look at it. The element is outlined in green dashes, unless the person drew on the shot, and
+  all of a task's with `deictic task 68 --out <dir>`), and look at it. The element is outlined in green dashes, unless the person drew on the shot, and
   the person's marks are drawn in; the notes are in the task's text too.
 - The element is one place; what the person means may be its component, its parent, a sibling (the next card in a
   row), or every element that line renders (a list item). The marks and the words decide.

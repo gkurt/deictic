@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 
+import { addToConfig, bundlerOf, init, packagesFor } from '#src/cli/init.ts';
 import { definePlugin } from '#src/index.ts';
 import { recommended } from '#src/plugins/recommended/index.ts';
 import { dom, screenshots } from '#src/plugins/screenshots/index.ts';
-import { addToConfig, bundlerOf, init, packagesFor } from '#src/tools/init.ts';
 import { installCommand, missing, missingMessage, packageManager, specOf } from '#src/tools/packages.ts';
 
 import { project } from './fixture.ts';

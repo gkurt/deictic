@@ -3,16 +3,16 @@
 The point is that a task left in the page gets worked without anyone prompting you. Use whatever your harness has
 for being woken by a command's output; between tasks, never sleep-poll in the foreground.
 
-`<skill>` below is this skill's folder; `deictic` is the channel (pass yours if the config sets another). `vb` is
-`node <skill>/scripts/vb.mjs`. Set `BOARD_PROFILE=<your name>` for the watch as for everything else.
+`deictic` after `watch` is the channel (pass yours if the config sets another). `vb` is `npx deictic vb`. Set
+`BOARD_PROFILE=<your name>` for the watch as for everything else.
 
-Always watch with `watch.mjs`, not with `vb` by itself: while it runs, the person's Task tab says you're watching
+Always watch with `deictic watch`, not with `vb` by itself: while it runs, the person's Task tab says you're watching
 (`claude watching`, beside the channel), which is how they know a task they add is taken up. A board can't tell
 them.
 
 ## A watch ends when nothing happens
 
-Don't watch for ever. `watch.mjs` ends by itself once nothing has happened on the channel for 20 minutes
+Don't watch for ever. `deictic watch` ends by itself once nothing has happened on the channel for 20 minutes
 (`--idle 45m` for another stretch; your own claims and replies count as something), printing `idle: …` and
 exiting 2. Then:
 
@@ -25,7 +25,7 @@ start it again at once.
 
 ## With a monitor (Claude Code's Monitor, or any tool that turns each output line into an event)
 
-Run `node <skill>/scripts/watch.mjs deictic` as the monitor, with the longest timeout it allows (Claude Code's: 30
+Run `npx deictic watch deictic` as the monitor, with the longest timeout it allows (Claude Code's: 30
 minutes), and start it again when the monitor expires, unless the watch said `idle` first. It prints, one line each:
 
 - `ready: #68 …` for each task already waiting as it starts;
@@ -46,7 +46,7 @@ On an event, work the task ([tasks.md](tasks.md)) while the monitor keeps runnin
 Where you're notified when a background command ends but can't stream events, run in the background:
 
 ```bash
-node <skill>/scripts/watch.mjs deictic --once
+npx deictic watch deictic --once
 ```
 
 It prints the tasks ready now and exits, or with none, waits for the first new task, reply or cancellation, prints
@@ -55,7 +55,7 @@ it and exits 0. Work it (claim the task first: [tasks.md](tasks.md)), then start
 
 ## Without either
 
-Run that same `watch.mjs deictic --once` in the foreground at the end of each task: your turn waits for the next
+Run that same `deictic watch deictic --once` in the foreground at the end of each task: your turn waits for the next
 one. Tell the person that's how you're waiting, as it holds the session.
 
 ## Things to know

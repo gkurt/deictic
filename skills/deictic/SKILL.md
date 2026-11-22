@@ -12,9 +12,9 @@ and viewport, and can carry screenshots (with marks drawn on them), rrweb record
 
 Assume deictic is installed and the person wants its tasks worked as they come, while they keep using the app:
 
-1. **Reach the board, under your own name.** `vb` in these pages is `node <skill>/scripts/vb.mjs`: the project's
-   own `@vercel/board` CLI, which is rarely on the PATH, on the board the dev server uses (`BOARD_URL`, or with
-   none, the one `.deictic/board.json` names). Set `BOARD_PROFILE=<your name>` (`claude`, `codex`) for every
+1. **Reach the board, under your own name.** Run every command in the project, where its `package.json` is.
+   `vb` in these pages is `npx deictic vb`: the project's own `@vercel/board` CLI, which is rarely on the PATH, on
+   the board the dev server uses (`BOARD_URL`, or with none, the one `.deictic/board.json` names). Set `BOARD_PROFILE=<your name>` (`claude`, `codex`) for every
    command, the watch too: `vb whoami` then answers `<them>/<you>`, and without it all you post is the person's
    own. Not installed or not set up: [references/install.md](references/install.md).
 2. **Watch.** Start a watch that wakes you on each new task, so no one has to prompt you; the person's Task tab
@@ -27,20 +27,22 @@ Assume deictic is installed and the person wants its tasks worked as they come, 
 
 Then go back to watching, unless the watch ended idle. Say in a line what each task was and what you changed.
 
-## Scripts
+## Commands
 
-In `scripts/` beside this file; Node 20+ or Bun, no dependencies of their own. Each takes a task ID (`68`), and the
-recording ones also a replay URL, a recording ID or a JSON file.
+The project's installed deictic, as `npx deictic <command>` (`--help` for any): the same version as what wrote the
+tasks and recordings it reads. Each takes a task ID (`68`), and the recording ones also a replay URL, a recording
+ID or a JSON file. A command it doesn't have means the project's deictic is older than this skill: say so, and
+that `npm install -D deictic@latest` (with their package manager) brings it.
 
-| Script           | What                                                                         | Needs                                                |
-| ---------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `vb.mjs`         | The board's CLI, found in the project, on the dev server's board             | `@vercel/board` in the project, or `vb` on the PATH  |
-| `watch.mjs`      | One line per new task, reply and cancellation; ends when the channel's idle  | `vb`                                                 |
-| `task.mjs`       | A task briefly: the ask, where, attachments, the page's other open tasks     | `vb`                                                 |
-| `recording.mjs`  | A recording as a timeline: clicks, typing, marks, console, requests; filters |                                                      |
-| `frame.mjs`      | PNGs of a recording at moments of it, marks and pointer included             | dev server, Playwright                               |
-| `voice.mjs`      | When speech happens in each voice clip, in the recording's time; WAV export  | ffmpeg                                               |
-| `transcribe.mjs` | What was said, with times, by Whisper on this machine                        | ffmpeg; `--setup` once, only after the person agrees |
+| Command              | What                                                                         | Needs                                                |
+| -------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `deictic vb`         | The board's CLI, found in the project, on the dev server's board             | `@vercel/board` in the project, or `vb` on the PATH  |
+| `deictic watch`      | One line per new task, reply and cancellation; ends when the channel's idle  | `vb`                                                 |
+| `deictic task`       | A task briefly: the ask, where, attachments, the page's other open tasks     | `vb`                                                 |
+| `deictic recording`  | A recording as a timeline: clicks, typing, marks, console, requests; filters |                                                      |
+| `deictic frame`      | PNGs of a recording at moments of it, marks and pointer included             | dev server, Playwright                               |
+| `deictic voice`      | When speech happens in each voice clip, in the recording's time; WAV export  | ffmpeg                                               |
+| `deictic transcribe` | What was said, with times, by Whisper on this machine                        | ffmpeg; `--setup` once, only after the person agrees |
 
 ## Rules
 

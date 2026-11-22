@@ -20,16 +20,16 @@ Where the project loads the `logs` and `network` plugins, the recording has rrwe
   were blanked to `***` before it was kept, so a `***` is not what the page sent. `--json` has the whole request.
 
 Both only from when the recording started. The replay page lists them beside the page, for a person; `&bare` (what
-`frame.mjs` opens) is the page alone. A `<canvas>` is recorded as pictures of it, a few a second. A route change with no load (a router's) is a `page` line too, from a
+`deictic frame` opens) is the page alone. A `<canvas>` is recorded as pictures of it, a few a second. A route change with no load (a router's) is a `page` line too, from a
 custom event tagged `deictic.page` (`href`).
 
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps
-them under `.deictic/recordings` and `.deictic/voice` too. Every script takes the task's ID.
+them under `.deictic/recordings` and `.deictic/voice` too. Every command takes the task's ID.
 
 ## The timeline
 
 ```bash
-node <skill>/scripts/recording.mjs 68      # --nth 2 for a task's second recording, --json for data
+npx deictic recording 68  # --nth 2 for a task's second recording, --json for data
 ```
 
 ```
@@ -46,20 +46,20 @@ Clicks and typing name the element and the nearest source place deictic marked. 
 Ask for a part of it, in any mix, where the whole is long:
 
 ```bash
-node <skill>/scripts/recording.mjs 68 --problems                # errors, warnings and requests that failed
-node <skill>/scripts/recording.mjs 68 --around 12               # the 3 seconds either side; or --from 10 --to 15
-node <skill>/scripts/recording.mjs 68 --only console,request    # kinds of line: page, click, input, scroll, resize, marks, voice, console, request
-node <skill>/scripts/recording.mjs 68 --grep /api/plans --full  # lines with the text; --full: stacks, headers and bodies
+npx deictic recording 68 --problems                # errors, warnings and requests that failed
+npx deictic recording 68 --around 12               # the 3 seconds either side; or --from 10 --to 15
+npx deictic recording 68 --only console,request    # kinds of line: page, click, input, scroll, resize, marks, voice, console, request
+npx deictic recording 68 --grep /api/plans --full  # lines with the text; --full: stacks, headers and bodies
 ```
 
 To find what went wrong: `--problems` first, then `--around` its moment for the click or the request before it,
-then `frame.mjs --at` that moment for what the page looked like.
+then `deictic frame --at` that moment for what the page looked like.
 
 ## Frames
 
 ```bash
-node <skill>/scripts/frame.mjs 68                  # just after each change to the marks, and the end
-node <skill>/scripts/frame.mjs 68 --at 4.7 --at 9  # at seconds; --every 2 for a contact sheet; --out <dir>
+npx deictic frame 68                  # just after each change to the marks, and the end
+npx deictic frame 68 --at 4.7 --at 9  # at seconds; --every 2 for a contact sheet; --out <dir>
 ```
 
 PNGs at the recorded viewport, from the dev server's replay page, so the dev server must be running (`--base <url>`
@@ -71,8 +71,8 @@ there, marks drawn over it.
 ## Voice
 
 ```bash
-node <skill>/scripts/voice.mjs 68                 # speech in each clip, in the recording's time
-node <skill>/scripts/voice.mjs 68 --wav <dir>     # and each clip as 16 kHz mono WAV
+npx deictic voice 68              # speech in each clip, in the recording's time
+npx deictic voice 68 --wav <dir>  # and each clip as 16 kHz mono WAV
 ```
 
 ```
@@ -86,10 +86,10 @@ talking about. `--noise -45` finds quieter speech; `--gap 0.2` splits on shorter
 
 ## What was said
 
-`transcribe.mjs` runs Whisper on this machine (transformers.js), with each stretch's time in the recording:
+`deictic transcribe` runs Whisper on this machine (transformers.js), with each stretch's time in the recording:
 
 ```bash
-node <skill>/scripts/transcribe.mjs 68             # --language tr when they don't speak English; --json for data
+npx deictic transcribe 68  # --language tr when they don't speak English; --json for data
 ```
 
 ```
@@ -97,16 +97,16 @@ clip 0mwp5fq5s03-202aea8a (in recording 0mwp5fq5y00-71749b04, from 0:04.1):
   0:04.1 –  0:09.1  But let's do something about this.
 ```
 
-It needs setting up once, and **that is the person's call, not yours**. When a task has voice and the script says
+It needs setting up once, and **that is the person's call, not yours**. When a task has voice and the command says
 it isn't set up, ask before anything else, in one message:
 
 > This task has a voice note. I can transcribe it on this machine with Whisper: a one-time download of about
 > 550 MB (transformers.js with ONNX Runtime, ~470 MB, and the model, ~77 MB) into `~/.cache/deictic/transcribe`, outside the project. After that,
 > audio never leaves the machine. Set it up?
 
-- **Yes**: `node <skill>/scripts/transcribe.mjs --setup`, then transcribe. `--model small` (~250 MB more) hears
+- **Yes**: `npx deictic transcribe --setup`, then transcribe. `--model small` (~250 MB more) hears
   better, and `tiny` is smaller; each is a download of its own, so ask again before one.
-- **No**: don't ask again this session. Work from the timeline, the frames and `voice.mjs`'s times, and if the
+- **No**: don't ask again this session. Work from the timeline, the frames and `deictic voice`'s times, and if the
   words matter, reply on the task asking what they said, quoting the times.
 
 Never send the audio to a service outside the machine unless the person asks for that.

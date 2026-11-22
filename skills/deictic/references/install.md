@@ -82,11 +82,11 @@ Tasks go to a Vercel Board. With nothing set, the dev server starts one on this 
 URL as it starts and keeps it in `.deictic/board.json`:
 
 ```bash
-export BOARD_PROFILE=claude              # your name: what you post is yours, not the person's
-node <skill>/scripts/vb.mjs whoami       # krtgo/claude, and the board's URL
+export BOARD_PROFILE=claude  # your name: what you post is yours, not the person's
+npx deictic vb whoami        # krtgo/claude, and the board's URL
 ```
 
-`vb.mjs` is the project's own `vb` (in `node_modules/.bin`, so rarely on the PATH), and like the other scripts here
+`deictic vb` is the project's own `vb` (in `node_modules/.bin`, so rarely on the PATH), and like the other commands
 it reads that file when `BOARD_URL` isn't set. A `vb` you run yourself needs the variable:
 `export BOARD_URL=$(node -p "require('./.deictic/board.json').url")`. The board is there only while the dev server
 runs.
@@ -100,7 +100,7 @@ none of its pages, more of `vb serve`'s arguments), and whatever `BOARD_URL` say
 ## This skill
 
 ```bash
-npx skills add gkurt/deictic     # or ./node_modules/deictic, the installed package's; -a <agent> to pick agents, -g for global
+npx skills add gkurt/deictic  # or ./node_modules/deictic, the installed package's; -a <agent> to pick agents, -g for global
 ```
 
 Then restart the agent if it only reads skills as it starts.

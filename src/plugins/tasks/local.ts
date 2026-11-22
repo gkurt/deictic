@@ -70,7 +70,7 @@ export async function localBoard(root: string, options: LocalOptions = {}): Prom
   const flags = [...(options.inspect === false ? ['--no-inspect'] : []), ...(options.args ?? [])];
   const as = JSON.stringify([options.port ?? null, dir, flags]);
 
-  const running = read(file);
+  const running = runningAt(file);
   if (running !== undefined && alive(running.pid) && (await answers(running.url))) {
     if (running.as === as) return { url: running.url, fresh: false, dir, stop: () => {} };
     process.kill(running.pid);
@@ -79,7 +79,9 @@ export async function localBoard(root: string, options: LocalOptions = {}): Prom
 
   const port = options.port ?? (await free(PORT));
   const url = `http://127.0.0.1:${port}/api/board`;
-  const child = spawn(process.execPath, [cli(), 'serve', '--port', String(port), '--no-open', '--dir', dir, ...flags], {
+  const script = vbScript();
+  if (script === undefined) throw new Error('@vercel/board is missing: add it to your devDependencies');
+  const child = spawn(process.execPath, [script, 'serve', '--port', String(port), '--no-open', '--dir', dir, ...flags], {
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   let said = '';
@@ -101,12 +103,23 @@ export async function localBoard(root: string, options: LocalOptions = {}): Prom
   return { url, fresh: true, dir, stop };
 }
 
-/** `vb`'s script in the project's `@vercel/board`, run with this process's own runtime: no shim, no shell. */
-function cli(): string {
-  return join(dirname(createRequire(import.meta.url).resolve('@vercel/board/package.json')), 'dist', 'cli.mjs');
+/**
+ * `vb`'s script in the project's `@vercel/board`, by its `bin`, to run with this process's own runtime: no shim, no
+ * shell. Nothing where it isn't installed.
+ */
+export function vbScript(): string | undefined {
+  try {
+    const manifest = createRequire(import.meta.url).resolve('@vercel/board/package.json');
+    const { bin } = JSON.parse(readFileSync(manifest, 'utf8')) as { bin?: string | { vb?: string } };
+    const entry = typeof bin === 'string' ? bin : bin?.vb;
+    return entry === undefined ? undefined : join(dirname(manifest), entry);
+  } catch {
+    return undefined;
+  }
 }
 
-function read(file: string): Running | undefined {
+/** What a `.deictic/board.json` says, where it says it. */
+export function runningAt(file: string): Running | undefined {
   try {
     const { url, pid, as } = JSON.parse(readFileSync(file, 'utf8')) as Partial<Running>;
     return typeof url === 'string' && typeof pid === 'number' ? { url, pid, as: as ?? '' } : undefined;

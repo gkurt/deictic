@@ -104,7 +104,7 @@ export interface Model {
   /** Tasks about the file's other elements, by line, canceled ones left out: each with its `at`. */
   elsewhere: Task[];
   /**
-   * Who watches the channel, by name (`claude`): the agents whose watch (the skill's `watch.mjs`) is running in
+   * Who watches the channel, by name (`claude`): the agents whose watch (`deictic watch`) is running in
    * this project, as a board can't say, and those holding a claim on one of the channel's tasks, which it can.
    * Empty where none is and the board is this machine's own;
    * left out where none is and the board is another, which an agent may watch from elsewhere.
@@ -395,7 +395,7 @@ export function tasks(options: TasksOptions = {}) {
           else if (once && at.tag === target.tag && message.labels['deictic.line'] === clip(line, LABEL)) tasks.push({ ...task, at });
           else elsewhere.push({ ...task, at });
         }
-        // An agent at work on a task is here too, though its watch may be over until the task is (`watch.mjs --once`).
+        // An agent at work on a task is here too, though its watch may be over until the task is (`deictic watch --once`).
         const working = agentsOf(actors, claims);
         const watching = [...new Set([...watchersOf(root ?? process.cwd(), channel), ...working])].sort();
         // A board of this machine's own is watched from here or not at all.

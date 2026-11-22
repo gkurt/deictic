@@ -61,8 +61,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   with the install command; `packageManager(root)` (the `packageManager` field, the nearest lockfile, then the running
   one's `npm_config_user_agent`), `installCommand` (deictic's own peer ranges, quoted, from `package.json`, inlined by
   the build). The screenshots renderer has `packages` too.
-- `src/cli.ts`: the `deictic` bin (`dist/cli.js`), `deictic init` (`--dry-run`, `--no-install`, `--skill`/`--no-skill`).
-  `src/tools/init.ts` is it: installs `deictic` and the recommended plugins' `packages` (and `launch-editor` for webpack
+- `src/cli/init.ts`: `deictic init` (`--dry-run`, `--no-install`, `--skill`/`--no-skill`), one of the bin's commands
+  (below): installs `deictic` and the recommended plugins' `packages` (and `launch-editor` for webpack
   and Rspack) the project lacks, as its own dev dependencies, since deictic's imports, the page's bundle and the skill
   all look in the project; `bundlerOf` from the dependencies; `addToConfig` adds deictic to Vite's or Astro's list or
   webpack's and Rspack's `plugins`, or wraps Next's export, with oxc and `magic-string` (through `defineConfig`, a
@@ -271,7 +271,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
   `data-deictic-modal` so Esc is its) and Delete, drawn over the row's end while it's pointed at or focused in. The list
   is five rows high and scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
-  `watchers.ts` reads the files the skill's `watch.mjs` keeps under `.deictic/watchers` while it runs, a name, channel and time
+  `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none); completed and failed tasks are folded under "N closed". A row starts with its
   state as a dot (a ring while no one has it, filled once claimed, blocked or over; named by its tooltip, with who holds it while it's claimed, `claimed by claude`: `Task.by`), and its title is a
   button that shows the task's whole text in place. With
@@ -292,7 +292,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
   `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
   project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
-  in `.deictic/board`, and writes `.deictic/board.json` (`url`, `pid`), which the skill's `lib.mjs` reads (`boardUrl`).
+  in `.deictic/board`, and writes `.deictic/board.json` (`url`, `pid`), which the CLI reads (`boardUrl`, in `src/cli/board.ts`).
   One that file names, alive and answering, is used as it is. `BOARD_URL` is then set, as `board()`
   takes a URL from nowhere else, for the `board()` call only. The team's board is `tasks({ board: board() })`.
   `local(options)`, exported from `deictic/tasks`, is that board as the `board` option, whatever `BOARD_URL` says:
@@ -300,21 +300,34 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   and `args` (more of `vb serve`'s). The file keeps the options too (`as`): one running with others is stopped first.
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add gkurt/deictic`, or `./node_modules/deictic` for the installed one):
-`SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed.
-`scripts/` are plain `.mjs` for Node 20+ or Bun with no dependencies (`lib.mjs` shared: `vb`, run as the project's
-own `@vercel/board` script on the dev server's board, `.deictic/` folders,
-finding a recording or clip by task, URL, ID or path): `vb.mjs` (that CLI, for the agent's own commands), `watch.mjs` (a line per task event, over `vb tail`,
-without the replies of the watcher's own profile; it ends, exit 2, once the channel's had no event for `--idle`, 20m, and the agent then stops watching
-and says so, so none watches for ever; `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process does, so one a session left behind isn't watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the last event's cursor; while it runs it's in `.deictic/watchers`, `watching` in `lib.mjs`), `task.mjs` (the task, who asked, who holds it, and the page's other open ones), `recording.mjs` (a timeline, or the part of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
-Playwright), `voice.mjs` (speech times, with ffmpeg) and `transcribe.mjs` (Whisper through a pinned
-transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
-without it the script refuses and says what to ask the person, as the skill has the agent ask first). The recording's marks event carries `annotations` as data
-for them. Change them with the task format, the replay page or the marks event.
+`SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed. It has no
+scripts: the agent runs the project's installed deictic, `npx deictic <command>`, so what reads the tasks and recordings
+is the version that wrote them. In this repository, `bun src/cli.ts <command>` (the root package has no bin of its own).
+
+The commands are `src/cli.ts`, the `deictic` bin (`dist/cli.js`), each in `src/cli/` and imported when run (`run(args)`,
+and a `usage` line for `--help`). `board.ts` is what they share: `vb`, run as the project's `@vercel/board` script
+(`vbScript`, from `tasks/local.ts`) on the dev server's board (`BOARD_URL`, or the nearest `.deictic/board.json`'s,
+read with `runningAt`), the `.deictic/` folders near here, `parseArgs` (Node's, strict, failing with the message), and
+`ME` (`npx deictic`, how output names other commands); `find.ts` finds a recording or clip by task, URL, ID or path,
+and runs ffmpeg and the project's Playwright. `init` (above); `vb` (that CLI, for the agent's own commands); `watch` (a
+line per task event, over `vb tail`, without the replies of the watcher's own profile; it ends, exit 2, once the
+channel's had no event for `--idle`, 20m, and the agent then stops watching and says so, so none watches for ever;
+`--once` ends at the first event, for a harness woken by an exit; it ends when its parent process or one of the three
+above it does, as a runner like `npx` sits between it and the shell and outlives it, so one a session left behind isn't
+watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the
+last event's cursor; while it runs it's in `.deictic/watchers`, `watcherAt` in `tasks/watchers.ts`, beside what reads
+it); `task` (the task, who asked, who holds it, and the page's other open ones); `recording` (a timeline, or the part
+of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`); `frame` (PNGs through the
+replay's `?t=`, with the project's Playwright); `voice` (speech times, with ffmpeg) and `transcribe` (Whisper through a
+pinned transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
+without it the command refuses and says what to ask the person, as the skill has the agent ask first). The recording's
+marks event carries `annotations` as data for them. Change them with the task format, the replay page or the marks
+event. `test/cli.test.ts` runs them, `task` and `watch` on a real local board.
 
 `examples/vite` is React + Tailwind v4 and imports deictic from `dist`, so build first. `dist`'s shared chunks
 have no hash in their names (`hash: false`; they go in `dist/shared/`, where none can take an entry's name) and a build doesn't empty `dist` first (`clean: false`; `prepack` does, with
 `--clean`), so rebuilding under a running dev server doesn't break its imports;
-restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`: `watch.mjs` waits for the board and follows it again). `examples/next`
+restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`: `deictic watch` waits for the board and follows it again). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
 integrations, also from `dist`; `test/integrations.test.ts` covers each integration, Rspack with a real compile.
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
