@@ -225,10 +225,11 @@ export function Home() {
         <div className="grid-paper pointer-events-none absolute inset-x-0 top-0 h-96" />
         <div className="relative">
           <h1 className="text-5xl font-bold tracking-tighter sm:text-7xl">
-            Element <span className="text-signal-text">→</span> source.
+            Element <span className="text-signal-text">→</span> task.
           </h1>
           <p className="mt-6 max-w-md text-muted">
-            <Kbd>Alt</Kbd>-click anything in your dev server. File a task on it, or edit its classes in the file.
+            <Kbd>Alt</Kbd>-click anything in your dev server and say what should change. The task knows its file and line, and goes to your
+            agent with a screenshot, a recording or a voice note.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-sm">
             <span className="flex items-center gap-4 rounded-md border border-line bg-surface px-3 py-2">
