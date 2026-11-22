@@ -4,7 +4,7 @@
  * model is downloaded.
  *
  * `--setup` puts @huggingface/transformers and the model in ~/.cache/deictic/transcribe (DEICTIC_CACHE moves it),
- * outside the project; an agent asks the person first. Models: tiny (~40 MB), base (~77 MB, the default), small
+ * outside the project; an agent asks the person first, and `deictic clean transcribe` deletes it. Models: tiny (~40 MB), base (~77 MB, the default), small
  * (~250 MB), large-v3-turbo (~800 MB), or any ONNX Whisper on Hugging Face by its ID. Needs ffmpeg on the PATH.
  */
 import { spawnSync } from 'node:child_process';
@@ -44,6 +44,9 @@ interface Transformers {
   >;
 }
 
+/** Where `--setup` installs it, outside any project: `deictic clean transcribe` deletes it. */
+export const transcribeDir = () => join(process.env.DEICTIC_CACHE ?? join(homedir(), '.cache', 'deictic'), 'transcribe');
+
 export async function run(args: string[]): Promise<void> {
   const { values, positionals } = parseArgs(args, {
     setup: { type: 'boolean' },
@@ -55,7 +58,7 @@ export async function run(args: string[]): Promise<void> {
   const named = MODELS[size];
   if (!size.includes('/') && named === undefined) fail(`--model is one of ${Object.keys(MODELS).join(', ')}, or a model ID`);
   const model = named === undefined ? size : `onnx-community/${named}`;
-  const dir = join(process.env.DEICTIC_CACHE ?? join(homedir(), '.cache', 'deictic'), 'transcribe');
+  const dir = transcribeDir();
   const models = join(dir, 'models');
   const installed = existsSync(join(dir, 'node_modules', '@huggingface', 'transformers', 'package.json'));
   const downloaded = existsSync(join(models, ...model.split('/')));
@@ -92,7 +95,7 @@ export async function run(args: string[]): Promise<void> {
   if (values.setup) console.log(`Downloading ${model} (quantized) into ${models}…`);
   const asr = await transformers.pipeline('automatic-speech-recognition', model, { dtype: 'q8' });
   if (values.setup) {
-    console.log(`Ready: ${again} <task>${sized}`);
+    console.log(`Ready: ${again} <task>${sized}. ${ME} clean transcribe deletes it.`);
     if (positionals[0] === undefined) return;
   }
 

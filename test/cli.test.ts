@@ -44,7 +44,8 @@ test('says its commands, and refuses one it has not', () => {
   const { root } = project({ 'package.json': '{}' });
   const help = deictic(root, '--help');
   expect(help.code).toBe(0);
-  for (const name of ['init', 'vb', 'watch', 'task', 'recording', 'frame', 'voice', 'transcribe']) expect(help.out).toContain(`  ${name} `);
+  for (const name of ['init', 'clean', 'vb', 'watch', 'task', 'recording', 'frame', 'voice', 'transcribe'])
+    expect(help.out).toContain(`  ${name} `);
   const wrong = deictic(root, 'nope');
   expect(wrong.code).toBe(1);
   expect(wrong.err).toContain('no command "nope"');
@@ -148,4 +149,46 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
   };
   expect(json.lines).toBe(5);
   expect(json.timeline.map((l) => l.kind)).toEqual(['click']);
+});
+
+test('cleans what deictic kept after saying what and how big, and leaves the history and board to a stopped dev server', () => {
+  const p = project({
+    'package.json': '{}',
+    '.deictic/screenshots/a.png': 'png',
+    '.deictic/recordings/b.json': '{}',
+    '.deictic/recordings/c.part': '[]',
+    '.deictic/voice/d.webm': 'webm',
+    '.deictic/history.json': '{"done":[],"undone":[]}',
+    '.deictic/board/local.db': 'db',
+    '.deictic/board.json': JSON.stringify({ url: 'http://127.0.0.1:4100/api/board', pid: process.pid, as: '' }),
+  });
+  const cache = join(p.root, 'cache');
+  mkdirSync(join(cache, 'transcribe'), { recursive: true });
+  const clean = (...args: string[]) => as({ DEICTIC_CACHE: cache }, p.root, 'clean', ...args);
+  const kept = (dir: string) => readdirSync(join(p.root, '.deictic', dir));
+
+  // No terminal to ask on: a list, and nothing deleted. Only this project's, or the run below would delete others'.
+  const listed = clean();
+  expect(listed.code).toBe(0);
+  expect(listed.out).not.toContain('..');
+  expect(listed.out).toContain(join('.deictic', 'screenshots'));
+  expect(listed.out).not.toContain('history');
+  expect(listed.out).toContain('npx deictic clean --yes deletes these');
+  expect(kept('screenshots')).toEqual(['a.png']);
+
+  expect(clean('--yes').out).toContain('Deleted');
+  expect([...kept('screenshots'), ...kept('voice')]).toEqual([]);
+  // A recording still going is left.
+  expect(kept('recordings')).toEqual(['c.part']);
+
+  const refused = clean('board', '--yes');
+  expect(refused.code).toBe(1);
+  expect(refused.err).toContain("is the running dev server's: stop it");
+  expect(clean('nope').err).toContain('no "nope" to clean');
+
+  const ended = Bun.spawnSync([process.execPath, '--version']).pid;
+  p.write('.deictic/board.json', JSON.stringify({ url: 'http://127.0.0.1:4100/api/board', pid: ended, as: '' }));
+  expect(clean('all', 'transcribe', '--yes').code).toBe(0);
+  expect(readdirSync(join(p.root, '.deictic')).toSorted()).toEqual(['recordings', 'screenshots', 'voice']);
+  expect(readdirSync(cache)).toEqual([]);
 });

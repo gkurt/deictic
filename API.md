@@ -89,6 +89,10 @@ options under its name, and `false` leaves it out (`recommended({ logs: false, n
 to pick them one by one.
 
 What a project keeps (the history, shots, recordings, voice notes) is in `.deictic/`, which ignores itself in git.
+Each plugin keeps only its latest (`keep`), so it doesn't grow for ever. `npx deictic clean` deletes the shots,
+recordings and voice notes after saying how much they take and asking (tasks carry theirs on the board); name
+`history`, `board` (the local board's tasks) or `all` for the rest, with the dev server stopped, and `transcribe` for
+the transcription model, which is outside the project. With no terminal to ask on, it lists them, and deletes with `--yes`.
 
 ## Tasks
 

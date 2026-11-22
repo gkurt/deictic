@@ -317,7 +317,10 @@ read with `runningAt`) as the agent running it (`profileOf`: `BOARD_PROFILE`, el
 `CLAUDECODE` and the like, else `AI_AGENT` cut to a profile's name; none at a person's terminal, who writes as
 themselves), the `.deictic/` folders near here, `parseArgs` (Node's, strict, failing with the message), and
 `ME` (`npx deictic`, how output names other commands); `find.ts` finds a recording or clip by task, URL, ID or path,
-and runs ffmpeg and the project's Playwright. `init` (above); `vb` (that CLI, for the agent's own commands); `watch` (a
+and runs ffmpeg and the project's Playwright. `init` (above); `clean` (for the person, like `init`: the `.deictic/`
+folders near here, the shots, recordings and voice clips, or `history`, `board`, `all`, refused while a local board's
+process lives, and `transcribe`, the machine's install; says each and its size, asks on a terminal, else deletes only
+with `--yes`, and leaves a recording's `.part`); `vb` (that CLI, for the agent's own commands); `watch` (a
 line per task event, over `vb tail`, without the replies of the watcher's own profile; it ends, exit 2, once the
 channel's had no event for `--idle`, 20m, and the agent then stops watching and says so, so none watches for ever;
 `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process or one of the three
