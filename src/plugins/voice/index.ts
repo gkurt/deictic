@@ -1,10 +1,11 @@
 /**
  * `deictic/voice`: records the mic, for other plugins to attach (tasks does) or play along with
  * something (a recording does). No tab of its own. The page half asks for the mic the first time, records
- * with `MediaRecorder` and sends each take to the `add` route; the server half keeps the latest `keep`
+ * with `MediaRecorder` and sends each take as it's spoken, its start to the `add` route and the rest to
+ * `more/<id>`, so one a page load cuts short is kept up to there; the server half keeps the latest `keep`
  * clips under `.deictic/voice` and serves them at `clip/<id>`.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { definePlugin } from '#src/index.ts';
@@ -18,12 +19,17 @@ export interface Clip {
   type: string;
 }
 
-/** A take going on: `stop` ends it and keeps it, `cancel` ends it and keeps nothing. */
+/** A take going on: `stop` ends it and answers its clip, `cancel` ends it with none (what was sent of it goes as the oldest clips do). */
 export interface Take {
   /** When it started, as `Date.now()`. */
   started: number;
   /** The mic, while it's recorded: to show it's heard (`liveWaveform` from `deictic/client`). */
   stream: MediaStream;
+  /**
+   * What's kept of it by now, as the clip it would be if it ended here, or nothing before its first second is:
+   * for a page that's going, with no time left to `stop` it.
+   */
+  soFar(): Pick<Clip, 'id' | 'duration'> | undefined;
   stop(): Promise<Clip>;
   cancel(): void;
 }
@@ -91,7 +97,7 @@ export function voice(options: VoiceOptions = {}) {
       return { read };
     },
     routes: {
-      // A take the page recorded, as the audio type its `MediaRecorder` made.
+      // A take the page is recording, as the audio type its `MediaRecorder` makes: its start, the rest to `more`.
       add: async (req) => {
         const type = (req.headers.get('content-type') ?? '').split(';')[0]!.trim();
         const ext = Object.keys(TYPES).find((e) => TYPES[e] === type);
@@ -100,6 +106,17 @@ export function voice(options: VoiceOptions = {}) {
         if (body.byteLength === 0) return Response.json({ problem: 'the clip is empty: speak for a moment longer' }, { status: 400 });
         if (body.byteLength > MAX) return Response.json({ problem: `a clip may weigh ${MAX / 1024 / 1024} MB at most` }, { status: 413 });
         return Response.json({ id: keepClip(body, ext) });
+      },
+      // `more/<id>`: the take goes on, and this is the next of its audio. With `?last`, and maybe nothing, it's over.
+      more: async (req) => {
+        const id = new URL(req.url).pathname.split('/').at(-1) ?? '';
+        const file = fileOf(id);
+        if (file === undefined) return Response.json({ problem: `clip ${id} isn't kept any more: record it again` }, { status: 404 });
+        const body = new Uint8Array(await req.arrayBuffer());
+        if (statSync(join(dir, file)).size + body.byteLength > MAX)
+          return Response.json({ problem: `a clip may weigh ${MAX / 1024 / 1024} MB at most` }, { status: 413 });
+        appendFileSync(join(dir, file), body);
+        return Response.json({ id });
       },
       // `clip/<id>`: the audio, to play back.
       clip: (req) => {

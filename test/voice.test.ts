@@ -44,6 +44,20 @@ test('keeps a take the page recorded, as its audio type, and plays it back', asy
   expect((await ask('plugins/voice/clip/nope')).status).toBe(404);
 });
 
+test('a take comes as it is spoken: its start, then the rest, kept end to end', async () => {
+  const { ask, add, post } = setup();
+  const { id } = await add();
+  expect(await post(`plugins/voice/more/${id}`, new Uint8Array([4, 5]), 'audio/webm')).toEqual({ status: 200, id: id! });
+  // The last may be nothing: it says the take is over.
+  expect(await post(`plugins/voice/more/${id}?last`, new Uint8Array(), 'audio/webm')).toEqual({ status: 200, id: id! });
+  const clip = await ask(`plugins/voice/clip/${id}`);
+  expect(new Uint8Array(await clip.arrayBuffer())).toEqual(new Uint8Array([...AUDIO, 4, 5]));
+  expect(await post('plugins/voice/more/nope-123', AUDIO, 'audio/webm')).toMatchObject({
+    status: 404,
+    problem: "clip nope-123 isn't kept any more: record it again",
+  });
+});
+
 test('takes only audio a browser records, not empty, and keeps the latest few', async () => {
   const { ask, add } = setup({ keep: 2 });
   expect(await add(AUDIO, 'audio/wav')).toMatchObject({ status: 415, problem: 'send the clip as audio/webm, audio/ogg, audio/mp4' });
@@ -65,7 +79,10 @@ test('a task attaches voice notes, and a recording’s voice, saying what each i
     events: [{ type: 4, data: {}, timestamp: 0 }],
     voice: [{ id: spoken.id!, at: 1_000, duration: 3_000 }],
   };
-  const { id: recorded } = await post('plugins/recordings/add', JSON.stringify(kept), 'application/json');
+  const { events, duration, voice: clips, ...meta } = kept;
+  const { id: recorded } = await post('plugins/recordings/begin', JSON.stringify(meta), 'application/json');
+  await post(`plugins/recordings/part/${recorded}?seq=0`, JSON.stringify(events), 'application/json');
+  await post(`plugins/recordings/end/${recorded}`, JSON.stringify({ duration, voice: clips }), 'application/json');
   const replay = `${ORIGIN}/__deictic/plugins/recordings/replay/${recorded}`;
   const res = await ask('apply', {
     method: 'POST',

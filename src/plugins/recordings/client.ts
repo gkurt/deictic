@@ -1,8 +1,13 @@
 /**
  * The recordings plugin's page half: `record()` starts rrweb (imported then) and shows the toolbar, a bar
  * docked to an edge of the window that its grip drags to any other, kept between recordings. It holds the
- * time, annotate mode's tools where that plugin is loaded, and Stop and Discard. Stop sends the events to
- * the `add` route.
+ * time, annotate mode's tools where that plugin is loaded, and Stop and Discard.
+ *
+ * The events go to the server as they happen (`begin`, a `part` each second, `end` on Stop), and what the next
+ * page needs to carry on is kept in the tab's session storage: a reload, or a link to another page of the site,
+ * leaves the recording going. The page that loads starts rrweb again under the same ID, which makes it a
+ * recording of several pages as rrweb has them (a `Meta` and a snapshot for each), puts the toolbar back with
+ * its time running, and turns the mic back on where it was.
  *
  * Nothing of deictic's is recorded: the overlay is blocked, as rrweb blocks. The marks are, as custom
  * events: the page's annotations and the toolbar's own, which go when it does, as SVGs in page
@@ -10,11 +15,12 @@
  */
 import { liveWaveform } from '#src/client/waveform.ts';
 import { defineClientPlugin } from '#src/index.ts';
+import type { Shape } from '#src/plugins/annotations/index.ts';
 import type { ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 
 import type { Take } from '#src/plugins/voice/index.ts';
 
-import type { Kept, Recorder, Recording, VoiceClip } from './index.ts';
+import type { Kept, Meta, Recorder, Recording, VoiceClip } from './index.ts';
 import { END, MARKS } from './marks.ts';
 import { dropOurs } from './ours.ts';
 
@@ -26,6 +32,42 @@ interface Dock {
 }
 
 const DOCK = 'deictic:recorder';
+/** Where the recording going on is kept, for the tab's next page to carry on with. */
+const GOING = 'deictic:recording';
+/** How often the events are sent, in milliseconds. */
+const EVERY = 1000;
+
+/** A recording going on, as the next page needs it. */
+interface Carried {
+  id: string;
+  startedAt: number;
+  /** The next part's place among the parts. */
+  seq: number;
+  /** The mic's clips so far, and whether it was on. */
+  clips: VoiceClip[];
+  mic: boolean;
+  /** What was drawn from the toolbar, and on which page: it's about that page, so only a reload of it shows it again. */
+  path: string;
+  marks: Shape[];
+}
+
+function carried(): Carried | undefined {
+  try {
+    return (JSON.parse(sessionStorage.getItem(GOING) ?? 'null') as Carried | null) ?? undefined;
+  } catch {
+    // Storage can be off: nothing carries over, then.
+    return undefined;
+  }
+}
+
+function carry(going: Carried | undefined): void {
+  try {
+    if (going === undefined) sessionStorage.removeItem(GOING);
+    else sessionStorage.setItem(GOING, JSON.stringify(going));
+  } catch {
+    // Not kept, then: a page load ends the recording.
+  }
+}
 const MARGIN = 12;
 
 const STYLE = `
@@ -131,25 +173,48 @@ export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
   setup: ({ base, root, options, use, request }) => {
     const { masking } = options as { masking: ResolvedMasking };
-    let going = false;
+    let going: Promise<Recording | undefined> | undefined;
 
-    const record = async (): Promise<Recording | undefined> => {
-      const rrweb = await import('rrweb').catch((e: unknown) => {
-        throw new Error('recordings need rrweb: add it to your devDependencies', { cause: e });
+    const post = async (route: string, body: unknown, keepalive = false) => {
+      const res = await request(route, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        ...(keepalive ? { keepalive } : {}),
       });
-      const events: { type: number; data?: unknown }[] = [];
-      const startedAt = Date.now();
-      const viewport = { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
-      const colorScheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      // `url`: where it replays, said by what keeps it with no server to serve it from (a `standalone` build).
+      const answer = (await res.json()) as { id?: string; url?: string; problem?: string };
+      if (answer.id === undefined) throw new Error(`recordings: ${answer.problem ?? res.statusText}`);
+      return { id: answer.id, url: answer.url };
+    };
+
+    /** Records until Stop or Discard: a new recording, or `from`, one a page before this started. */
+    const record = async (from?: Carried): Promise<Recording | undefined> => {
+      const startedAt = from?.startedAt ?? Date.now();
+      const begin = async (): Promise<string> => {
+        const viewport = { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
+        const colorScheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        return (await post('begin', { page: location.href, viewport, colorScheme, startedAt } satisfies Meta)).id;
+      };
+      const [rrweb, id] = await Promise.all([
+        import('rrweb').catch((e: unknown) => {
+          throw new Error('recordings need rrweb: add it to your devDependencies', { cause: e });
+        }),
+        from?.id ?? begin(),
+      ]);
+      const clips: VoiceClip[] = from?.clips ?? [];
+      // What the server doesn't have yet, and the place of the next part sent.
+      let unsent: { type: number; data?: unknown }[] = [];
+      let seq = from?.seq ?? 0;
       const host = root.host;
-      const keep = dropOurs<(typeof events)[number]>(
+      const keep = dropOurs<(typeof unsent)[number]>(
         () => rrweb.record.mirror.getId(host),
         () => rrweb.record.mirror.getId(document.documentElement),
       );
       const stopRecording = rrweb.record({
         emit: (event) => {
           const kept = keep(event);
-          if (kept !== undefined) events.push(kept);
+          if (kept !== undefined) unsent.push(kept);
         },
         blockClass: masking.blockClass,
         // deictic's own UI, the overlay: a blocked element is kept as an empty box its size, and it has none.
@@ -165,6 +230,7 @@ export default defineClientPlugin<never, never, Recorder>({
       const marks = use('annotations');
       // The toolbar's own, drawn while recording: shown with the page's, gone when it ends.
       const tools = marks?.tools();
+      if (from?.path === location.pathname) for (const shape of from.marks) tools?.marks.add(shape);
       const mark = () => {
         const area = { x: -scrollX, y: -scrollY, width: 1, height: 1 };
         rrweb.record.addCustomEvent(MARKS, {
@@ -174,7 +240,56 @@ export default defineClientPlugin<never, never, Recorder>({
         });
       };
       mark();
-      const unsubscribe = [marks?.subscribe(mark), tools?.marks.subscribe(mark)];
+
+      // The mic, where the voice plugin is loaded: each stretch it's on is a clip, at its time in the recording.
+      const voice = use('voice');
+      let take: Take | undefined;
+      /** What the next page carries on from, kept as it changes: a page that's going has no time to say it then. */
+      let over = false;
+      const save = () =>
+        // Not once it's ended, as its last events go: the next page would carry on with one that's over.
+        over ||
+        carry({
+          id,
+          startedAt,
+          seq,
+          clips,
+          mic: take !== undefined,
+          path: location.pathname,
+          marks: tools?.marks.list().map((a) => a.shape) ?? [],
+        });
+      const unsubscribe = [
+        marks?.subscribe(mark),
+        tools?.marks.subscribe(() => {
+          mark();
+          save();
+        }),
+      ];
+
+      // One part at a time, each with its place. A part that didn't arrive goes again with the next, before it.
+      let sending: Promise<void> = Promise.resolve();
+      const flush = () => {
+        const next = sending
+          .catch(() => {})
+          .then(async () => {
+            if (unsent.length === 0) return;
+            const part = unsent;
+            unsent = [];
+            const at = seq++;
+            save();
+            try {
+              await post(`part/${id}?seq=${at}`, part);
+            } catch (e) {
+              unsent = [...part, ...unsent];
+              throw e;
+            }
+          });
+        sending = next;
+        return next;
+      };
+      // A problem is heard at Stop, where it matters: a part that fails meanwhile goes again a second on.
+      const flushing = setInterval(() => void flush().catch(() => {}), EVERY);
+      save();
 
       return new Promise((done, fail) => {
         const bar = document.createElement('div');
@@ -188,10 +303,6 @@ export default defineClientPlugin<never, never, Recorder>({
         live.append(dot, time);
         const sep = () => Object.assign(document.createElement('span'), { className: 'sep' });
 
-        // The mic, where the voice plugin is loaded: each stretch it's on is a clip, at its time in the recording.
-        const voice = use('voice');
-        const clips: VoiceClip[] = [];
-        let take: Take | undefined;
         // The mic's live waveform beside it while it's on, so it's plain it hears.
         const wave = Object.assign(document.createElement('canvas'), { className: 'wave', hidden: true });
         let stopWave: (() => void) | undefined;
@@ -237,38 +348,55 @@ export default defineClientPlugin<never, never, Recorder>({
             mic.setAttribute('aria-pressed', String(on));
             mic.title = on ? 'Turn the mic off' : 'Turn the mic on';
             mic.setAttribute('aria-label', mic.title);
+            save();
           });
         };
         mic?.classList.add('mic');
         mic?.setAttribute('aria-pressed', 'false');
+        // On, as the page before left it: a browser that was let use the mic gives it again without asking.
+        if (from?.mic === true) toggle();
 
-        const end = async (keep: boolean) => {
+        // The page is going, for another or for good, with no time to wait for anything: what's sent of the mic's
+        // take is its clip, the next page is told where things stand, and the last events go as the page does.
+        const leave = () => {
+          const spoken = take?.soFar();
+          if (take !== undefined && spoken !== undefined)
+            clips.push({ id: spoken.id, at: take.started - startedAt, duration: spoken.duration });
+          const part = unsent;
+          unsent = [];
+          const at = seq++;
+          save();
+          // Not behind `sending`, which a page that's going never gets to: the server orders the parts by their place.
+          // A browser sends 64 KB at most for a page that's gone, so a last second busier than that is lost.
+          if (part.length > 0) void post(`part/${id}?seq=${at}`, part, true).catch(() => {});
+        };
+        addEventListener('pagehide', leave);
+
+        const end = async (kept: boolean) => {
           rrweb.record.addCustomEvent(END, {});
           stopRecording?.();
           for (const stop of unsubscribe) stop?.();
           tools?.close();
+          clearInterval(flushing);
           clearInterval(ticking);
           removeEventListener('resize', replace);
+          removeEventListener('pagehide', leave);
           bar.remove();
+          over = true;
+          carry(undefined);
           await busy;
-          if (!keep) {
+          if (!kept) {
             unwave();
             take?.cancel();
+            void post(`discard/${id}`, {}).catch(() => {});
             return done(undefined);
           }
           await micOff();
           const duration = Date.now() - startedAt;
           const voiced = clips.length > 0 ? { voice: clips } : {};
-          const kept: Kept = { page: location.href, viewport, colorScheme, startedAt, duration, events, ...voiced };
           try {
-            const res = await request('add', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(kept),
-            });
-            // `url`: where it replays, said by what keeps it with no server to serve it from (a `standalone` build).
-            const { id, url, problem } = (await res.json()) as { id?: string; url?: string; problem?: string };
-            if (id === undefined) throw new Error(`recordings: ${problem ?? res.statusText}`);
+            await flush();
+            const { url } = await post(`end/${id}`, { duration, ...voiced } satisfies Pick<Kept, 'duration' | 'voice'>);
             done({ id, url: url ?? `${base}__deictic/plugins/recordings/replay/${id}`, duration, ...voiced });
           } catch (e) {
             fail(e);
@@ -300,16 +428,34 @@ export default defineClientPlugin<never, never, Recorder>({
       });
     };
 
+    const run = (from?: Carried) => {
+      const mine = record(from).finally(() => {
+        if (going === mine) going = undefined;
+      });
+      going = mine;
+      return mine;
+    };
+    // One the page before this left going: carried on at once, whoever asks for it later (`going`), or no one.
+    const left = carried();
+    if (left !== undefined) {
+      run(left).catch((e: unknown) => {
+        // Not for the page after this to try again.
+        carry(undefined);
+        console.warn('deictic: the recording did not carry on, or was not kept', e);
+      });
+    }
+    // A page shown again as it was left (Back, out of the browser's cache) knows nothing of what happened since:
+    // loaded afresh, it carries on like any other.
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted && (going !== undefined || carried() !== undefined)) location.reload();
+    });
+
     return {
-      recording: () => going,
+      recording: () => going !== undefined,
+      going: () => going,
       record: async () => {
-        if (going) throw new Error('recordings: one is going already: stop it first');
-        going = true;
-        try {
-          return await record();
-        } finally {
-          going = false;
-        }
+        if (going !== undefined) throw new Error('recordings: one is going already: stop it first');
+        return run();
       },
     };
   },

@@ -6,6 +6,10 @@ start). The person's marks are custom events tagged `deictic.annotations` (`anno
 in page coordinates: CSS pixels from the document's top left), one at the start and one at each change;
 `deictic.end` marks where it stopped. Times below are from the recording's start.
 
+A recording may cross pages: the person reloaded, or followed a link, and it went on. `page` is where it started, which
+is the page with the task's element; each page it went to is a `page` line in the timeline, and what follows happened
+there. A mic that was on makes a clip per page.
+
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps
 them under `.deictic/recordings` and `.deictic/voice` too. Every script takes the task's ID.
 

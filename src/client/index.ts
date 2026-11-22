@@ -11,6 +11,7 @@
 import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Standalone, Target } from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
+import { dropAway, keepAway, keptAway } from './away.ts';
 import { openLightbox } from './lightbox.ts';
 import { STYLE } from './style.ts';
 import { tooltips } from './tooltip.ts';
@@ -384,15 +385,32 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       onClose: () => (panel = undefined),
       ...(resumed === undefined ? {} : { resumed }),
       reopen: (again, element, kept) => {
-        const found = element.isConnected ? element : sameAs(element)[0];
-        const at = found === undefined ? undefined : targetOf(found);
-        // Gone from the page while away: there's nothing to come back to.
-        if (found === undefined || at === undefined)
-          return console.warn('deictic: the element is no longer on the page, so the popup stays closed');
-        openTab(again, found, at, kept, pointed?.isConnected === true && found === element ? pointed : undefined);
+        // Rendered again while away, or gone from the page, which moved on: the popup comes back all the same, on
+        // the element as it was left, since what it kept (a recording) is about it wherever the page is now.
+        const found = element.isConnected ? element : (sameAs(element)[0] ?? element);
+        openTab(again, found, targetOf(found) ?? target, kept, pointed?.isConnected === true && found === element ? pointed : undefined);
       },
     });
   };
+  // What the page before this left a panel for (`away`), where that carries on here: the popup comes back when
+  // it's done, on the element where this page has it, and on a stand-in for it where it doesn't.
+  void keptAway().then((away) => {
+    if (away === undefined) return;
+    const tab = tabs.find((t) => t.plugin.name === away.tab);
+    const task = tab?.plugin.resume?.(contextOf(away.tab));
+    if (tab === undefined || task === undefined) return dropAway();
+    const back = (resumed: Resumed) => {
+      dropAway();
+      const { loc, tag } = away.target;
+      const absent = document.createElement(tag);
+      absent.setAttribute(ATTRIBUTE, `${loc.file}:${loc.line}:${loc.column}`);
+      openTab(tab, sameAs(absent).find((el) => el.localName === tag) ?? absent, away.target, resumed);
+    };
+    task.then(
+      (result) => back({ state: away.state, result }),
+      (e: unknown) => back({ state: away.state, problem: messageOf(e) }),
+    );
+  });
   function openAt(name: string, given: Element): boolean {
     const tab = tabs.find((t) => t.plugin.name === name);
     const el = given.isConnected ? given : (sameAs(given)[0] ?? undefined);
@@ -482,6 +500,9 @@ function openPanel({
   close.classList.add('close');
   head.append(...buttons.map((b) => b.el), close);
   bar.append(where, undo, redo);
+  // Back from `away` on a page that doesn't have the element: said, as nothing on it is outlined.
+  if (!element.isConnected)
+    where.after(Object.assign(document.createElement('span'), { className: 'absent', textContent: 'not on this page' }));
   const body = div('body');
   body.setAttribute('role', 'tabpanel');
   const status = div('status');
@@ -616,9 +637,15 @@ function openPanel({
       away: (state, task) => {
         const tab = current;
         done(true);
+        // For the tab's next page too, should this one go before the task is done. Not one a page pinned: that's the page's own.
+        if (!pinned) keepAway({ tab: tab.plugin.name, target, state });
+        const back = (resumed: Resumed) => {
+          if (!pinned) dropAway();
+          reopen(tab, element, resumed);
+        };
         void task().then(
-          (result) => reopen(tab, element, { state, result }),
-          (e: unknown) => reopen(tab, element, { state, problem: messageOf(e) }),
+          (result) => back({ state, result }),
+          (e: unknown) => back({ state, problem: messageOf(e) }),
         );
       },
       element,
@@ -715,7 +742,11 @@ function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, 
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Where the element was last seen: one gone from the page leaves the popup where it was.
   let r = element.getBoundingClientRect();
-  let moved: { left: number; top: number } | undefined;
+  // An element that's not on the page (back from `away`, on another) has no place to be beside: as if dragged to the
+  // middle, toward the top.
+  let moved: { left: number; top: number } | undefined = element.isConnected
+    ? undefined
+    : { left: (document.documentElement.clientWidth - panel.offsetWidth) / 2, top: document.documentElement.clientHeight / 5 };
   const fit = () => {
     cancelAnimationFrame(frame);
     clearTimeout(timer);

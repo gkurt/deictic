@@ -132,7 +132,9 @@ In the Task tab:
 
 - **Attach** adds a screenshot of the page, and **Annotate** opens it to draw boxes, arrows and notes on.
 - **Attach HTML snapshot** adds the element as the page has it, as a file.
-- **Record** records the page as you use it, drawing as you go, with the mic on if you like.
+- **Record** records the page as you use it, drawing as you go, with the mic on if you like. A reload, or a link to
+  another page of your site, leaves it going: stop it there, and the Task tab comes back with it, about the element
+  you started on, whether that page has it or not.
 - **Voice** records a note.
 - The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed
   can be edited or deleted. Undo takes any of it back.
@@ -203,8 +205,10 @@ import type { Standalone } from 'deictic';
 export default (async (request) => Response.json({ model: null })) satisfies Standalone;
 ```
 
-What a plugin's `add` route would keep, the module keeps, and answers with the `url` it's at. A recording's is a
-replay page for the build to publish: `replayPage({ player, source })`, from `deictic/recordings`, is its HTML.
+What a plugin's routes would keep, the module keeps, and answers with the `url` it's at: screenshots' `add`; voice's
+`add` and then `more/<id>`, a take as it's spoken (the `url` with `?last`); recordings' `begin`, `part/<id>?seq=<n>`
+and `end/<id>` (the `url`) or `discard/<id>`. A recording's is a replay page for the build to publish:
+`replayPage({ player, source })`, from `deictic/recordings`, is its HTML.
 
 ## Events
 
@@ -252,6 +256,9 @@ export default defineClientPlugin<Model, Op>({
   screenshots and recordings.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.
 - Throw a `Refusal` for an op the plugin won't make. The panel shows its message.
+- A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.
+  Where the task outlasts a page load, as a recording does, the page half's `resume` answers it on the next page, and
+  the popup comes back there: on the element, or without it (`element.isConnected` is false) where that page has none.
 
 The types in `deictic`'s index document each part.
 

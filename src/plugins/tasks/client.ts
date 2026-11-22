@@ -135,7 +135,15 @@ interface Kept {
   drawn: Drawn[];
   recordings: Recording[];
   voices: Clip[];
+  /** What the page said of the element as the panel left, for a task added where the page no longer has it. */
+  facts: Facts;
 }
+
+/** What a task says that only the page with the element on it knows. */
+type Facts = Pick<Op, 'page' | 'viewport' | 'pointed' | 'count' | 'chain'> & {
+  /** The element's HTML, as it would be attached. */
+  html: string;
+};
 
 const clock = (ms: number) => {
   const s = Math.round(ms / 1000);
@@ -270,6 +278,8 @@ function announce(model: Model, op: Op, target: Target): void {
 export default defineClientPlugin<Model, Change>({
   name: 'tasks',
   label: 'Task',
+  // All the panel leaves for is a recording, which a page load doesn't end.
+  resume: ({ use }) => use('recordings')?.going(),
   mount: (panel, context) => {
     const style = element('style', { textContent: STYLE });
     const list = element('ul', { className: 'tasks' });
@@ -291,6 +301,8 @@ export default defineClientPlugin<Model, Change>({
     panel.append(style, list, closed, fold, text);
 
     const shots = context.use('screenshots');
+    // Back from a recording that went on to a page without the element: there's nothing here to take a shot of.
+    const here = context.element.isConnected;
     const notes = context.use('annotations');
     const recorder = context.use('recordings');
     const voice = context.use('voice');
@@ -300,7 +312,7 @@ export default defineClientPlugin<Model, Change>({
     const aborts = new AbortController();
 
     const attach = element('input', { type: 'checkbox', checked: true });
-    const toggle = element('label', { hidden: shots === undefined });
+    const toggle = element('label', { hidden: shots === undefined || !here });
     toggle.append(attach, 'Attach a screenshot');
     const annotate = element('button', { type: 'button', textContent: 'Annotate', title: 'Take the screenshot now and draw on it' });
     const record = element('button', {
@@ -310,7 +322,7 @@ export default defineClientPlugin<Model, Change>({
     });
     const speak = element('button', { type: 'button', textContent: 'Voice', title: 'Record your voice, here' });
     const actions = element('span', { className: 'actions' });
-    actions.append(...(shots !== undefined && notes !== undefined ? [annotate] : []));
+    actions.append(...(shots !== undefined && notes !== undefined && here ? [annotate] : []));
     const shot = element('div', { className: 'shot' });
     shot.append(toggle, actions);
     const chipsEl = element('div', { className: 'chips' });
@@ -409,7 +421,7 @@ export default defineClientPlugin<Model, Change>({
             },
           );
         }),
-        ...(attached && shots !== undefined && notes !== undefined ? [another] : []),
+        ...(attached && shots !== undefined && notes !== undefined && here ? [another] : []),
         ...(attached ? more() : []),
       );
       able();
@@ -473,7 +485,7 @@ export default defineClientPlugin<Model, Change>({
       // A take going on is kept first, as a chip, to come back to with the rest.
       void speakOff().then(() => {
         const drawn = chips.map(({ url: _, ...d }) => d);
-        const kept: Kept = { text: text.value, attach: attach.checked, html: withHtml.checked, drawn, recordings, voices };
+        const kept: Kept = { text: text.value, attach: attach.checked, html: withHtml.checked, drawn, recordings, voices, facts: facts() };
         context.away(kept, () => recorder.record());
       });
     });
@@ -687,6 +699,27 @@ export default defineClientPlugin<Model, Change>({
       mark();
     };
 
+    const back = context.resumed;
+    /**
+     * What the page says of the element: read now, while the page has it, and as the panel left it where the
+     * page has moved on without it (a recording that went on to another), which is the page the task is about.
+     */
+    const facts = (): Facts => {
+      const { element: el, elements } = context;
+      if (!here && back !== undefined) return (back.state as Kept).facts;
+      const chain = chainOf(el, context.target.loc.file);
+      return {
+        page: location.href,
+        viewport: { width: innerWidth, height: innerHeight },
+        ...(context.pointed === undefined
+          ? {}
+          : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
+        count: elements.length,
+        ...(chain.length === 0 ? {} : { chain }),
+        html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML),
+      };
+    };
+
     /**
      * The shots to attach: each chip's PNG, kept as a shot, as the person drew it, or a shot taken now where the
      * box is ticked. Only that one has the element outlined in it (or is as it was taken, where that can't be
@@ -705,7 +738,7 @@ export default defineClientPlugin<Model, Change>({
         );
       }
       // With a recording attached the box is away, so no shot is asked for.
-      if (!attach.checked || recordings.length > 0) return undefined;
+      if (!attach.checked || recordings.length > 0 || !here) return undefined;
       add.textContent = 'Capturing…';
       const taken = await shots.capture(context.element);
       try {
@@ -735,19 +768,12 @@ export default defineClientPlugin<Model, Change>({
         return;
       }
       add.textContent = 'Add task';
-      const { element: el, elements } = context;
-      const chain = chainOf(el, context.target.loc.file);
       try {
+        const { html, ...said } = facts();
         const op: Op = {
           text: text.value,
-          page: location.href,
-          viewport: { width: innerWidth, height: innerHeight },
-          ...(context.pointed === undefined
-            ? {}
-            : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
-          count: elements.length,
-          ...(chain.length === 0 ? {} : { chain }),
-          ...(sendsHtml && withHtml.checked ? { html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML) } : {}),
+          ...said,
+          ...(sendsHtml && withHtml.checked ? { html } : {}),
           ...(screenshots === undefined ? {} : { screenshots }),
           ...(recordings.length === 0
             ? {}
@@ -775,7 +801,6 @@ export default defineClientPlugin<Model, Change>({
     };
 
     // Back from recording: what was kept, and the recording, or why there's none.
-    const back = context.resumed;
     if (back !== undefined) {
       const kept = back.state as Kept;
       text.value = kept.text;

@@ -34,7 +34,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes, and
   `open(plugin, element)` to open the popup at a tab. A panel's context has `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
-  `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). `Refusal` is an op
+  `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
+  doesn't lose it: the state is kept for the tab's next page (`src/client/away.ts`), whose overlay asks the plugin's
+  `resume(context)` for the task where it carries on there, and reopens when it's done. Back from `away` the `element`
+  may be off the page (`isConnected` false): as it was left, or after a load an empty one of its tag and mark. `Refusal` is an op
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
   record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
@@ -101,6 +104,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   answers a `Parsed` (the frontmatter's `program`, the template's opening tags) or the `problem`; `locateAstro` marks
   with it. No mark on `script`, `style` (an attribute makes Astro leave them unprocessed) or `slot`; none at all with an
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
+- `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
+  page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
 - `src/client/lightbox.ts`: `openLightbox(root, items, { at, from })`, offered to panels as `context.lightbox`: an
   `image`, a `page` (an iframe) or an `audio` item (a player: play, the clip's waveform lit as it plays, seek by
   clicking or dragging it, the time), big over everything, ← → between items, each item's `actions` beside its
@@ -129,7 +134,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `data-deictic-modal` is in the root, Esc is that modal's, not the popup's. Pointing goes down through open
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`
-  (a task names its path and HTML). `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
+  (a task names its path and HTML). On an element that's not on the page (back from `away`, where the page moved on or
+  another loaded) it opens in the middle, nothing outlined, its bar saying `not on this page`. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
   homepage demo's plain click). As it opens over the page and as it closes, the page hears `deictic:open`
   (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
   `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a
@@ -186,19 +192,27 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   over a shot (`overlay` in a `PageCapture`), and a task names the count and notes.
 - `src/plugins/recordings/`: no tab. `index.ts`, the server half: keeps the latest `keep` recordings (JSON:
   `Kept`, rrweb's events with page, viewport and duration) under `.deictic/recordings`, answers
-  `read(id)`, and routes `add`, `recording/<id>`, `replay/<id>` (`replay.ts`, `rrweb-player` sized to the window,
+  `read(id)`, and routes `begin`, `part/<id>?seq=<n>`, `end/<id>` and `discard/<id>` (a recording comes as it goes: its
+  parts are lines of `<id>.part`, put in order and kept as `<id>.json` at `end`; one nobody ended goes a day on), `recording/<id>`, `replay/<id>` (`replay.ts`, `rrweb-player` sized to the window,
   restyled dark under `#main`, the marks drawn in its replayer's wrapper and moved with its scroll, a timeline
   marker per marks event, voice in step at its speed; `?t=`, `&bare`) and `player.js`/`player.css`
   (`rrweb-player`'s build, an optional peer). `replayPage(sources)`, exported, is that page for one published as a
   file where there are no routes: `player` is the folder its two files are in, `source` a script that sets
   `globalThis.deicticReplay` (`recording(id)`, `clip(id)`), and the recording is `?id=`.
-  `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots', and
+  `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots', sends the
+  events each second, and keeps what the next page needs in session storage (`deictic:recording`: the ID, the start, the
+  next part's place, the clips, the mic, the toolbar's marks and their page). So a load doesn't end it: `setup` on the
+  next page carries on under the same ID (rrweb's own `Meta` and snapshot per page; the last events go with `keepalive`
+  on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
+  `resume` gives the overlay. It
   shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;
   the marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each change.
 - `src/plugins/voice/`: no tab. `index.ts`, the server half: keeps the latest `keep` clips under
   `.deictic/voice` as the audio a `MediaRecorder` makes (webm, ogg, mp4, by extension), answers
-  `read(id)`, routes `add` and `clip/<id>`. `client.ts`: `start()` asks for the mic and answers a `Take`, whose
-  `stop` posts it and lets the mic go (`cancel` keeps nothing). The recording toolbar's mic (its live waveform beside it while on) makes a clip of each
+  `read(id)`, routes `add`, `more/<id>` and `clip/<id>`. `client.ts`: `start()` asks for the mic and answers a `Take`,
+  which sends the audio each second (`add` its start, `more` the rest, the last with `?last`); `stop` lets the mic go and
+  answers the clip, `cancel` answers none, and `soFar()` is the clip as far as it's sent, for a page that's going: a
+  recording's take ends there, and the next page's mic starts another. The recording toolbar's mic (its live waveform beside it while on) makes a clip of each
   stretch it's on, at its offset (`Kept.voice`); the replay plays them in step and starts paused, as a browser
   plays sound only after a click.
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
@@ -238,6 +252,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
   `Op.recordings` attaches each one's JSON (and its voice clips) and says how long it ran and where it replays.
+  The kept state has `facts` too, what only the element's page says (page, viewport, count, chain, pointed, HTML): a
+  recording stopped on a page without the element comes back to a panel with no shot to take, and the task says those.
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
   `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached), which the playground lists as a board.
   With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
@@ -276,7 +292,8 @@ repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
-works on the deployed site: `src/standalone.ts` answers it in the page (tasks, shots and clips kept there, class edits
+works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, a recording's parts and the voice clips in
+IndexedDB for a day, so a recording carries on to the site's next page, class edits
 on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
 publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a
 `BroadcastChannel`. Its tasks go to the tasks plugin's own board (`site/.deictic/board`, port 4100) unless

@@ -105,6 +105,7 @@ export const STYLE = `
 .bar .where svg { flex: none; }
 .bar .where:hover, .bar .where:focus-visible { color: var(--deictic-fg); }
 .bar .where:hover span { text-decoration: underline; }
+.bar .absent { flex: none; margin-right: 6px; font-size: 12px; color: var(--deictic-muted); }
 .lightbox {
   position: fixed;
   inset: 0;

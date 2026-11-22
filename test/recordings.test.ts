@@ -33,11 +33,22 @@ function setup(options: Parameters<typeof recordings>[0] = {}) {
   });
   const ask = (path: string, init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {}) =>
     handle(new Request(`${ORIGIN}/__deictic/${path}`, { ...init, headers: { origin: ORIGIN, ...init.headers } })).then((r) => r!);
-  const add = async (body: BodyInit = JSON.stringify(KEPT), type = 'application/json') => {
-    const res = await ask('plugins/recordings/add', { method: 'POST', headers: { 'content-type': type }, body });
+  const post = async (route: string, body: unknown) => {
+    const res = await ask(`plugins/recordings/${route}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
     return { status: res.status, ...((await res.json()) as { id?: string; problem?: string }) };
   };
-  return { p, ask, add };
+  const { events, duration, ...meta } = KEPT;
+  /** A recording as the page sends one: begun, its events in a part, ended. */
+  const add = async () => {
+    const { id } = await post('begin', meta);
+    await post(`part/${id}?seq=0`, events);
+    return post(`end/${id}`, { duration });
+  };
+  return { p, ask, add, post, meta };
 }
 
 test('keeps what the page recorded, serves it back, and a page to replay it with rrweb’s player', async () => {
@@ -62,11 +73,56 @@ test('keeps what the page recorded, serves it back, and a page to replay it with
   expect((await ask('plugins/recordings/player.css')).status).toBe(200);
 });
 
-test('takes only a recording with events, as JSON, and keeps the latest few', async () => {
-  const { ask, add } = setup({ keep: 2 });
-  expect(await add('events', 'text/plain')).toMatchObject({ status: 415, problem: 'send the recording as application/json' });
-  expect(await add('{', 'application/json')).toMatchObject({ status: 400, problem: "the recording isn't JSON" });
-  expect(await add(JSON.stringify({ ...KEPT, events: [] }))).toMatchObject({ status: 400 });
+test('takes a recording in parts, from one page after another, and puts them in their order', async () => {
+  const { ask, post, meta } = setup();
+  const event = (timestamp: number) => ({ type: 3, data: {}, timestamp });
+  const { id } = await post('begin', meta);
+  await post(`part/${id}?seq=0`, [event(0), event(1)]);
+  // A page's last part, sent as it goes, overtakes the one before it; the next page carries on from there.
+  await post(`part/${id}?seq=2`, [event(4)]);
+  await post(`part/${id}?seq=1`, [event(2), event(3)]);
+  await post(`part/${id}?seq=3`, [event(5)]);
+  // Not kept, nor served, until it ends.
+  expect((await ask(`plugins/recordings/recording/${id}`)).status).toBe(404);
+  const voice = [{ id: 'clip-1', at: 100, duration: 900 }];
+  expect(await post(`end/${id}`, { duration: 5_000, voice })).toEqual({ status: 200, id: id! });
+  expect(await (await ask(`plugins/recordings/recording/${id}`)).json()).toEqual({
+    ...meta,
+    duration: 5_000,
+    voice,
+    events: [0, 1, 2, 3, 4, 5].map(event),
+  });
+  // Over: there's nothing to add to, or to end again.
+  expect(await post(`part/${id}?seq=4`, [event(6)])).toMatchObject({
+    status: 404,
+    problem: `no recording ${id} is going any more: record again`,
+  });
+  expect((await post(`end/${id}`, { duration: 1 })).status).toBe(404);
+});
+
+test('a discarded recording is gone, and one with no events is not kept', async () => {
+  const { ask, post, meta } = setup();
+  const { id } = await post('begin', meta);
+  await post(`part/${id}?seq=0`, KEPT.events);
+  expect((await post(`discard/${id}`, {})).status).toBe(200);
+  expect((await post(`end/${id}`, { duration: 1 })).status).toBe(404);
+  expect((await ask(`plugins/recordings/recording/${id}`)).status).toBe(404);
+
+  const { id: empty } = await post('begin', meta);
+  expect(await post(`end/${empty}`, { duration: 1 })).toMatchObject({
+    status: 400,
+    problem: 'the recording has no events: record for a moment longer',
+  });
+});
+
+test('says what to send, and keeps the latest few', async () => {
+  const { ask, add, post, meta } = setup({ keep: 2 });
+  expect(await post('begin', '{')).toMatchObject({ status: 400, problem: 'send the page, its viewport and when it started, as JSON' });
+  expect(await post('part/nope?seq=0', [])).toMatchObject({ status: 404 });
+  const { id } = await post('begin', meta);
+  expect(await post(`part/${id}`, [])).toMatchObject({ status: 400, problem: 'send the events as a JSON array, and `seq`, their place' });
+  expect(await post(`part/${id}?seq=0`, { events: [] })).toMatchObject({ status: 400 });
+  expect(await post(`end/${id}`, {})).toMatchObject({ status: 400, problem: 'send how long it ran, as JSON' });
   const [first, second, third] = [await add(), await add(), await add()];
   expect((await ask(`plugins/recordings/recording/${first.id}`)).status).toBe(404);
   expect((await ask(`plugins/recordings/recording/${second.id}`)).status).toBe(200);

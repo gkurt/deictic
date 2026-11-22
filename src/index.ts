@@ -191,7 +191,11 @@ export interface LightboxOptions {
 }
 
 export interface PanelContext<Model, Op> extends ClientContext {
-  /** The element clicked: the one the source marked, under the pointer or around what is. */
+  /**
+   * The element clicked: the one the source marked, under the pointer or around what is. Back from `away`
+   * it may be off the page (`isConnected` is false), where the page moved on without it: the element as it
+   * was left, or after a page load an empty one of its tag and mark. `elements` is then empty.
+   */
   element: Element;
   /**
    * What was under the pointer, where it isn't `element` but inside it: markup nothing marked, as a
@@ -215,7 +219,9 @@ export interface PanelContext<Model, Op> extends ClientContext {
    * Leaves the popup to do something on the page, then comes back: closes it, runs `task` (a recording, a
    * pick of another element), and opens it again at this tab on this element. The next mount gets
    * `resumed`: the `state` kept now (what was typed, what's attached), and what `task` answered, or why
-   * it failed. The state stays in the page, as it is: no need for JSON.
+   * it failed. The state stays in the page, as it is: no need for JSON. It's also kept for the tab's next
+   * page, as a structured clone, where it can be one: after a page load, the plugin's `resume` says whether
+   * the task carries on, and the popup comes back there.
    */
   away: <T>(state: unknown, task: () => Promise<T>) => void;
   /** Set when this mount is the panel coming back from `away`. */
@@ -240,6 +246,12 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * plugin's API to the others in the page, at once: one that needs time keeps its promises inside it.
    */
   setup?(context: ClientContext): Api;
+  /**
+   * Asked as a page starts where the page before it left this plugin's panel `away`: the task it left for,
+   * where that carries on in this page (a recording does), or nothing where it ended with the page. When it's
+   * done the popup opens at this tab with `resumed`, on the element where this page has it and without where not.
+   */
+  resume?(context: ClientContext): Promise<unknown> | undefined;
   /** Draws into `panel`, inside deictic's shadow root. Returns what to undo on the page when the panel closes. */
   mount?: (panel: HTMLElement, context: PanelContext<Model, Op>) => (() => void) | void;
 }
