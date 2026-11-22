@@ -67,7 +67,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   and Rspack) the project lacks, as its own dev dependencies, since deictic's imports, the page's bundle and the skill
   all look in the project; `bundlerOf` from the dependencies, and Bun only where a module of the project's calls
   `Bun.serve` and imports an HTML file (`serverOf`), as Bun may run Vite or Next.js, or no page at all; `addToConfig`
-  adds deictic to Vite's or Astro's list or webpack's and Rspack's `plugins`, or wraps Next's export, with oxc and
+  adds deictic first in Vite's or Astro's list or webpack's and Rspack's `plugins` (a plugin before it that changes a
+  module would have the marks count in its code), or wraps Next's export, with oxc and
   `magic-string` (through `defineConfig`, never another call, as a merge's first argument is a base, a function, a
   `const`, `satisfies`; ESM or CommonJS), and nothing where it can't tell, where it prints the snippet. `cli/bun.ts`
   is Bun's: `deictic.plugin.ts` written, it first in bunfig's `[serve.static] plugins` (`addToBunfig`), its routes first

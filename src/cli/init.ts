@@ -18,7 +18,7 @@ import { installCommand, packageManager, readJson, runnerOf } from '#src/tools/p
 
 import { fail } from './board.ts';
 import { addToBunfig, addToServer, BY_HAND, MODULE, PLUGIN, serverOf } from './bun.ts';
-import { addFirst, addImports, eolOf, indentAt } from './edit.ts';
+import { addFirst, addImports } from './edit.ts';
 
 export type Bundler = 'next' | 'astro' | 'vite' | 'rspack' | 'webpack' | 'bun';
 
@@ -62,7 +62,7 @@ const SETUPS: Record<Exclude<Bundler, 'bun'>, Setup> = {
     name: 'deictic',
     list: 'plugins',
     value: `deictic(${PLUGINS})`,
-    snippet: `export default defineConfig({ plugins: [react(), deictic(${PLUGINS})] });`,
+    snippet: `export default defineConfig({ plugins: [deictic(${PLUGINS}), react()] });`,
   },
   rspack: {
     files: extensions('rspack.config'),
@@ -177,7 +177,7 @@ function exportedOf(program: Program): { value: Expression; commonjs: boolean } 
 
 /**
  * The config with deictic added, or nothing where it can't tell where: deictic's import beside the config's, and its
- * plugin last in the list (`plugins`, `integrations`), or the config wrapped (Next's). Written in the config's quotes,
+ * plugin first in the list (`plugins`, `integrations`), as its marks count lines and columns in the code it's given, or the config wrapped (Next's). Written in the config's quotes,
  * semicolons and line endings.
  */
 export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code: string): string | undefined {
@@ -186,7 +186,6 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
   if (errors.length > 0) return undefined;
   const exported = exportedOf(program);
   if (exported === undefined) return undefined;
-  const eol = eolOf(code);
   const out = new MagicString(code);
 
   if (setup.wrap) {
@@ -194,7 +193,7 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
     out.appendRight(exported.value.end, `, ${setup.value})`);
   } else {
     const object = objectOf(exported.value, program);
-    if (object === undefined || !addTo(out, code, object, setup.list!, setup.value, eol)) return undefined;
+    if (object === undefined || !addTo(out, code, object, setup.list!, setup.value)) return undefined;
   }
 
   const lines: [string, string][] = [
@@ -205,8 +204,12 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
   return out.toString();
 }
 
-/** Adds `value` last in the object's array `list`, or the list with it, as the object is laid out. False where `list` isn't an array. */
-function addTo(out: MagicString, code: string, object: ObjectExpression, list: string, value: string, eol: string): boolean {
+/**
+ * Adds `value` first in the object's array `list`, or the list with it, as the object is laid out. False where `list`
+ * isn't an array. First, since a plugin before deictic's that changes a module (both `pre` under Vite) leaves the
+ * page's marks pointing at its code, not the file.
+ */
+function addTo(out: MagicString, code: string, object: ObjectExpression, list: string, value: string): boolean {
   const property = object.properties.find(
     (p) =>
       p.type === 'Property' &&
@@ -218,13 +221,12 @@ function addTo(out: MagicString, code: string, object: ObjectExpression, list: s
     let array = property.value;
     while (array.type === 'TSAsExpression' || array.type === 'TSSatisfiesExpression') array = array.expression;
     if (array.type !== 'ArrayExpression') return false;
-    const last = array.elements.findLast((e) => e !== null);
-    if (last == null) {
+    const first = array.elements.find((e) => e !== null);
+    if (first == null) {
       out.appendLeft(array.start + 1, value);
       return true;
     }
-    const multiline = code.slice(array.start, array.end).includes('\n');
-    out.appendLeft(last.end, multiline ? `,${eol}${indentAt(code, last.start)}${value}` : `, ${value}`);
+    addFirst(out, code, array.start, first, value);
     return true;
   }
   addFirst(out, code, object.start, object.properties[0], `${list}: [${value}]`);

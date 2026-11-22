@@ -75,7 +75,7 @@ test('knows the bundler from the dependencies', () => {
   expect(bundlerOf(project({ 'package.json': manifest({ react: '19' }) }).root)).toBeUndefined();
 });
 
-test("adds the plugin last in Vite's plugins, as the config is laid out, and its imports after the config's", () => {
+test("adds the plugin first in Vite's plugins, as the config is laid out, and its imports after the config's", () => {
   const code = `import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
@@ -92,13 +92,13 @@ import { deictic } from "deictic/vite"
 
 export default defineConfig({
   plugins: [
-    react(),
     deictic({ plugins: recommended() }),
+    react(),
   ],
 })
 `);
   expect(addToConfig('vite', 'vite.config.ts', `export default { plugins: [react()] };\n`)).toBe(
-    `import { recommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/vite';\n\nexport default { plugins: [react(), deictic({ plugins: recommended() })] };\n`,
+    `import { recommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/vite';\n\nexport default { plugins: [deictic({ plugins: recommended() }), react()] };\n`,
   );
 });
 

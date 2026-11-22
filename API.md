@@ -20,12 +20,13 @@ adds it to the bundler's config, and offers the agent skill (`--dry-run`, `--no-
 For Bun it writes `deictic.plugin.ts`, names it in `bunfig.toml` and spreads its routes into `Bun.serve`'s, where a
 server of the project's has Bun bundle an HTML page (a Bun project that runs Vite or Next.js is theirs). This is what
 it adds, and what to add by hand where it can't (a config it can't read). Every integration takes the same options
-and runs in the dev server only.
+and runs in the dev server only. deictic goes first among the plugins: one before it that changes a module would have
+the page point at that plugin's code, not the file.
 
 ```ts
 // Vite, and anything on it (React Router, TanStack Start…): vite.config.ts
 import { deictic } from 'deictic/vite';
-export default defineConfig({ plugins: [react(), deictic({ plugins: recommended() })] });
+export default defineConfig({ plugins: [deictic({ plugins: recommended() }), react()] });
 
 // Next.js (`next dev`, Turbopack or webpack): next.config.ts
 import { withDeictic } from 'deictic/next';

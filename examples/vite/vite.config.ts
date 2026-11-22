@@ -7,5 +7,5 @@ import { defineConfig } from 'vite';
 
 // Tasks go to a board the dev server starts on this machine (`.deictic/board`), or the one BOARD_URL names.
 export default defineConfig({
-  plugins: [react({ compiler: true }), tailwindcss(), deictic({ plugins: [tasks(), tailwind({ css: 'src/index.css' })] })],
+  plugins: [deictic({ plugins: [tasks(), tailwind({ css: 'src/index.css' })] }), react({ compiler: true }), tailwindcss()],
 });
