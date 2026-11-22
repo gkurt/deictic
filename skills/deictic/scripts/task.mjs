@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { deicticDirs, fail, parseArgs, vb } from './lib.mjs';
+import { deicticDirs, eventsOf, fail, parseArgs, vb } from './lib.mjs';
 
 const vbScript = join(dirname(fileURLToPath(import.meta.url)), 'vb.mjs');
 
@@ -20,10 +20,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 // Who asked, said as that: the line's state is beside it, and a board's record names no one for a task's end.
 console.log(`#${root.id} ${root.task?.state ?? 'not a task'}, asked by ${root.author?.handle ?? root.by.actor}, ${root.createdAt}`);
-// Who holds it, by the profile its actor's ID ends in (`…+claude`), or the ID of one that writes as itself.
+// An actor by the profile its ID ends in (`…+claude`), or the ID of one that writes as itself.
+const nameOf = (actor) => (actor.includes('+') ? actor.slice(actor.lastIndexOf('+') + 1) : actor);
 const claim = root.task?.claim;
-const holder = claim?.actor.includes('+') ? claim.actor.slice(claim.actor.lastIndexOf('+') + 1) : claim?.actor;
-if (claim) console.log(`Claimed by ${holder} until ${claim.until}`);
+if (claim) console.log(`Claimed by ${nameOf(claim.actor)} until ${claim.until}`);
+// Who ended it is only in the thread's events, which take a moment to read: asked for a task that's over.
+if (['completed', 'failed'].includes(root.task?.state)) {
+  const ended = eventsOf(root.id).findLast((e) => e.type === `task.${root.task.state}` && String(e.payload?.id) === String(root.id));
+  if (ended?.payload?.by?.actor)
+    console.log(`${root.task.state === 'completed' ? 'Completed' : 'Failed'} by ${nameOf(ended.payload.by.actor)}, ${ended.createdAt}`);
+}
 if (root.task?.result) console.log(`Result: ${root.task.result}`);
 if (root.task?.reason) console.log(`Reason: ${root.task.reason}`);
 console.log(`\nAsked:\n${asked.trim()}\n`);

@@ -29,8 +29,11 @@ import { watchersOf } from './watchers.ts';
 
 export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
-/** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'>;
+/**
+ * What the plugin uses of a board: `board()` from `@vercel/board` is one. `events` is for who ended a task, and
+ * a board without it shows none.
+ */
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'> & Partial<Pick<Board, 'events'>>;
 
 export interface TasksOptions {
   /**
@@ -75,6 +78,8 @@ export interface Task {
   /** What was typed, whole: what an edit changes. */
   text: string;
   state: string;
+  /** Who holds its claim, or who completed or failed it, by name (`claude`), where the board says. */
+  by?: string;
   /** Whether it can still be edited or deleted: no one has claimed it. */
   open: boolean;
   /** Its page on the board, when there's one to link to. */
@@ -293,6 +298,27 @@ export function tasks(options: TasksOptions = {}) {
     if (message.text !== from) throw new Refusal(`task ${id} has been edited since: change it on the board`);
     await team.edit(id, to, { revision: message.revision });
   };
+  /**
+   * Who completed or failed each task, by the actor's ID. A board's record of a task names who made it and who
+   * holds it, never who ended it: only its events do, so the channel's are followed, from its latest hundred.
+   */
+  const enders = new Map<string, string>();
+  let following = false;
+  const follow = (team: TaskBoard) => {
+    if (following || team.events === undefined) return;
+    following = true;
+    void (async () => {
+      try {
+        for await (const event of team.events!({ channel, last: 100 }))
+          if (event.type === 'task.completed' || event.type === 'task.failed') enders.set(String(event.payload.id), event.payload.by.actor);
+      } catch {
+        // A board that doesn't answer its events (or one started again, which refuses the old token): no names
+        // from here on, until the next read follows it anew.
+      } finally {
+        following = false;
+      }
+    })();
+  };
   const create = async (record: Omit<Added, 'id'>): Promise<Added> => {
     const { task } = await (
       await boardOf()
@@ -348,11 +374,14 @@ export function tasks(options: TasksOptions = {}) {
       project ??= nameOf(given.root);
       // Started with the dev server, not at the first task, so whoever works the tasks can watch from the start.
       // Not waited for: a failure is the first request's to tell.
-      void boardOf().catch(() => {});
+      void boardOf()
+        .then(follow)
+        .catch(() => {});
     },
     read: (source, target) =>
       asked(async () => {
         const team = await boardOf();
+        follow(team);
         const labelled = (label: Record<string, string>) => team.tasks.list({ channel, label, state: 'all' });
         // By place too: a task added before there was a `deictic.file` has none, and is still its element's.
         const [here, inFile, page, held] = await Promise.all([
@@ -367,9 +396,15 @@ export function tasks(options: TasksOptions = {}) {
         const once = source.code.split(line).length === 2;
         const tasks: Task[] = [];
         const elsewhere: (Task & { at: Place })[] = [];
-        for (const { message } of [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks]) {
+        const about = [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks];
+        // Who has each, or ended it, and who holds any claim on the channel: asked of the board at once.
+        const actorOf = ({ id, task }: (typeof about)[number]['message']) => task?.claim?.actor ?? enders.get(id);
+        const claims = held.tasks.flatMap(({ message }) => message.task?.claim ?? []);
+        const actors = await actorsOf(team, [...about.flatMap(({ message }) => actorOf(message) ?? []), ...claims.map((c) => c.actor)]);
+        for (const { message } of about) {
           const state = message.task?.state ?? 'ready';
           if (state === 'canceled') continue;
+          const by = actors.get(actorOf(message) ?? '')?.name;
           const text = message.text.split(REST, 1)[0]!;
           const to = taskLink(page, message.id);
           const task = {
@@ -377,6 +412,7 @@ export function tasks(options: TasksOptions = {}) {
             title: text.split('\n', 1)[0]!,
             text,
             state,
+            ...(by === undefined ? {} : { by }),
             open: OPEN.has(state),
             ...(to === undefined ? {} : { link: to }),
           };
@@ -386,10 +422,7 @@ export function tasks(options: TasksOptions = {}) {
           else elsewhere.push({ ...task, at });
         }
         // An agent at work on a task is here too, though its watch may be over until the task is (`watch.mjs --once`).
-        const working = await agentsOf(
-          team,
-          held.tasks.flatMap(({ message }) => message.task?.claim ?? []),
-        );
+        const working = agentsOf(actors, claims);
         const watching = [...new Set([...watchersOf(root ?? process.cwd(), channel), ...working])].sort();
         // A board of this machine's own is watched from here or not at all.
         const ours = own !== undefined || (options.board === undefined && process.env.BOARD_URL === undefined);
@@ -597,16 +630,25 @@ function placeOf(box: Box): Record<string, string> {
 }
 
 /**
- * The agents holding these claims, by name, while their leases run. An actor's ID isn't read for it (each board
- * writes them its own way), so the board is asked who they are, and only when a claim is held. A person holding
- * one is left out: they needn't be told they're there. (Whatever else holds one works tasks: an agent, a workflow.)
+ * The actors these IDs name, by ID. An actor's ID isn't read for its name (each board writes them its own way), so
+ * the board is asked who they are, and only when there's one to ask about.
  */
-async function agentsOf(team: TaskBoard, claims: { actor: string; until: string }[]): Promise<string[]> {
-  const holders = new Set(claims.filter((claim) => Date.parse(claim.until) > Date.now()).map((claim) => claim.actor));
-  if (holders.size === 0) return [];
-  // By ID, which a board from 0.54 answers without listing everyone; an older one lists them all, so they're picked out here too.
-  return (await team.actors({ id: [...holders] }))
-    .filter((actor) => holders.has(actor.id) && actor.kind !== 'person')
+async function actorsOf(team: TaskBoard, ids: string[]): Promise<Map<string, Awaited<ReturnType<TaskBoard['actors']>>[number]>> {
+  const asked = [...new Set(ids)];
+  if (asked.length === 0) return new Map();
+  // By ID, which a board from 0.54 answers without listing everyone; an older one lists them all, and the rest go unread.
+  return new Map((await team.actors({ id: asked })).map((actor) => [actor.id, actor]));
+}
+
+/**
+ * The agents holding these claims, by name, while their leases run. A person holding one is left out: they needn't
+ * be told they're there. (Whatever else holds one works tasks: an agent, a workflow.)
+ */
+function agentsOf(actors: Awaited<ReturnType<typeof actorsOf>>, claims: { actor: string; until: string }[]): string[] {
+  return claims
+    .filter((claim) => Date.parse(claim.until) > Date.now())
+    .flatMap((claim) => actors.get(claim.actor) ?? [])
+    .filter((actor) => actor.kind !== 'person')
     .map((actor) => actor.name);
 }
 

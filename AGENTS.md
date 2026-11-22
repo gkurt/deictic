@@ -261,7 +261,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   is five rows high and scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` reads the files the skill's `watch.mjs` keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none); completed and failed tasks are folded under "N closed". A row starts with its
-  state as a dot (a ring while no one has it, filled once claimed, blocked or over; named by its tooltip), and its title is a
+  state as a dot (a ring while no one has it, filled once claimed, blocked or over; named by its tooltip, with who has it or ended it,
+  `completed by claude`: `Task.by`, the claim's holder, or whoever a `task.completed` or `task.failed` event names, as a board's record
+  of a task keeps no one for its end, so `index.ts` follows the channel's events from `setup`, the latest hundred and on, where the board has `events`), and its title is a
   button that shows the task's whole text in place. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
@@ -293,7 +295,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 own `@vercel/board` script on the dev server's board, `.deictic/` folders,
 finding a recording or clip by task, URL, ID or path): `vb.mjs` (that CLI, for the agent's own commands), `watch.mjs` (a line per task event, over `vb tail`,
 without the replies of the watcher's own profile; it ends, exit 2, once the channel's had no event for `--idle`, 20m, and the agent then stops watching
-and says so, so none watches for ever; `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process does, so one a session left behind isn't watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the last event's cursor; while it runs it's in `.deictic/watchers`, `watching` in `lib.mjs`), `task.mjs` (the task, and the page's other open ones), `recording.mjs` (a timeline, or the part of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
+and says so, so none watches for ever; `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process does, so one a session left behind isn't watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the last event's cursor; while it runs it's in `.deictic/watchers`, `watching` in `lib.mjs`), `task.mjs` (the task, who asked, who holds it, who ended it, read off a two-second `vb tail` of its thread, and the page's other open ones), `recording.mjs` (a timeline, or the part of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
 Playwright), `voice.mjs` (speech times, with ffmpeg) and `transcribe.mjs` (Whisper through a pinned
 transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
 without it the script refuses and says what to ask the person, as the skill has the agent ask first). The recording's marks event carries `annotations` as data

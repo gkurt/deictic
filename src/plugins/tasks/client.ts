@@ -687,7 +687,7 @@ export default defineClientPlugin<Model, Change>({
       /** A task's row: its state, its ID, a link where it has a page, its title, and where it's from when that's said. */
       const rowOf = (t: Task, from?: HTMLElement) => {
         const item = element('li');
-        const state = element('span', { className: `state ${t.state}`, title: t.state });
+        const state = element('span', { className: `state ${t.state}`, title: t.by === undefined ? t.state : `${t.state} by ${t.by}` });
         state.role = 'img';
         const id = element('code', { textContent: `#${t.id}` });
         const title = element('button', { type: 'button', className: 'title' });

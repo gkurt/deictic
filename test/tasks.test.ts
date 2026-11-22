@@ -352,3 +352,22 @@ test('says who watches the channel from the project, while their watch still say
   await claim.complete('done');
   expect(await watching()).toEqual(['claude']);
 });
+
+test('says who holds a task, and who ended it, which the board keeps only in its events', async () => {
+  const { post, target } = setup('ended');
+  const listed = async () => (await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks;
+  const { id } = (await post<{ model: Model }>('apply', { plugin: 'tasks', target, op })).json.model.tasks.at(-1)!;
+  expect((await listed())[0]!.by).toBeUndefined();
+
+  const claim = await team.as('codex').tasks.claim(id);
+  expect(await listed()).toEqual([expect.objectContaining({ id, state: 'claimed', by: 'codex' })]);
+
+  await claim.complete('done');
+  // The event follows the write: read until it's been heard.
+  let tasks = await listed();
+  for (let tries = 0; tries < 50 && tasks[0]!.by === undefined; tries++) {
+    await new Promise((r) => setTimeout(r, 20));
+    tasks = await listed();
+  }
+  expect(tasks).toEqual([expect.objectContaining({ id, state: 'completed', by: 'codex' })]);
+});
