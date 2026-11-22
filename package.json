@@ -250,13 +250,9 @@
     "build": "tsdown",
     "prepack": "tsdown --clean",
     "example": "tsdown && bun run --cwd examples/vite dev",
-    "prepare": "husky",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "staged": "bun scripts/staged.ts",
     "tegami": "bun scripts/tegami.mts"
-  },
-  "lint-staged": {
-    "*": [
-      "oxlint --fix --no-error-on-unmatched-pattern"
-    ]
   },
   "dependencies": {
     "magic-string": "^1.4.5",
@@ -274,9 +270,7 @@
     "astro": "^7.4.13",
     "babel-loader": "^10.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
-    "husky": "^9.1.7",
     "launch-editor": "2.14.2",
-    "lint-staged": "^17.6.1",
     "modern-screenshot": "^4.7.0",
     "next": "^16.4.6",
     "oxc-transform-react": "^0.158.0",

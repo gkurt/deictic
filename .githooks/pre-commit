@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# GUI git clients may not have Bun on their PATH.
+export PATH="$HOME/.bun/bin:$PATH"
+bun run staged

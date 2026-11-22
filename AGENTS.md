@@ -15,6 +15,7 @@ bun run checks   # lint + type check + test
 bun run build    # dist/ with tsdown
 bun run example  # build, then the Vite example's dev server
 bun run tegami   # write a changelog entry (.tegami/<slug>.md)
+bun run staged   # the pre-commit hook (.githooks/, set by `prepare`): lint autofix + format the staged files
 ```
 
 `bun check` and `bun fmt` are Bun built-ins, not scripts: never add a `check` or `fmt` script, it would shadow
