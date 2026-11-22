@@ -212,7 +212,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   the user's own `labels`; the source isn't sent. After the words, what the page says and no label holds: `Source:`,
   the chain of source it rendered through, as `file:line`s from its own out (`Op.chain`, read off the marks around it,
   the nearest of each file in turn, five at most: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is never in the text, which stays short: it's attached as `element.html`
-  (`Op.html`, masked by `screenshots.masked` where that's loaded; sent while the panel's Attach its HTML box is ticked,
+  (`Op.html`, masked by `screenshots.masked` where that's loaded; sent while the panel's Attach HTML snapshot box is ticked,
   as it is by default, and the `html: false` option, a `clientOptions`, takes the box away), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`, the
   rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
   that opens that element's tasks where the page has it), a task whose place moved still the element's own where its tag and `deictic.line`

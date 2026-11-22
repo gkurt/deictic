@@ -319,7 +319,7 @@ export default defineClientPlugin<Model, Change>({
     // Its own line: the screenshot's gives way to the chips, and this is asked whatever else is attached.
     const withHtml = element('input', { type: 'checkbox', checked: true });
     const htmlToggle = element('label', { title: 'The element as the page has it now, as a file: element.html' });
-    htmlToggle.append(withHtml, 'Attach its HTML');
+    htmlToggle.append(withHtml, 'Attach HTML snapshot');
     const htmlRow = element('div', { className: 'shot' });
     htmlRow.append(htmlToggle);
     if (sendsHtml) panel.append(htmlRow);
