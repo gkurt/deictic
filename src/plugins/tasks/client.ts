@@ -27,7 +27,8 @@ import type { Clip, Take } from '#src/plugins/voice/index.ts';
 import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
 
 const STYLE = `
-.tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+/* The column is no wider than the panel: an \`auto\` one grows to a long title, which then never truncates. */
+.tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .tasks li { display: flex; gap: 6px; align-items: baseline; }
 .tasks .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tasks .state { font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
