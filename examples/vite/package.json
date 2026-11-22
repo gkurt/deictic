@@ -14,7 +14,7 @@
     "@tailwindcss/vite": "^4.3.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vercel/board": "^0.53.0",
+    "@vercel/board": "^0.54.0",
     "@vitejs/plugin-react": "^6.3.0",
     "deictic": "workspace:*",
     "oxc-transform-react": "^0.158.0",

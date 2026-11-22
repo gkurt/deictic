@@ -266,7 +266,7 @@
     "@rrweb/rrweb-plugin-network-record": "2.2.2",
     "@rspack/core": "2.3.3",
     "@types/bun": "^1.4.5",
-    "@vercel/board": "^0.53.0",
+    "@vercel/board": "^0.54.0",
     "@vitejs/plugin-react": "^6.3.0",
     "astro": "^7.4.13",
     "babel-loader": "^10.1.1",

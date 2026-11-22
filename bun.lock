@@ -15,7 +15,7 @@
         "@rrweb/rrweb-plugin-network-record": "2.2.2",
         "@rspack/core": "2.3.3",
         "@types/bun": "^1.4.5",
-        "@vercel/board": "^0.53.0",
+        "@vercel/board": "^0.54.0",
         "@vitejs/plugin-react": "^6.3.0",
         "astro": "^7.4.13",
         "babel-loader": "^10.1.1",
@@ -131,7 +131,7 @@
         "@tailwindcss/vite": "^4.3.5",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
-        "@vercel/board": "^0.53.0",
+        "@vercel/board": "^0.54.0",
         "@vitejs/plugin-react": "^6.3.0",
         "deictic": "workspace:*",
         "oxc-transform-react": "^0.158.0",
@@ -153,7 +153,7 @@
         "@tailwindcss/vite": "^4.3.5",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
-        "@vercel/board": "^0.53.0",
+        "@vercel/board": "^0.54.0",
         "@vitejs/plugin-react": "^6.3.0",
         "deictic": "workspace:*",
         "modern-screenshot": "^4.7.0",
@@ -718,7 +718,7 @@
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.4.0", "", {}, "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="],
 
-    "@vercel/board": ["@vercel/board@0.53.0", "", { "dependencies": { "@vercel/oidc": "^3.8.9", "jose": "^6.2.12", "zod": "^4.6.5" }, "peerDependencies": { "@chat-adapter/github": "^4.41.1", "@chat-adapter/linear": "^4.41.1", "@chat-adapter/slack": "^4.41.1", "@vercel/connect": "^2.3.4", "chat": "^4.41.1" }, "optionalPeers": ["@chat-adapter/github", "@chat-adapter/linear", "@chat-adapter/slack", "@vercel/connect", "chat"], "bin": { "vb": "./dist/cli.mjs", "board": "./dist/cli.mjs" } }, "sha512-r4NXOPkvjD4jnyrL92rlmj5e08yT9w44l4qlv2qWaMlHRIAc401wE2XlHT3dvrRlTSwQfx3Um5vhGm9HWyAuUA=="],
+    "@vercel/board": ["@vercel/board@0.54.0", "", { "dependencies": { "@vercel/oidc": "^3.8.9", "jose": "^6.2.12", "zod": "^4.6.5" }, "peerDependencies": { "@chat-adapter/github": "^4.41.1", "@chat-adapter/linear": "^4.41.1", "@chat-adapter/slack": "^4.41.1", "@vercel/connect": "^2.3.4", "chat": "^4.41.1" }, "optionalPeers": ["@chat-adapter/github", "@chat-adapter/linear", "@chat-adapter/slack", "@vercel/connect", "chat"], "bin": { "vb": "./dist/cli.mjs", "board": "./dist/cli.mjs" } }, "sha512-JPsKFnPVgSQpZGxtj/8TrPbHnJzebIMXXdzDeAZkfkXq9B0d0L3diAq5TByWtvP+4nDgrOqCHQxnzxdvsFNJ2A=="],
 
     "@vercel/cli-config": ["@vercel/cli-config@0.3.1", "", { "dependencies": { "xdg-app-paths": "5", "zod": "4.1.11" } }, "sha512-sISbygqlFXYb8qfPu/+2Cf/A8IjrlAuZePdag3EDQr2PRA455s7UZtl9Ro674CWsB/saBRmz3jEkw0YsQs8OoQ=="],
 

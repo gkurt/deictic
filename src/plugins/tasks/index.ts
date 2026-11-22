@@ -599,7 +599,10 @@ function placeOf(box: Box): Record<string, string> {
 async function agentsOf(team: TaskBoard, claims: { actor: string; until: string }[]): Promise<string[]> {
   const holders = new Set(claims.filter((claim) => Date.parse(claim.until) > Date.now()).map((claim) => claim.actor));
   if (holders.size === 0) return [];
-  return (await team.actors()).filter((actor) => holders.has(actor.id) && actor.kind !== 'person').map((actor) => actor.name);
+  // By ID, which a board from 0.54 answers without listing everyone; an older one lists them all, so they're picked out here too.
+  return (await team.actors({ id: [...holders] }))
+    .filter((actor) => holders.has(actor.id) && actor.kind !== 'person')
+    .map((actor) => actor.name);
 }
 
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;
