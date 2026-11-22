@@ -3,7 +3,7 @@
  * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
  * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
- * the source can't tell: the marked elements around it that other files wrote, its HTML, and where the
+ * the source can't tell: the marked elements around it that other files wrote, its HTML (a file attached), and where the
  * annotations plugin is loaded, what's marked on the page.
  *
  * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked, the element
@@ -193,8 +193,8 @@ function around(el: Element, file: string): NonNullable<Op['within']> {
   return found;
 }
 
-/** What a task says of the element's HTML at most: the server cuts it shorter, to what a task's text holds. */
-const HTML = 4000;
+/** What's sent of the element's HTML at most, in characters: the server attaches it as a file. */
+const HTML = 100_000;
 
 /** The overlay's own green, as its outline of the element while the popup is open. */
 const OUTLINE = '#12b358';

@@ -80,6 +80,10 @@ for (const a of root.attachments) {
   } else if (a.name.startsWith('voice-')) {
     console.log(`  ${a.name} (${kb}), a voice clip${saved}`);
     console.log(`    speech:   node ${join(here, 'voice.mjs')} ${root.id}`);
+  } else if (a.name === 'element.html') {
+    console.log(
+      `  ${a.name} (${kb}), the element's HTML as it rendered, if you need it${saved || `: node ${vbScript} download ${a.id} ${a.name}`}`,
+    );
   } else {
     // To a file's path: the CLI writes what it's given, and refuses a folder.
     console.log(`  ${a.name} (${a.type}, ${kb})${saved || `: node ${vbScript} download ${a.id} ${a.name}`}`);

@@ -168,9 +168,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `Shot` with the element's `box`; nothing of deictic's is ever drawn. Its API has `masked(element)` too, a copy with
   what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. `dom.ts` draws in the page with
   `modern-screenshot`, masking the copy. `rrweb.ts` sends an `rrweb-snapshot` (masked by rrweb, the overlay cut
-  out) with viewport, scroll and density; `playwright.ts` rebuilds it in a sandboxed iframe on a blank page of
+  out) with viewport, window, scroll and density; `playwright.ts` rebuilds it in a sandboxed iframe on a blank page of
   the page's origin (Playwright answers it) in a browser launched once (Playwright's Chromium, then Chrome, then
-  Edge), and screenshots it. Masking options follow rrweb's names and defaults. Optional peers, each imported on
+  Edge), and screenshots it. The browser is the window's size and shows its scrollbars (media queries ask the window's
+  width, the layout has what the scrollbar leaves), and the shot is cut to the viewport. Masking options follow rrweb's names and defaults. Optional peers, each imported on
   first use. `test/rrweb.test.ts` compares a render with the live page by brightness (the iframe's text has no
   colour fringes) and skips without a browser.
 - `src/plugins/annotations/`: marks on the page, page half only. `index.ts` is the types (`Shape`: box, arrow, pen,
@@ -210,8 +211,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
   the user's own `labels`; the source isn't sent. After the words, what the page says and no label holds: `Inside:`,
   the marked elements around it that other files wrote (`Op.within`, the nearest of each file in turn, five at most:
-  a shared component's use), and `As it rendered:`, its HTML (`Op.html`, masked by `screenshots.masked` where that's
-  loaded, cut to 2,000 characters; the `html: false` option, a `clientOptions`, leaves it out). `read` lists the element's tasks by `deictic.at`, the
+  a shared component's use). The element's HTML is never in the text, which stays short: it's attached as `element.html`
+  (`Op.html`, masked by `screenshots.masked` where that's loaded; the `html: false` option, a `clientOptions`, leaves it
+  out), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`, the
   rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
   that opens that element's tasks where the page has it), a task whose place moved still the element's own where its tag and `deictic.line`
   are the element's and the file has that line once (its `at` is where it was), and the channel's page

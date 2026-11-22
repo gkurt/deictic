@@ -3,7 +3,8 @@
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
  * line and tag, the page and the project, all as labels beside the short facts (viewport, how many, where
  * it is in the shot), and after the words what a label can't hold: the elements around it that other files wrote
- * (its component is used in one of them) and its HTML as it rendered. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
+ * (its component is used in one of them). Its HTML as it rendered is a file attached, `element.html`, for whoever
+ * wants more than the task says: a task stays short. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
  * from there; deictic only adds them.
  *
  * Adding one is a change like any other: undo cancels the task, while no one has claimed it, and redo
@@ -56,8 +57,8 @@ export interface TasksOptions {
    */
   link?: (channel: string, task?: string) => string | undefined;
   /**
-   * Whether a task says the element's HTML as it rendered, cut short and masked as a screenshot is (the
-   * screenshots plugin's masking, where it's loaded): what was on the page, for whoever can't open it as the
+   * Whether a task has the element's HTML as it rendered attached, as `element.html`, masked as a screenshot is
+   * (the screenshots plugin's masking, where it's loaded): what was on the page, for whoever can't open it as the
    * person did. True by default; `false` where a page shows what the board shouldn't hold.
    */
   html?: boolean;
@@ -124,7 +125,7 @@ export interface Op {
    * shared component's line says nothing of which use of it this is, and these do.
    */
   within?: { at: string; tag: string }[];
-  /** The element's HTML as it rendered, cut short, and masked where the screenshots plugin is loaded. */
+  /** The element's HTML as it rendered, to attach: cut short, and masked where the screenshots plugin is loaded. */
   html?: string;
   /**
    * Shots the screenshots plugin took of it, to attach, where that plugin is loaded: each with where the
@@ -295,7 +296,7 @@ export function tasks(options: TasksOptions = {}) {
   // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
   let project = options.project;
-  /** The screenshots and recordings to attach, uploaded to the board, or nothing when there are none. */
+  /** The screenshots, recordings and the element's HTML to attach, uploaded to the board, or nothing when there are none. */
   const attach = async (op: Op): Promise<string[] | undefined> => {
     // All read first, so one no longer kept uploads none.
     const files = [
@@ -314,6 +315,10 @@ export function tasks(options: TasksOptions = {}) {
         if (clip === undefined) throw new Refusal(`voice clip ${id} isn't kept any more: record it again`);
         return clip;
       }),
+      // Last, and a file, not the task's words: it's there to look into, and most tasks are done without it.
+      ...(typeof op.html !== 'string' || op.html === ''
+        ? []
+        : [{ data: new TextEncoder().encode(op.html.slice(0, HTML)), name: 'element.html', type: 'text/html' }]),
     ];
     if (files.length === 0) return undefined;
     const team = await boardOf();
@@ -525,6 +530,9 @@ const WITHIN = 5;
 /** A box as `x,y,width,height`, in whole CSS pixels from the shot's top left. */
 const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.round);
 
+/** What `element.html` holds of an element at most, in characters: a table's rows, not a whole page. */
+const HTML = 100_000;
+
 /** A label's value: a board holds 256 characters. */
 const LABEL = 256;
 
@@ -578,7 +586,7 @@ function placeIn(labels: Record<string, string>): Place | undefined {
 
 /**
  * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, the
- * elements around it, its HTML as it rendered, what was pointed at inside it, and a URL too long for a label.
+ * elements around it, what was pointed at inside it, and a URL too long for a label.
  * A board holds 10,000 characters.
  */
 function textOf(op: Op): string {
@@ -589,7 +597,6 @@ function textOf(op: Op): string {
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
     ...withinOf(op.within ?? []),
-    ...(op.html === undefined || op.html === '' ? [] : ['As it rendered:', fence(op.html, 'html', 2000)]),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
   const tail = more.length === 0 ? '' : REST + more.join('\n');
@@ -611,7 +618,7 @@ function shown(op: Op): string | undefined {
   return attached.length === 0 ? undefined : `See ${new Intl.ListFormat('en', { type: 'conjunction' }).format(attached)}`;
 }
 
-const fence = (text: string, lang: string, max = 1500) => `\`\`\`\`${lang}\n${clip(text, max)}\n\`\`\`\``;
+const fence = (text: string, lang: string) => `\`\`\`\`${lang}\n${clip(text, 1500)}\n\`\`\`\``;
 
 const clip = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
 

@@ -18,10 +18,6 @@ A task's text is what the person typed. Where there's more that no label holds, 
   `<div> src/ParticipantsField.tsx:20:5 ← <section> src/WorkflowPanel.tsx:880:7`. When `deictic.at` is a shared
   component (`ui/label.tsx`, seven of them on the page), the change is rarely there: it's where the component is
   used, in the first of these files, beside that element.
-- `As it rendered:` the element's HTML when the task was left, cut to 2,000 characters, masked as the screenshots
-  are: its text and classes say which of several alike it is, and what the page showed, which you may not be able
-  to open as they did. A child's `data-deictic` is the line that wrote it. Not there when the config says
-  `tasks({ html: false })`.
 - Sometimes `Pointed at, inside it:` a path and HTML: the person pointed at markup inside the element that no line
   marks (a dependency's, or a shadow root's). That part is what they mean; find it by its classes. On deictic's
   own `/internal/` page it's deictic's popup, so the fix is in deictic's client code, not the page.
@@ -46,6 +42,12 @@ The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
 You rarely need them: the element is outlined in the screenshot, in green dashes, which the text says
 (`the element outlined in dashes`). The source isn't in the task: read the file.
 
+Attached to most tasks is `element.html`: the element's HTML when the task was left, masked as the screenshots
+are. Don't read it by default; download it (`vb download <attachment> element.html`) when the task and the
+screenshot don't settle which of several alike is meant, or you can't open the page as the person had it. Its text
+and classes say what the page showed, and a child's `data-deictic` is the line that wrote it. Not there when the
+config says `tasks({ html: false })`.
+
 `task.mjs` says whether that line still reads as the task saw it, or where it moved, and lists the other open tasks
 about the same page: tasks left within a minute of each other are often one change (three about one page's
 layout). Read them all before you start; claim and work them one after another, and say in each one's result which
@@ -64,7 +66,7 @@ others the change answers.
   `document.querySelector('[data-deictic="src/pages/home.tsx:42:9"]')`, and read its computed style.
 - `deictic.url` is the page as the person had it: their host, their account, their data. You often can't open it.
   Use the app as the project's instructions say to (a local dev server, a test account), and get to the same
-  screen by its path (`deictic.page`) and what `As it rendered` and the screenshot show. Where the test account
+  screen by its path (`deictic.page`) and what `element.html` and the screenshot show. Where the test account
   has nothing like it (no workflow with participants, an empty team), make that data if the app lets you, and
   otherwise change the source from the HTML and the screenshot, and say in the result what you couldn't see live.
   Never ask for, or use, the person's own session.

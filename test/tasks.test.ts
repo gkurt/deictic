@@ -105,7 +105,7 @@ test('says what was pointed at inside the element, where nothing marked it', asy
   expect(message.text).toContain(pointed.html);
 });
 
-test('says the elements around it from other files, its HTML as it rendered, and that the shot outlines it', async () => {
+test('says the elements around it from other files, and attaches its HTML as it rendered', async () => {
   const { post, target } = setup('around');
   const within = [
     { at: 'src/ParticipantsField.tsx:20:5', tag: 'div' },
@@ -114,19 +114,15 @@ test('says the elements around it from other files, its HTML as it rendered, and
   const html = '<h1 class="text-4xl" data-deictic="src/App.tsx:1:26">Pricing</h1>';
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, within, html } });
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.text).toBe(
-    `${op.text}\n---\nInside: <div> src/ParticipantsField.tsx:20:5 ← <section> src/WorkflowPanel.tsx:880:7\nAs it rendered:\n\`\`\`\`html\n${html}\n\`\`\`\``,
-  );
+  expect(message.text).toBe(`${op.text}\n---\nInside: <div> src/ParticipantsField.tsx:20:5 ← <section> src/WorkflowPanel.tsx:880:7`);
+  // The HTML is a file, for whoever looks into it: the task's words stay short.
+  expect(message.attachments).toEqual([expect.objectContaining({ name: 'element.html', type: 'text/html', size: html.length })]);
   // What was typed is all the panel lists.
   expect(json.model.tasks[0]).toMatchObject({ text: op.text });
 
-  // A long element is cut to what a task's text has room for.
-  const long = await post<{ model: Model }>('apply', {
-    plugin: 'tasks',
-    target,
-    op: { ...op, html: `<ul>${'<li>Row</li>'.repeat(400)}</ul>` },
-  });
-  expect((await team.thread(long.json.model.tasks[1]!.id)).message.text.length).toBeLessThan(2200);
+  // With the HTML alone, the text is what was typed.
+  const plain = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, html } });
+  expect((await team.thread(plain.json.model.tasks[1]!.id)).message.text).toBe(op.text);
 });
 
 test("lists the file's other tasks apart, and keeps an element's own as it moves", async () => {
