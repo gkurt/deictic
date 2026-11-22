@@ -1,26 +1,30 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task's source chain names the components, its outline is where the element was drawn, and a watch outlives a restart\n\n- `Source:` in a task now names the components the element rendered through, where the page is React in development: `src/ui/label.tsx:6 ← Field (src/Field.tsx:20) ← Panel`. A component with no element of its own around the one clicked, which the chain used to skip, is there by its name, and a layout component the element was only passed through isn't. Three at most, so it stops before the app's shell. Other pages keep the chain of `file:line`s.\n- A screenshot's outline is drawn where the element is in the shot. The `rrweb()` renderer measures it in the page it rebuilt, which can lay out a few pixels from the live one, and a shot of an element alone is cut there too. A renderer's `render` may answer `{ png, box }`.\n- The skill's `watch.mjs` waits for a board that went away (a dev server restarted, and its board with it) and follows it again from the last event, where it used to end on the new board's first refusal.\n- The Task tab's dot says who holds a claimed task (`claimed by claude`, `Task.by` in the tab's model), and the skill's `task.mjs` says `asked by` for who wrote the task and `Claimed by` for who holds it: a completed task read as if the person had completed it. Who completed it isn't said, as a board's record of a task keeps no one for its end.\n"
-    filename: task-gaps-after-0-3.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### The skill's scripts are the `deictic` command's\n\n- What the agent runs to work tasks is now the package's own command, `npx deictic <command>`: `vb`, `watch`, `task`, `recording`, `frame`, `voice` and `transcribe`, as the scripts were, with `--help`. It reads tasks and recordings with the version of deictic that wrote them. The skill's `scripts/` folder is gone.\n- `deictic watch` also ends when a process a few above it does, so a watch run through `npx` stops with the session that started it.\n- The skill is the loop in a few lines, with a few pointers each for watching, reading a task and recordings; its setup reference is gone, as `npx deictic init` is the setup. What to do next is in the commands' own output: a canceled task, a transcription to ask about, a recording's problems.\n- The commands write to the board as the coding agent running them, by what its harness sets (`CLAUDECODE`, `CODEX_THREAD_ID`, `AI_AGENT` and the like), with no `BOARD_PROFILE` on every command. `BOARD_PROFILE` still names another, and a person at a terminal writes as themselves.\n"
+    filename: cli-commands.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `npx deictic init` sets a project up, and a plugin's missing packages are said as the dev server starts\n\n- `npx deictic init` installs deictic and what the recommended plugins use with the project's package manager, adds deictic to the Vite, Next.js, Astro, webpack or Rspack config, or to a Bun server that bundles an HTML page (`deictic.plugin.ts`, `bunfig.toml` and its routes in `Bun.serve`), and says what to add where it can't tell where, and offers to add the agent skill. `--dry-run`, `--no-install`, `--skill` and `--no-skill` change what it does.\n- A plugin names what it imports that the project installs (`packages`, on `ServerPlugin` and on a screenshots renderer). The dev server warns of any that's missing as it starts, with the command that installs them, rather than the first shot or recording failing.\n"
+    filename: deictic-init.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - task-gaps-after-0-3.md
+      - cli-commands.md
+      - deictic-init.md
     id: npm:deictic
     updated: true
-  - id: npm:example-bun
-    updated: false
-  - id: npm:example-vite
-    updated: false
-  - id: npm:example-next
-    updated: false
   - id: npm:site
     updated: false
   - id: npm:example-rspack
+    updated: false
+  - id: npm:example-next
+    updated: false
+  - id: npm:example-vite
+    updated: false
+  - id: npm:example-bun
     updated: false
 npm:packages:
   - id: npm:deictic
-  - id: npm:example-bun
-  - id: npm:example-vite
-  - id: npm:example-next
   - id: npm:site
   - id: npm:example-rspack
+  - id: npm:example-next
+  - id: npm:example-vite
+  - id: npm:example-bun
