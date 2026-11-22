@@ -549,24 +549,21 @@ const clock = (ms: number) => {
 };
 
 /**
- * What's drawn on each shot (the element's outline, the person's marks), and with several, where the element is
- * in each. One shot's place is the `deictic.position` and `deictic.size` labels, so a shot with nothing drawn
- * on it has no line.
+ * The marks drawn on each shot, and with several, where the element is in each. One shot's place is the
+ * `deictic.position` and `deictic.size` labels, so a shot with no marks has no line.
  */
 function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
   const [only] = shots;
   if (shots.length === 1 && only !== undefined) {
-    const { marks, outlined } = only;
-    const has = [
-      ...(outlined === true ? ['the element outlined in dashes'] : []),
-      ...(marks === undefined || marks.count === 0 ? [] : [`${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`]),
-    ];
-    return has.length === 0 ? [] : [`The screenshot has ${has.join(' and ')}`];
+    const { marks } = only;
+    return marks === undefined || marks.count === 0
+      ? []
+      : [`The screenshot has ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`];
   }
-  return shots.map(({ box, marks, outlined }, i) => {
+  return shots.map(({ box, marks }, i) => {
     const drawn = marks === undefined || marks.count === 0 ? '' : `, with ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`;
     const [x, y, width, height] = boxOf(box);
-    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${outlined === true ? ', outlined in dashes' : ''}${drawn}`;
+    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${drawn}`;
   });
 }
 

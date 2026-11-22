@@ -291,7 +291,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   loaded, Annotate captures a shot and `edit`s it: saved, each is a chip (removable; removing the last unticks the
   box). Every chip opens one lightbox of all that's attached, at itself: a shot with Change marks, a recording's
   replay (`?embed`) with New tab, a voice note's player; and sending uploads each `flatten`ed PNG with `screenshots.upload`, as it was drawn. Only the shot the box takes as the task goes
-  has the element outlined in it (`outlined`, in green dashes `ROOM` off it, drawn on and kept again), which the op says (`outlined`) and the text after it. `Op.screenshots`
+  has the element outlined in it (`outlined`, in green dashes `ROOM` off it, drawn on and kept again), which the op says (`outlined`), not the text. `Op.screenshots`
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
   `Op.recordings` attaches each one's JSON (and its voice clips) and says how long it ran and where it replays.

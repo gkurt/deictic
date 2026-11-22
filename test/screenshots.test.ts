@@ -52,7 +52,7 @@ test('takes only PNGs, and keeps the latest few', async () => {
   expect((await ask(`plugins/screenshots/shot/${third.id}`)).status).toBe(200);
 });
 
-test('a task attaches the shot it names, and refuses one no longer kept', async () => {
+test('a task attaches the shot it names, and leaves out one no longer kept', async () => {
   const { p, ask, add } = setup();
   const { id } = await add();
   const post = (body: unknown) =>
@@ -79,11 +79,9 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
   expect(message.attachments).toEqual([expect.objectContaining({ name: `${id}.png`, type: 'image/png', size: PNG.length })]);
 
   const box = { x: 0, y: 0, width: 1, height: 1 };
-  // A shot with the element outlined in it says so, as nothing else in the task would.
+  // The outline is in the picture, not the words.
   const outlined = await post({ plugin: 'tasks', target, op: { ...op, screenshots: [{ id, box, outlined: true }] } });
-  expect((await team.thread(outlined.model.tasks.at(-1)!.id)).message.text).toBe(
-    'Too tight\n---\nThe screenshot has the element outlined in dashes',
-  );
+  expect((await team.thread(outlined.model.tasks.at(-1)!.id)).message.text).toBe('Too tight');
   // With no words, the task is named by what's attached; with nothing attached either, it's refused.
   const wordless = await post({ plugin: 'tasks', target, op: { ...op, text: ' ', screenshots: [{ id, box }] } });
   expect(wordless.model.tasks.map((t) => t.title)).toContain('See the screenshot');
@@ -166,7 +164,7 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
   const { model } = (await res.json()) as { model: Model };
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toContain('In screenshot 1 at x 10, y 20, 300×24, with 2 marks drawn on it; the notes say: "Too close"');
-  expect(message.text).toContain('In screenshot 2 at x 0, y 0, 300×24, outlined in dashes');
+  expect(message.text).toEndWith('\nIn screenshot 2 at x 0, y 0, 300×24');
   expect(message.labels['deictic.position']).toBeUndefined();
   expect(message.labels['deictic.size']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);

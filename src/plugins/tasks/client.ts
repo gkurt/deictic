@@ -276,8 +276,8 @@ const OUTLINE = '#12b358';
 const ROOM = 3;
 
 /**
- * A shot's PNG with the element outlined in it: dashes around its box, white under them so they show on any
- * page. The shot may have more pixels than its size in CSS ones, which the box is in.
+ * A shot's PNG with the element outlined in it: dashes around its box, with nothing between them, as the overlay
+ * draws it. The shot may have more pixels than its size in CSS ones, which the box is in.
  */
 async function outlined(png: Blob | string, { box, size }: Pick<Shot, 'box' | 'size'>): Promise<Blob> {
   const url = typeof png === 'string' ? png : URL.createObjectURL(png);
@@ -291,9 +291,6 @@ async function outlined(png: Blob | string, { box, size }: Pick<Shot, 'box' | 's
     ctx.drawImage(image, 0, 0);
     const k = image.naturalWidth / size.width;
     const rect = [(box.x - ROOM) * k, (box.y - ROOM) * k, (box.width + 2 * ROOM) * k, (box.height + 2 * ROOM) * k] as const;
-    ctx.lineWidth = 4 * k;
-    ctx.strokeStyle = '#fff';
-    ctx.strokeRect(...rect);
     ctx.lineWidth = 2 * k;
     ctx.strokeStyle = OUTLINE;
     ctx.setLineDash([6 * k, 4 * k]);
