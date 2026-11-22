@@ -1,6 +1,6 @@
 {
   "name": "deictic",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Point at an element in your running app and leave a task about it for your agent.",
   "keywords": [
     "annotations",
