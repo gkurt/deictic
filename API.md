@@ -95,6 +95,7 @@ What a project keeps (the history, shots, recordings, voice notes) is in `.deict
 | `project`  | your `package.json`'s `name`    | The `deictic.project` label, to share a board              |
 | `labels`   | none                            | Your own labels on every task                              |
 | `link`     | the local board's pages         | `(channel, task?) => url`, where the panel links a task to |
+| `html`     | `true`                          | Whether a task says the element's HTML as it rendered      |
 | `shortcut` | none                            | Opens the Task tab directly                                |
 
 With nothing set, the dev server starts a board on your machine: `http://127.0.0.1:4100/`, kept in `.deictic/board`.
@@ -116,7 +117,11 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 `args`, more of `vb serve`'s.
 
 A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
-`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them.
+`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them. After the
+words comes what a label can't hold: the marked elements around it that other files wrote (a shared component's line
+is the same wherever it's used; these say where), and the element's HTML as it rendered, cut short and masked as
+screenshots are, for whoever can't open the page as you had it. `html: false` leaves the HTML out. An attached
+screenshot has the element outlined in it.
 
 The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
 that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening

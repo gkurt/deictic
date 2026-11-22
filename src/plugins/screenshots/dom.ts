@@ -3,38 +3,7 @@
  * (imported on the first shot), so it needs no server, but text may lay out a little differently than
  * the page's. Masking changes only the copy that's drawn, never the page.
  */
-import { boxOf, notOurs, screenshotsClient } from './client.ts';
-import type { ResolvedMasking } from './index.ts';
-
-const BLANK = '#d4d4d8';
-
-const selector = (className: string, extra: string | undefined) => [`.${CSS.escape(className)}`, ...(extra ? [extra] : [])].join(', ');
-
-/**
- * Hides in the copy what rrweb would: blocked elements become a blank box their size (the copy keeps each
- * element's size as its styles), masked text keeps its spaces but shows `*`, and so do passwords' values,
- * or every field's.
- */
-function mask(copy: Node, m: ResolvedMasking): void {
-  if (!(copy instanceof Element)) return;
-  const all = (sel: string) => [...(copy.matches(sel) ? [copy] : []), ...copy.querySelectorAll(sel)];
-  const stars = (text: string) => text.replace(/\S/g, '*');
-  for (const el of all(selector(m.blockClass, m.blockSelector))) {
-    el.replaceChildren();
-    if (el instanceof HTMLElement || el instanceof SVGElement) el.style.background = BLANK;
-  }
-  for (const el of all(selector(m.maskTextClass, m.maskTextSelector))) {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) text.textContent = stars(text.textContent ?? '');
-  }
-  for (const field of all('input, textarea')) {
-    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
-    if (!m.maskAllInputs && !(field instanceof HTMLInputElement && field.type === 'password')) continue;
-    field.value = stars(field.value);
-    field.setAttribute('value', field.value);
-    if (field instanceof HTMLTextAreaElement) field.textContent = field.value;
-  }
-}
+import { boxOf, mask, notOurs, screenshotsClient } from './client.ts';
 
 /** Draws an SVG over the whole canvas, which is the area it was made for at the canvas's scale. */
 async function drawOver(canvas: HTMLCanvasElement, svg: string | undefined): Promise<HTMLCanvasElement> {

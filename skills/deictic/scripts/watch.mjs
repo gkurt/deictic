@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Watches the board for deictic's tasks and prints one line per thing to act on: the tasks ready now as it
 // starts, then each new task, a reply on one, and one canceled (undone in the page, say). Made for an agent's
-// monitor (each line an event); it runs until stopped, and says so if the board goes away.
+// monitor (each line an event); it runs until stopped, and says so if the board goes away. Replies the watcher
+// wrote itself are left out where it has a name of its own (BOARD_PROFILE): with none it writes as the person.
 // Usage: watch.mjs [channel, default deictic] [--label k=v ...]
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
-import { boardUrl, parseArgs, vb, vbCommand } from './lib.mjs';
+import { boardUrl, parseArgs, vb, vbCommand, whoami } from './lib.mjs';
 
 const { options, rest } = parseArgs(process.argv.slice(2));
 const channel = rest[0] ?? 'deictic';
@@ -15,7 +16,14 @@ const say = (line) => console.log(line.replace(/\s+/g, ' ').trim());
 const first = (text) => (text.split('\n---')[0] ?? '').trim().slice(0, 160);
 
 const ready = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
-say(`watching ${channel} on ${boardUrl() ?? "the team's board"}`);
+const me = whoami();
+say(`watching ${channel} on ${boardUrl() ?? "the team's board"} as ${me.handle ?? me.actor}`);
+// With no profile, the person's replies and the watcher's own are one actor's: none can be left out.
+if (!me.profile) {
+  say(
+    `you write as ${me.handle ?? me.actor}, the person's own identity: set BOARD_PROFILE=<your name> (claude, codex) for every vb command, this watch too, and start it again`,
+  );
+}
 for (const line of ready ? ready.split('\n') : []) if (/^#\d+/.test(line)) say(`ready: ${line}`);
 
 // What the board says about each thread: its root's first line and where, to name it when a task is made.
@@ -40,6 +48,7 @@ createInterface({ input: tail.stdout }).on('line', (line) => {
   if (e.type === 'task.created') say(`new task #${p.id}: ${roots.get(p.thread) ?? ''}. Read it: vb read ${p.id}`);
 
   if (e.type === 'message.posted' && p.re !== null && p.re !== undefined) {
+    if (me.profile && p.by?.actor === me.actor) return;
     const by = e.message?.author?.handle ?? p.by?.actor ?? 'someone';
     say(`reply on #${p.re} by ${by}: ${first(p.text ?? '')}`);
   }

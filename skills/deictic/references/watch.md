@@ -3,7 +3,8 @@
 The point is that a task left in the page gets worked without anyone prompting you. Use whatever your harness has
 for being woken by a command's output; between tasks, never sleep-poll in the foreground.
 
-`<skill>` below is this skill's folder; `deictic` is the channel (pass yours if the config sets another).
+`<skill>` below is this skill's folder; `deictic` is the channel (pass yours if the config sets another). `vb` is
+`node <skill>/scripts/vb.mjs`. Set `BOARD_PROFILE=<your name>` for the watch as for everything else.
 
 ## With a monitor (Claude Code's Monitor, or any tool that turns each output line into an event)
 
@@ -12,11 +13,13 @@ when it expires. It prints, one line each:
 
 - `ready: #68 …` for each task already waiting as it starts;
 - `new task #71: "Make it bolder" at src/App.tsx:12:5 on /`;
-- `reply on #71 by krtgo: …`: an answer to your question, or more to do on a task;
+- `reply on #71 by krtgo: …`: an answer to your question, or more to do on a task. Your own replies aren't
+  printed, as long as you have a profile: with none you write as the person, the watch can't tell you apart, and
+  it says so as it starts;
 - `task #71 canceled: …`: the person undid it in the page; stop, and put back what you changed for it;
 - `watch ended …`: the board went away; check `vb whoami`, then start it again.
 
-On an event, work the task ([tasks.md](tasks.md)) while the monitor keeps running. Ignore replies you wrote yourself.
+On an event, work the task ([tasks.md](tasks.md)) while the monitor keeps running.
 
 ## With a background command that exits (one wake-up per task)
 

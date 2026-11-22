@@ -71,14 +71,29 @@ export function boardUrl() {
   return undefined;
 }
 
+/** The project's own `@vercel/board` CLI, as a script: from here, above, or beside a `.deictic/` near here. */
+function vbScript() {
+  for (const dir of new Set([...upFrom(), ...deicticDirs().map(dirname)])) {
+    const pkg = join(dir, 'node_modules', '@vercel', 'board', 'package.json');
+    if (!existsSync(pkg)) continue;
+    const { bin } = JSON.parse(readFileSync(pkg, 'utf8'));
+    const entry = typeof bin === 'string' ? bin : bin?.vb;
+    if (typeof entry === 'string') return join(dirname(pkg), entry);
+  }
+  return undefined;
+}
+
 /**
- * How to run the board's CLI: `vb` from the project's dependencies or the PATH, with the environment's board
- * or the project's own, as `spawn`'s command, arguments and options.
+ * How to run the board's CLI, with the environment's board or the project's own, as `spawn`'s command,
+ * arguments and options: the project's `@vercel/board`, run by this runtime, so it needn't be on the PATH and
+ * no shell reads the arguments; with none installed, `vb` from the PATH.
  */
 export function vbCommand(args) {
   const bins = [...upFrom()].map((d) => join(d, 'node_modules', '.bin'));
   const url = boardUrl();
   const env = { ...process.env, ...(url === undefined ? {} : { BOARD_URL: url }), PATH: [...bins, process.env.PATH].join(delimiter) };
+  const script = vbScript();
+  if (script !== undefined) return [process.execPath, [script, ...args], { env }];
   // npm's shims on Windows are .cmd files, which only a shell runs; the arguments here are IDs and names.
   if (process.platform === 'win32') return [`vb ${args.map((a) => `"${a}"`).join(' ')}`, [], { env, shell: true }];
   return ['vb', args, { env }];
@@ -96,6 +111,12 @@ export function vb(args, { json = false } = {}) {
   if (run.status !== 0) fail(`vb ${args.join(' ')}: ${String(run.stderr).trim() || `exit ${run.status}`}`);
   return json ? JSON.parse(run.stdout) : run.stdout;
 }
+
+/**
+ * Who the CLI writes as: `{ actor, handle, profile }`. `profile` is the name `BOARD_PROFILE` (or `--as`) gave, and
+ * `null` without one: then what's written is the person's own, as the board sees it.
+ */
+export const whoami = () => vb(['whoami'], { json: true });
 
 /** A task's root message, by its ID (`68` or `#68`). */
 export const task = (id) => vb(['read', String(id).replace(/^#/, '')], { json: true }).message;

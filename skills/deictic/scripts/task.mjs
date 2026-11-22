@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // A task, briefly: what was asked, where (and whether that place has moved in the source since), the page,
-// what's attached with the command to look at each, and the replies. Usage: task.mjs <id> [--out dir]
+// what's attached with the command to look at each, the replies, and the other open tasks about the same page.
+// Usage: task.mjs <id> [--out dir]
 // --out downloads the attachments there.
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { deicticDirs, fail, parseArgs, vb } from './lib.mjs';
+
+const vbScript = join(dirname(fileURLToPath(import.meta.url)), 'vb.mjs');
 
 const { options, rest } = parseArgs(process.argv.slice(2));
 if (rest[0] === undefined) fail('Name a task: task.mjs 68');
@@ -47,12 +50,13 @@ if (at !== undefined) {
     console.log(`\n${file} isn't under ${roots.join(' or ')}: find the dev server's root.`);
   } else {
     const lines = readFileSync(path, 'utf8').split('\n');
+    // The tag's first line may follow other code on its line: `const App = () => <h1>`.
     const first = root.labels['deictic.line'];
     const now = lines[line - 1]?.trim();
-    if (first === undefined || now?.startsWith(first.slice(0, 40))) {
+    if (first === undefined || now?.includes(first.slice(0, 40))) {
       console.log(`\nSource: ${path}:${line}, as the task saw it.`);
     } else {
-      const moved = lines.findIndex((l) => l.trim().startsWith(first.slice(0, 40)));
+      const moved = lines.findIndex((l) => l.includes(first.slice(0, 40)));
       console.log(
         moved >= 0
           ? `\nSource: moved to ${path}:${moved + 1} (the task says line ${line}).`
@@ -77,8 +81,29 @@ for (const a of root.attachments) {
     console.log(`  ${a.name} (${kb}), a voice clip${saved}`);
     console.log(`    speech:   node ${join(here, 'voice.mjs')} ${root.id}`);
   } else {
-    console.log(`  ${a.name} (${a.type}, ${kb})${saved || `: vb download ${a.id} <dir>`}`);
+    // To a file's path: the CLI writes what it's given, and refuses a folder.
+    console.log(`  ${a.name} (${a.type}, ${kb})${saved || `: node ${vbScript} download ${a.id} ${a.name}`}`);
   }
 }
 if (replies.length > 0) console.log('\nReplies:');
 for (const r of replies) console.log(`  ${r.author?.handle ?? r.by.actor}: ${r.text}`);
+
+// The other open tasks about the same page, of the same project: left a minute apart, they're often one change.
+const page = root.labels['deictic.page'];
+if (page !== undefined) {
+  const project = root.labels['deictic.project'];
+  const labels = [`deictic.page=${page}`, ...(project === undefined ? [] : [`deictic.project=${project}`])];
+  const { tasks } = vb(['tasks', root.channel, ...labels.flatMap((l) => ['--label', l])], { json: true });
+  const others = tasks.map((t) => t.message).filter((m) => m.id !== root.id);
+  if (others.length > 0) {
+    const count = `${others.length} other open task${others.length === 1 ? '' : 's'}`;
+    console.log(`\n${count} on ${page}: read them before you start, they may be one change.`);
+    for (const m of others) {
+      const title = m.text
+        .split(/\n---\n/)[0]
+        .split('\n')[0]
+        .slice(0, 100);
+      console.log(`  #${m.id} ${m.task?.state ?? ''}, ${m.labels['deictic.at'] ?? '?'}: ${title}`);
+    }
+  }
+}

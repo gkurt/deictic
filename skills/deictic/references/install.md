@@ -74,12 +74,14 @@ Tasks go to a Vercel Board. With nothing set, the dev server starts one on this 
 URL as it starts and keeps it in `.deictic/board.json`:
 
 ```bash
-export BOARD_URL=$(node -p "require('./.deictic/board.json').url")   # where you run vb
-vb whoami
+export BOARD_PROFILE=claude              # your name: what you post is yours, not the person's
+node <skill>/scripts/vb.mjs whoami       # krtgo/claude, and the board's URL
 ```
 
-The scripts here read that file themselves when `BOARD_URL` isn't set; a `vb` you run needs the variable. The board
-is there only while the dev server runs.
+`vb.mjs` is the project's own `vb` (in `node_modules/.bin`, so rarely on the PATH), and like the other scripts here
+it reads that file when `BOARD_URL` isn't set. A `vb` you run yourself needs the variable:
+`export BOARD_URL=$(node -p "require('./.deictic/board.json').url")`. The board is there only while the dev server
+runs.
 
 For another board, set `BOARD_URL` for the dev server and for `vb` alike. For the team's, through `vercel login`,
 with no `BOARD_URL`: `tasks({ board: board() })` in the bundler config (`board` from `@vercel/board`), or

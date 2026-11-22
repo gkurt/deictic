@@ -3,9 +3,11 @@
  * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
  * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
- * the source can't tell; and where the annotations plugin is loaded, what's marked on the page.
+ * the source can't tell: the marked elements around it that other files wrote, its HTML, and where the
+ * annotations plugin is loaded, what's marked on the page.
  *
- * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked. With
+ * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked, the element
+ * outlined in it as the task goes: nothing else says which of two rows alike was meant. With
  * the annotations plugin too, Annotate takes the shot now and opens it to draw on: saved, it's a chip
  * under the field, which opens it again to change the marks, and Add another takes one more. Any chip
  * (a recording's too) takes the box's place; removing the last brings it back unticked, so a task goes
@@ -163,6 +165,73 @@ function pathTo(inner: Element, outer: Element): string {
   return steps.join(' > ');
 }
 
+const parentOf = (el: Element): Element | undefined => {
+  if (el.parentElement !== null) return el.parentElement;
+  const root = el.getRootNode();
+  return root instanceof ShadowRoot ? root.host : undefined;
+};
+
+/** How many elements around it a task names. */
+const WITHIN = 5;
+
+/**
+ * The marked elements around `el` that other files wrote, nearest first: of each run of one file's, the nearest.
+ * A shared component's own line is the same wherever it's used, and the element around it is in the file that
+ * uses it (or in a component between them, which is why there are several).
+ */
+function around(el: Element, file: string): NonNullable<Op['within']> {
+  const found: NonNullable<Op['within']> = [];
+  let last = file;
+  for (let at = parentOf(el); at !== undefined && found.length < WITHIN; at = parentOf(at)) {
+    const mark = at.getAttribute('data-deictic');
+    if (mark === null) continue;
+    const from = mark.replace(/:\d+:\d+$/, '');
+    if (from === last) continue;
+    last = from;
+    found.push({ at: mark, tag: at.localName });
+  }
+  return found;
+}
+
+/** What a task says of the element's HTML at most: the server cuts it shorter, to what a task's text holds. */
+const HTML = 4000;
+
+/** The overlay's own green, as its outline of the element while the popup is open. */
+const OUTLINE = '#12b358';
+/** CSS pixels between the element and its outline, so the dashes are on nothing of the element's. */
+const ROOM = 3;
+
+/**
+ * A shot's PNG with the element outlined in it: dashes around its box, white under them so they show on any
+ * page. The shot may have more pixels than its size in CSS ones, which the box is in.
+ */
+async function outlined(png: Blob | string, { box, size }: Pick<Shot, 'box' | 'size'>): Promise<Blob> {
+  const url = typeof png === 'string' ? png : URL.createObjectURL(png);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const canvas = element('canvas', { width: image.naturalWidth, height: image.naturalHeight });
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) throw new Error("tasks: this browser won't draw to a canvas");
+    ctx.drawImage(image, 0, 0);
+    const k = image.naturalWidth / size.width;
+    const rect = [(box.x - ROOM) * k, (box.y - ROOM) * k, (box.width + 2 * ROOM) * k, (box.height + 2 * ROOM) * k] as const;
+    ctx.lineWidth = 4 * k;
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(...rect);
+    ctx.lineWidth = 2 * k;
+    ctx.strokeStyle = OUTLINE;
+    ctx.setLineDash([6 * k, 4 * k]);
+    ctx.strokeRect(...rect);
+    return await new Promise<Blob>((done, fail) =>
+      canvas.toBlob((blob) => (blob === null ? fail(new Error('tasks: the screenshot drew nothing')) : done(blob)), 'image/png'),
+    );
+  } finally {
+    if (typeof png !== 'string') URL.revokeObjectURL(url);
+  }
+}
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
   return Object.assign(document.createElement(tag), props);
 }
@@ -219,6 +288,8 @@ export default defineClientPlugin<Model, Change>({
     const notes = context.use('annotations');
     const recorder = context.use('recordings');
     const voice = context.use('voice');
+    // The server half's `html` option; a page half with no options (a `standalone` server's) sends it.
+    const sendsHtml = (context.options as { html?: boolean } | undefined)?.html !== false;
     // Closes an open editor with the panel.
     const aborts = new AbortController();
 
@@ -603,14 +674,24 @@ export default defineClientPlugin<Model, Change>({
       mark();
     };
 
-    /** The shots to attach: each chip's PNG, kept as a shot, or a shot taken now where the box is ticked. */
+    /**
+     * The shots to attach: each chip's PNG, kept as a shot, or a shot taken now where the box is ticked. Each
+     * with the element outlined in it, or as it is where that can't be drawn.
+     */
     const screenshotsOf = async (): Promise<Op['screenshots']> => {
       if (shots === undefined) return undefined;
+      const kept = async (png: Blob | string, taken: Shot): Promise<{ id: string; outlined?: boolean } | undefined> => {
+        try {
+          return { id: (await shots.upload(await outlined(png, taken), taken)).id, outlined: true };
+        } catch {
+          return undefined;
+        }
+      };
       if (chips.length > 0) {
         add.textContent = 'Uploading…';
         return Promise.all(
           chips.map(async ({ shot: taken, marks, png }) => ({
-            id: (await shots.upload(png, taken)).id,
+            ...((await kept(png, taken)) ?? { id: (await shots.upload(png, taken)).id }),
             box: taken.box,
             ...(marks.length === 0 ? {} : { marks: marksOf(marks) }),
           })),
@@ -619,8 +700,8 @@ export default defineClientPlugin<Model, Change>({
       // With a recording attached the box is away, so no shot is asked for.
       if (!attach.checked || recordings.length > 0) return undefined;
       add.textContent = 'Capturing…';
-      const { id, box } = await shots.capture(context.element);
-      return [{ id, box }];
+      const taken = await shots.capture(context.element);
+      return [{ ...((await kept(taken.url, taken)) ?? { id: taken.id }), box: taken.box }];
     };
 
     const send = async () => {
@@ -644,6 +725,7 @@ export default defineClientPlugin<Model, Change>({
       }
       add.textContent = 'Add task';
       const { element: el, elements } = context;
+      const within = around(el, context.target.loc.file);
       try {
         const op: Op = {
           text: text.value,
@@ -653,6 +735,8 @@ export default defineClientPlugin<Model, Change>({
             ? {}
             : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
           count: elements.length,
+          ...(within.length === 0 ? {} : { within }),
+          ...(sendsHtml ? { html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML) } : {}),
           ...(screenshots === undefined ? {} : { screenshots }),
           ...(recordings.length === 0
             ? {}

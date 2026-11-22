@@ -165,7 +165,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   route takes a PNG, or JSON its renderer's `render` makes one of. A `Renderer` is a page module (`client`, which
   becomes the plugin's) and an optional `render`: `rrweb()` (default) and `dom()`. `client.ts` is
   `screenshotsClient(capture)`, the page half around a renderer's capture, which posts to `add` and answers the
-  `Shot` with the element's `box`; nothing of deictic's is ever drawn. `dom.ts` draws in the page with
+  `Shot` with the element's `box`; nothing of deictic's is ever drawn. Its API has `masked(element)` too, a copy with
+  what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. `dom.ts` draws in the page with
   `modern-screenshot`, masking the copy. `rrweb.ts` sends an `rrweb-snapshot` (masked by rrweb, the overlay cut
   out) with viewport, scroll and density; `playwright.ts` rebuilds it in a sandboxed iframe on a blank page of
   the page's origin (Playwright answers it) in a browser launched once (Playwright's Chromium, then Chrome, then
@@ -207,7 +208,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   only something attached says it, then only what no label
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
-  the user's own `labels`; the source and the rendered HTML aren't sent. `read` lists the element's tasks by `deictic.at`, the
+  the user's own `labels`; the source isn't sent. After the words, what the page says and no label holds: `Inside:`,
+  the marked elements around it that other files wrote (`Op.within`, the nearest of each file in turn, five at most:
+  a shared component's use), and `As it rendered:`, its HTML (`Op.html`, masked by `screenshots.masked` where that's
+  loaded, cut to 2,000 characters; the `html: false` option, a `clientOptions`, leaves it out). `read` lists the element's tasks by `deictic.at`, the
   rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
   that opens that element's tasks where the page has it), a task whose place moved still the element's own where its tag and `deictic.line`
   are the element's and the file has that line once (its `at` is where it was), and the channel's page
@@ -227,7 +231,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   attachment's ID for redo. With annotations
   loaded, Annotate captures a shot and `edit`s it: saved, each is a chip (removable; removing the last unticks the
   box). Every chip opens one lightbox of all that's attached, at itself: a shot with Change marks, a recording's
-  replay (`?embed`) with New tab, a voice note's player; and sending uploads each `flatten`ed PNG with `screenshots.upload`. `Op.screenshots`
+  replay (`?embed`) with New tab, a voice note's player; and sending uploads each `flatten`ed PNG with `screenshots.upload`, the element outlined in it
+  first (`outlined`, in green dashes `ROOM` off it; a shot taken as the task goes is drawn on and kept again), which the op says (`outlined`) and the text after it. `Op.screenshots`
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
   `Op.recordings` attaches each one's JSON (and its voice clips) and says how long it ran and where it replays.
@@ -245,9 +250,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add gkurt/deictic`, or `./node_modules/deictic` for the installed one):
 `SKILL.md` stays short and points to `references/` (install, watch, tasks, recordings), read only when needed.
-`scripts/` are plain `.mjs` for Node 20+ or Bun with no dependencies (`lib.mjs` shared: `vb`, `.deictic/` folders,
-finding a recording or clip by task, URL, ID or path): `watch.mjs` (a line per task event, over `vb tail`),
-`task.mjs`, `recording.mjs` (a timeline), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
+`scripts/` are plain `.mjs` for Node 20+ or Bun with no dependencies (`lib.mjs` shared: `vb`, run as the project's
+own `@vercel/board` script on the dev server's board, `.deictic/` folders,
+finding a recording or clip by task, URL, ID or path): `vb.mjs` (that CLI, for the agent's own commands), `watch.mjs` (a line per task event, over `vb tail`,
+without the replies of the watcher's own profile), `task.mjs` (the task, and the page's other open ones), `recording.mjs` (a timeline), `frame.mjs` (PNGs through the replay's `?t=`, with the project's
 Playwright), `voice.mjs` (speech times, with ffmpeg) and `transcribe.mjs` (Whisper through a pinned
 transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
 without it the script refuses and says what to ask the person, as the skill has the agent ask first). The recording's marks event carries `annotations` as data

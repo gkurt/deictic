@@ -2,7 +2,8 @@
  * `deictic/tasks`: open its tab on an element to add a task about it to a Vercel Board
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
  * line and tag, the page and the project, all as labels beside the short facts (viewport, how many, where
- * it is in the shot). Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
+ * it is in the shot), and after the words what a label can't hold: the elements around it that other files wrote
+ * (its component is used in one of them) and its HTML as it rendered. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
  * from there; deictic only adds them.
  *
  * Adding one is a change like any other: undo cancels the task, while no one has claimed it, and redo
@@ -54,6 +55,12 @@ export interface TasksOptions {
    * deictic can't know.
    */
   link?: (channel: string, task?: string) => string | undefined;
+  /**
+   * Whether a task says the element's HTML as it rendered, cut short and masked as a screenshot is (the
+   * screenshots plugin's masking, where it's loaded): what was on the page, for whoever can't open it as the
+   * person did. True by default; `false` where a page shows what the board shouldn't hold.
+   */
+  html?: boolean;
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
   shortcut?: Shortcut;
 }
@@ -113,10 +120,18 @@ export interface Op {
   /** How many elements on the page come from the same place in the source. */
   count: number;
   /**
-   * Shots the screenshots plugin took of it, to attach, where that plugin is loaded: each with where the
-   * element is in it, and the marks drawn on it in the panel, where there are any.
+   * The marked elements around it that other files wrote, nearest first, the nearest of each file in turn: a
+   * shared component's line says nothing of which use of it this is, and these do.
    */
-  screenshots?: { id: string; box: Box; marks?: Marks }[];
+  within?: { at: string; tag: string }[];
+  /** The element's HTML as it rendered, cut short, and masked where the screenshots plugin is loaded. */
+  html?: string;
+  /**
+   * Shots the screenshots plugin took of it, to attach, where that plugin is loaded: each with where the
+   * element is in it, whether it's `outlined` there (dashes drawn around it, in the PNG), and the marks drawn
+   * on it in the panel, where there are any.
+   */
+  screenshots?: { id: string; box: Box; outlined?: boolean; marks?: Marks }[];
   /**
    * Recordings the recordings plugin made, to attach, where that plugin is loaded: how long each ran,
    * where it plays back, and the voice plugin's clips of the mic in it, attached too.
@@ -308,6 +323,8 @@ export function tasks(options: TasksOptions = {}) {
   return definePlugin<Model, Change, Kept>({
     name: 'tasks',
     client: 'deictic/tasks/client',
+    // Only where it's turned off: the page half sends the HTML unless told not to.
+    ...(options.html === false ? { clientOptions: { html: false } } : {}),
     shortcut: options.shortcut,
     setup: (given) => {
       context = given;
@@ -475,23 +492,35 @@ const clock = (ms: number) => {
 };
 
 /**
- * What was drawn on each shot, and with several, where the element is in each: nothing marks it there. One
- * shot's place is the `deictic.position` and `deictic.size` labels, so a shot with no marks has no line.
+ * What's drawn on each shot (the element's outline, the person's marks), and with several, where the element is
+ * in each. One shot's place is the `deictic.position` and `deictic.size` labels, so a shot with nothing drawn
+ * on it has no line.
  */
 function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
   const [only] = shots;
   if (shots.length === 1 && only !== undefined) {
-    const { marks } = only;
-    return marks === undefined || marks.count === 0
-      ? []
-      : [`The screenshot has ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`];
+    const { marks, outlined } = only;
+    const has = [
+      ...(outlined === true ? ['the element outlined in dashes'] : []),
+      ...(marks === undefined || marks.count === 0 ? [] : [`${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`]),
+    ];
+    return has.length === 0 ? [] : [`The screenshot has ${has.join(' and ')}`];
   }
-  return shots.map(({ box, marks }, i) => {
+  return shots.map(({ box, marks, outlined }, i) => {
     const drawn = marks === undefined || marks.count === 0 ? '' : `, with ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`;
     const [x, y, width, height] = boxOf(box);
-    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${drawn}`;
+    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${outlined === true ? ', outlined in dashes' : ''}${drawn}`;
   });
 }
+
+/** `<div> src/Field.tsx:20:5 ← <section> src/Panel.tsx:880:7`: the elements around it, as the page said them. */
+function withinOf(within: NonNullable<Op['within']>): string[] {
+  const places = within.slice(0, WITHIN).map(({ at, tag }) => `<${clip(String(tag), 40)}> ${clip(String(at), LABEL)}`);
+  return places.length === 0 ? [] : [`Inside: ${places.join(' ← ')}`];
+}
+
+/** How many elements around it a task names: the first few say which use of a component it is. */
+const WITHIN = 5;
 
 /** A box as `x,y,width,height`, in whole CSS pixels from the shot's top left. */
 const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.round);
@@ -548,8 +577,9 @@ function placeIn(labels: Record<string, string>): Place | undefined {
 }
 
 /**
- * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, what
- * was pointed at inside the element, and a URL too long for one. A board holds 10,000 characters.
+ * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, the
+ * elements around it, its HTML as it rendered, what was pointed at inside it, and a URL too long for a label.
+ * A board holds 10,000 characters.
  */
 function textOf(op: Op): string {
   const more = [
@@ -558,6 +588,8 @@ function textOf(op: Op): string {
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
+    ...withinOf(op.within ?? []),
+    ...(op.html === undefined || op.html === '' ? [] : ['As it rendered:', fence(op.html, 'html', 2000)]),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
   const tail = more.length === 0 ? '' : REST + more.join('\n');
@@ -579,7 +611,7 @@ function shown(op: Op): string | undefined {
   return attached.length === 0 ? undefined : `See ${new Intl.ListFormat('en', { type: 'conjunction' }).format(attached)}`;
 }
 
-const fence = (text: string, lang: string) => `\`\`\`\`${lang}\n${clip(text, 1500)}\n\`\`\`\``;
+const fence = (text: string, lang: string, max = 1500) => `\`\`\`\`${lang}\n${clip(text, max)}\n\`\`\`\``;
 
 const clip = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
 

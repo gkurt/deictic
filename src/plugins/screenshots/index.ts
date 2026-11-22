@@ -46,6 +46,8 @@ export interface Capture {
   capture(element: Element, options?: CaptureOptions): Promise<Shot>;
   /** Keeps a PNG made of a shot (the same one with marks drawn over it, say) as a shot of its own. */
   upload(png: Blob, of: Pick<Shot, 'box' | 'size'>): Promise<Shot>;
+  /** A copy of an element with what a shot hides hidden in it too: for a plugin that sends its HTML somewhere. */
+  masked(element: Element): Element;
 }
 
 /** The server's half, for other plugins' server halves. */
