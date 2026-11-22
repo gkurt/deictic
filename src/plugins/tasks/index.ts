@@ -2,8 +2,8 @@
  * `deictic/tasks`: open its tab on an element to add a task about it to a Vercel Board
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
  * line and tag, the page and the project, all as labels beside the short facts (viewport, how many, where
- * it is in the shot), and after the words what a label can't hold: the elements around it that other files wrote
- * (its component is used in one of them). Its HTML as it rendered is a file attached, `element.html`, for whoever
+ * it is in the shot), and after the words what a label can't hold: the chain of source it rendered through, from
+ * its own line out to the files that use its component. Its HTML as it rendered is a file attached, `element.html`, for whoever
  * wants more than the task says: a task stays short. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
  * from there; deictic only adds them.
  *
@@ -59,7 +59,8 @@ export interface TasksOptions {
   /**
    * Whether a task has the element's HTML as it rendered attached, as `element.html`, masked as a screenshot is
    * (the screenshots plugin's masking, where it's loaded): what was on the page, for whoever can't open it as the
-   * person did. True by default; `false` where a page shows what the board shouldn't hold.
+   * person did. True by default: the Task tab has a box for it, ticked, to untick for a task that should go
+   * without. `false` takes the box away, where a page shows what the board shouldn't hold.
    */
   html?: boolean;
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
@@ -121,10 +122,10 @@ export interface Op {
   /** How many elements on the page come from the same place in the source. */
   count: number;
   /**
-   * The marked elements around it that other files wrote, nearest first, the nearest of each file in turn: a
-   * shared component's line says nothing of which use of it this is, and these do.
+   * The source it rendered through, after its own place, nearest first, each a `file:line`: where the file
+   * before it is used. A shared component's line says nothing of which use of it this is, and these do.
    */
-  within?: { at: string; tag: string }[];
+  chain?: string[];
   /** The element's HTML as it rendered, to attach: cut short, and masked where the screenshots plugin is loaded. */
   html?: string;
   /**
@@ -412,7 +413,7 @@ export function tasks(options: TasksOptions = {}) {
       return asked(async () => {
         const attachments = await attach(op);
         return {
-          done: await create({ channel, text: textOf(op), labels, ...(attachments === undefined ? {} : { attachments }) }),
+          done: await create({ channel, text: textOf(op, target), labels, ...(attachments === undefined ? {} : { attachments }) }),
         };
       });
     },
@@ -518,14 +519,14 @@ function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
   });
 }
 
-/** `<div> src/Field.tsx:20:5 ← <section> src/Panel.tsx:880:7`: the elements around it, as the page said them. */
-function withinOf(within: NonNullable<Op['within']>): string[] {
-  const places = within.slice(0, WITHIN).map(({ at, tag }) => `<${clip(String(tag), 40)}> ${clip(String(at), LABEL)}`);
-  return places.length === 0 ? [] : [`Inside: ${places.join(' ← ')}`];
+/** `Source: src/ui/label.tsx:6 ← src/Field.tsx:20 ← src/Panel.tsx:880`: from the element's line out, as the page said it. */
+function chainOf({ loc }: Target, chain: NonNullable<Op['chain']>): string[] {
+  const places = chain.slice(0, CHAIN).map((place) => clip(String(place), LABEL));
+  return places.length === 0 ? [] : [`Source: ${[`${loc.file}:${loc.line}`, ...places].join(' ← ')}`];
 }
 
-/** How many elements around it a task names: the first few say which use of a component it is. */
-const WITHIN = 5;
+/** How many places a chain names after the element's own: the first few say which use of a component it is. */
+const CHAIN = 5;
 
 /** A box as `x,y,width,height`, in whole CSS pixels from the shot's top left. */
 const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.round);
@@ -586,17 +587,17 @@ function placeIn(labels: Record<string, string>): Place | undefined {
 
 /**
  * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, the
- * elements around it, what was pointed at inside it, and a URL too long for a label.
+ * source it rendered through, what was pointed at inside it, and a URL too long for a label.
  * A board holds 10,000 characters.
  */
-function textOf(op: Op): string {
+function textOf(op: Op, target: Target): string {
   const more = [
     ...(op.page.length <= LABEL ? [] : [op.page]),
     ...shotsOf(op.screenshots ?? []),
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
-    ...withinOf(op.within ?? []),
+    ...chainOf(target, op.chain ?? []),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
   const tail = more.length === 0 ? '' : REST + more.join('\n');

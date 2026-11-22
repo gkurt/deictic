@@ -95,7 +95,7 @@ What a project keeps (the history, shots, recordings, voice notes) is in `.deict
 | `project`  | your `package.json`'s `name`    | The `deictic.project` label, to share a board              |
 | `labels`   | none                            | Your own labels on every task                              |
 | `link`     | the local board's pages         | `(channel, task?) => url`, where the panel links a task to |
-| `html`     | `true`                          | Whether a task has the element's HTML attached             |
+| `html`     | `true`                          | Whether the Task tab offers to attach the element's HTML   |
 | `shortcut` | none                            | Opens the Task tab directly                                |
 
 With nothing set, the dev server starts a board on your machine: `http://127.0.0.1:4100/`, kept in `.deictic/board`.
@@ -118,10 +118,11 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 
 A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
 `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them. After the
-words comes what a label can't hold: the marked elements around it that other files wrote (a shared component's line
-is the same wherever it's used; these say where). The element's HTML as it rendered is attached as `element.html`,
+words comes what a label can't hold: the chain of source it rendered through, as
+`src/ui/label.tsx:6 ← src/Field.tsx:20 ← src/Panel.tsx:880` (a shared component's line is the same wherever it's
+used; the rest say where). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
-`html: false` leaves it out. An attached screenshot has the element outlined in it.
+Untick **Attach its HTML** for a task without it; `html: false` takes the box away. An attached screenshot has the element outlined in it.
 
 The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
 that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening
@@ -130,6 +131,7 @@ tag's first line is still the same and the file has it once.
 In the Task tab:
 
 - **Attach** adds a screenshot of the page, and **Annotate** opens it to draw boxes, arrows and notes on.
+- **Attach its HTML** adds the element as the page has it, as a file.
 - **Record** records the page as you use it, drawing as you go, with the mic on if you like.
 - **Voice** records a note.
 - The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed

@@ -14,10 +14,11 @@ A task's text is what the person typed. Where there's more that no label holds, 
 
 - What's attached and needs saying: the marks on a screenshot and what the notes say; a recording, its length, its
   voice clips and its replay URL; a voice note's length.
-- `Inside:` the marked elements around it that other files wrote, nearest first, the nearest of each file:
-  `<div> src/ParticipantsField.tsx:20:5 ← <section> src/WorkflowPanel.tsx:880:7`. When `deictic.at` is a shared
-  component (`ui/label.tsx`, seven of them on the page), the change is rarely there: it's where the component is
-  used, in the first of these files, beside that element.
+- `Source:` the chain of source it rendered through, from its own line out:
+  `src/ui/label.tsx:6 ← src/ParticipantsField.tsx:20 ← src/WorkflowPanel.tsx:880`. Each place after the first is
+  where the file before it is used: the line of the element around that use, so the component's own tag is at or
+  just under it. When `deictic.at` is a shared component (`ui/label.tsx`, seven of them on the page), the change
+  is rarely there: it's at the next place, or the one after. No line when it all came from one file.
 - Sometimes `Pointed at, inside it:` a path and HTML: the person pointed at markup inside the element that no line
   marks (a dependency's, or a shadow root's). That part is what they mean; find it by its classes. On deictic's
   own `/internal/` page it's deictic's popup, so the fix is in deictic's client code, not the page.
@@ -46,7 +47,7 @@ Attached to most tasks is `element.html`: the element's HTML when the task was l
 are. Don't read it by default; download it (`vb download <attachment> element.html`) when the task and the
 screenshot don't settle which of several alike is meant, or you can't open the page as the person had it. Its text
 and classes say what the page showed, and a child's `data-deictic` is the line that wrote it. Not there when the
-config says `tasks({ html: false })`.
+person unticked it, or the config says `tasks({ html: false })`.
 
 `task.mjs` says whether that line still reads as the task saw it, or where it moved, and lists the other open tasks
 about the same page: tasks left within a minute of each other are often one change (three about one page's

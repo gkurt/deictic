@@ -3,7 +3,7 @@
  * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
  * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
- * the source can't tell: the marked elements around it that other files wrote, its HTML (a file attached), and where the
+ * the source can't tell: the chain of source it rendered through, its HTML (a file attached), and where the
  * annotations plugin is loaded, what's marked on the page.
  *
  * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked, the element
@@ -12,6 +12,9 @@
  * under the field, which opens it again to change the marks, and Add another takes one more. Any chip
  * (a recording's too) takes the box's place; removing the last brings it back unticked, so a task goes
  * without a shot unless asked again.
+ *
+ * The element's HTML as it rendered goes with it too, as a file, unless its box is unticked (or the server
+ * half's `html` option is off, and then there's no box).
  *
  * Where the recordings plugin is loaded, Record leaves the popup (`away`) to record the page, keeping
  * what's typed and attached, and comes back with the recording as a chip too, which plays it back.
@@ -127,6 +130,7 @@ interface Chip extends Drawn {
 interface Kept {
   text: string;
   attach: boolean;
+  html: boolean;
   drawn: Drawn[];
   recordings: Recording[];
   voices: Clip[];
@@ -171,24 +175,25 @@ const parentOf = (el: Element): Element | undefined => {
   return root instanceof ShadowRoot ? root.host : undefined;
 };
 
-/** How many elements around it a task names. */
-const WITHIN = 5;
+/** How many places a chain names after the element's own. */
+const CHAIN = 5;
 
 /**
- * The marked elements around `el` that other files wrote, nearest first: of each run of one file's, the nearest.
- * A shared component's own line is the same wherever it's used, and the element around it is in the file that
- * uses it (or in a component between them, which is why there are several).
+ * The source `el` rendered through, after its own file, nearest first, each a `file:line`: a shared component's
+ * own line is the same wherever it's used, and what uses it is the next file out (or a component between them,
+ * which is why there are several). Read off the marks around it, the only trace of source the page has: each
+ * place is the nearest element the next file wrote, which is where, in that file, the one before is used.
  */
-function around(el: Element, file: string): NonNullable<Op['within']> {
-  const found: NonNullable<Op['within']> = [];
+function chainOf(el: Element, file: string): NonNullable<Op['chain']> {
+  const found: NonNullable<Op['chain']> = [];
   let last = file;
-  for (let at = parentOf(el); at !== undefined && found.length < WITHIN; at = parentOf(at)) {
+  for (let at = parentOf(el); at !== undefined && found.length < CHAIN; at = parentOf(at)) {
     const mark = at.getAttribute('data-deictic');
     if (mark === null) continue;
     const from = mark.replace(/:\d+:\d+$/, '');
     if (from === last) continue;
     last = from;
-    found.push({ at: mark, tag: at.localName });
+    found.push(mark.replace(/:\d+$/, ''));
   }
   return found;
 }
@@ -288,7 +293,7 @@ export default defineClientPlugin<Model, Change>({
     const notes = context.use('annotations');
     const recorder = context.use('recordings');
     const voice = context.use('voice');
-    // The server half's `html` option; a page half with no options (a `standalone` server's) sends it.
+    // The server half's `html` option, which takes the box away; a page half with no options (a `standalone` server's) has it.
     const sendsHtml = (context.options as { html?: boolean } | undefined)?.html !== false;
     // Closes an open editor with the panel.
     const aborts = new AbortController();
@@ -311,6 +316,13 @@ export default defineClientPlugin<Model, Change>({
     const another = element('button', { type: 'button', textContent: 'Add another', title: 'Take another screenshot and draw on it' });
     const problem = element('div', { className: 'shot-problem' });
     if (shots !== undefined || recorder !== undefined || voice !== undefined) panel.append(shot, chipsEl, problem);
+    // Its own line: the screenshot's gives way to the chips, and this is asked whatever else is attached.
+    const withHtml = element('input', { type: 'checkbox', checked: true });
+    const htmlToggle = element('label', { title: 'The element as the page has it now, as a file: element.html' });
+    htmlToggle.append(withHtml, 'Attach its HTML');
+    const htmlRow = element('div', { className: 'shot' });
+    htmlRow.append(htmlToggle);
+    if (sendsHtml) panel.append(htmlRow);
     panel.append(row);
 
     let chips: Chip[] = [];
@@ -460,7 +472,7 @@ export default defineClientPlugin<Model, Change>({
       // A take going on is kept first, as a chip, to come back to with the rest.
       void speakOff().then(() => {
         const drawn = chips.map(({ url: _, ...d }) => d);
-        const kept: Kept = { text: text.value, attach: attach.checked, drawn, recordings, voices };
+        const kept: Kept = { text: text.value, attach: attach.checked, html: withHtml.checked, drawn, recordings, voices };
         context.away(kept, () => recorder.record());
       });
     });
@@ -725,7 +737,7 @@ export default defineClientPlugin<Model, Change>({
       }
       add.textContent = 'Add task';
       const { element: el, elements } = context;
-      const within = around(el, context.target.loc.file);
+      const chain = chainOf(el, context.target.loc.file);
       try {
         const op: Op = {
           text: text.value,
@@ -735,8 +747,8 @@ export default defineClientPlugin<Model, Change>({
             ? {}
             : { pointed: { path: pathTo(context.pointed, el), html: context.pointed.outerHTML.slice(0, 4000) } }),
           count: elements.length,
-          ...(within.length === 0 ? {} : { within }),
-          ...(sendsHtml ? { html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML) } : {}),
+          ...(chain.length === 0 ? {} : { chain }),
+          ...(sendsHtml && withHtml.checked ? { html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML) } : {}),
           ...(screenshots === undefined ? {} : { screenshots }),
           ...(recordings.length === 0
             ? {}
@@ -769,6 +781,7 @@ export default defineClientPlugin<Model, Change>({
       const kept = back.state as Kept;
       text.value = kept.text;
       attach.checked = kept.attach;
+      withHtml.checked = kept.html;
       chips = kept.drawn.map(toChip);
       recordings = [...kept.recordings, ...(back.result === undefined ? [] : [back.result as Recording])];
       voices = kept.voices;

@@ -54,13 +54,13 @@ if (at !== undefined) {
     const first = root.labels['deictic.line'];
     const now = lines[line - 1]?.trim();
     if (first === undefined || now?.includes(first.slice(0, 40))) {
-      console.log(`\nSource: ${path}:${line}, as the task saw it.`);
+      console.log(`\nFile:${path}:${line}, as the task saw it.`);
     } else {
       const moved = lines.findIndex((l) => l.includes(first.slice(0, 40)));
       console.log(
         moved >= 0
-          ? `\nSource: moved to ${path}:${moved + 1} (the task says line ${line}).`
-          : `\nSource: ${path}:${line} no longer reads as the task saw it; it was:\n  ${first}`,
+          ? `\nFile:moved to ${path}:${moved + 1} (the task says line ${line}).`
+          : `\nFile:${path}:${line} no longer reads as the task saw it; it was:\n  ${first}`,
       );
     }
   }
