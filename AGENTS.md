@@ -206,6 +206,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `PAGE` in `marks.ts`, with the `href`; the last events go with `keepalive`
   on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
   `resume` gives the overlay. It
+  keeps the console (`logs.ts`: `watchLogs` wraps `console.debug|log|info|warn|error` and hears the window's `error` and
+  `unhandledrejection`, from the start of `record` to its end and never otherwise, as a wrapped console names the wrapper
+  as each line's source in the browser's tools; a `LOG` custom event each, `Logged`; the `console: false` option, a
+  `clientOptions`, for none), and
   shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;
   the marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each change.
 - `src/plugins/voice/`: no tab. `index.ts`, the server half: keeps the latest `keep` clips under

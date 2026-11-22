@@ -21,7 +21,8 @@ import type { ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 import type { Take } from '#src/plugins/voice/index.ts';
 
 import type { Kept, Meta, Recorder, Recording, VoiceClip } from './index.ts';
-import { END, MARKS, PAGE } from './marks.ts';
+import { type Logged, watchLogs } from './logs.ts';
+import { END, LOG, MARKS, PAGE } from './marks.ts';
 import { dropOurs } from './ours.ts';
 
 type Edge = 'top' | 'bottom' | 'left' | 'right';
@@ -172,7 +173,7 @@ function draggable(bar: HTMLElement, grip: HTMLElement, docked: (dock: Dock) => 
 export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
   setup: ({ base, root, options, use, request }) => {
-    const { masking } = options as { masking: ResolvedMasking };
+    const { masking, console: logging } = options as { masking: ResolvedMasking; console?: boolean };
     let going: Promise<Recording | undefined> | undefined;
 
     const post = async (route: string, body: unknown, keepalive = false) => {
@@ -196,12 +197,20 @@ export default defineClientPlugin<never, never, Recorder>({
         const colorScheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         return (await post('begin', { page: location.href, viewport, colorScheme, startedAt } satisfies Meta)).id;
       };
+      // The console, heard from here on and only until the recording ends (`logs.ts` says why). At once, before
+      // rrweb is there to take the lines: a page that carries a recording on logs the most as it starts.
+      const early: Logged[] = [];
+      let log = (line: Logged): void => void early.push(line);
+      const unwatch = logging === false ? undefined : watchLogs((line) => log(line));
       const [rrweb, id] = await Promise.all([
         import('rrweb').catch((e: unknown) => {
           throw new Error('recordings need rrweb: add it to your devDependencies', { cause: e });
         }),
         from?.id ?? begin(),
-      ]);
+      ]).catch((e: unknown) => {
+        unwatch?.();
+        throw e;
+      });
       const clips: VoiceClip[] = from?.clips ?? [];
       // What the server doesn't have yet, and the place of the next part sent.
       let unsent: { type: number; data?: unknown }[] = [];
@@ -251,6 +260,8 @@ export default defineClientPlugin<never, never, Recorder>({
         });
       };
       mark();
+      log = (line) => rrweb.record.addCustomEvent(LOG, line);
+      for (const line of early) log(line);
 
       // The mic, where the voice plugin is loaded: each stretch it's on is a clip, at its time in the recording.
       const voice = use('voice');
@@ -384,6 +395,7 @@ export default defineClientPlugin<never, never, Recorder>({
         addEventListener('pagehide', leave);
 
         const end = async (kept: boolean) => {
+          unwatch?.();
           rrweb.record.addCustomEvent(END, {});
           stopRecording?.();
           for (const stop of unsubscribe) stop?.();

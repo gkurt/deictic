@@ -94,6 +94,12 @@ export interface RecordingsOptions extends Masking {
   keep?: number;
   /** Where they're kept, from the project's root: `.deictic/recordings` by default. */
   dir?: string;
+  /**
+   * Whether a recording has what the page logs while it goes, and the errors nothing caught, as custom events
+   * (`deictic.console`): it does by default. The console is wrapped for that only while one is going, and with
+   * `false` never.
+   */
+  console?: boolean;
 }
 
 const ID = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -177,6 +183,7 @@ export function recordings(options: RecordingsOptions = {}) {
         maskTextSelector: options.maskTextSelector,
         maskAllInputs: options.maskAllInputs ?? false,
       } satisfies ResolvedMasking,
+      console: options.console ?? true,
     },
     setup: ({ root }) => {
       dir = options.dir === undefined ? keptIn(root, 'recordings') : resolve(root, options.dir);

@@ -126,6 +126,11 @@ for (const e of events) {
   }
   // The address changed with no load: a route of the app's.
   if (e.type === 5 && e.data.tag === 'deictic.page') push(t, 'page', `${e.data.payload.href} (a route change, no load)`);
+  // The page's console, and errors nothing caught: an error's stack goes under it.
+  if (e.type === 5 && e.data.tag === 'deictic.console') {
+    const { level, text, stack } = e.data.payload;
+    push(t, `console.${level}`, text, stack ? { stack } : {});
+  }
   if (e.type === 5 && e.data.tag === 'deictic.end') push(t, 'end', 'recording stopped');
   if (e.type !== 3) continue;
   const d = e.data;
@@ -184,5 +189,10 @@ if (options.json) {
   console.log(`viewport ${kept.viewport.width}×${kept.viewport.height}, ${head.colorScheme}, started ${head.startedAt}`);
   if (replay) console.log(`replays at ${replay} (add ?t=<seconds> to open it paused there)`);
   console.log();
-  for (const e of timeline) console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(12)} ${e.text}`);
+  for (const e of timeline) {
+    console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${e.text}`);
+    // The stack without its first line where that's the message again.
+    for (const line of (e.stack ?? '').split('\n').filter((l) => l.trim() !== '' && !e.text.includes(l.trim())))
+      console.log(`${' '.repeat(22)}${line.trim()}`);
+  }
 }

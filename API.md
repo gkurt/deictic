@@ -173,6 +173,10 @@ Masking follows [rrweb](https://github.com/rrweb-io/rrweb)'s names and defaults:
 (`blockClass`, `blockSelector`), `rr-mask` masks its text (`maskTextClass`, `maskTextSelector`), and `maskAllInputs`
 masks every field. Passwords always are. Nothing of deictic's own UI is in a shot or a recording.
 
+A recording has what the page logged while it went, and the errors nothing caught, each at its moment. Masking doesn't
+reach what your code logs. The console is wrapped for it only while a recording is going, so the rest of the time the
+browser's tools name your own code as each line's source; `recordings: { console: false }` never wraps it.
+
 ## Tailwind
 
 Not in `recommended()`. `tailwind()`, from `deictic/tailwind`, adds a tab that edits the element's classes in place,

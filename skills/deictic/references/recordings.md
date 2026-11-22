@@ -8,7 +8,12 @@ in page coordinates: CSS pixels from the document's top left), one at the start 
 
 A recording may cross pages: the person reloaded, or followed a link, and it went on. `page` is where it started, which
 is the page with the task's element; each page it went to is a `page` line in the timeline, and what follows happened
-there. A mic that was on makes a clip per page. A route change with no load (a router's) is a `page` line too, from a
+there. A mic that was on makes a clip per page.
+
+What the page logged while recording is there too, as custom events tagged `deictic.console` (`level`, `text`, and
+for an error its `stack`), with the errors nothing caught (`Uncaught …`, `Unhandled rejection: …`): `console.<level>`
+lines in the timeline, at the moment they happened, so an error sits right after the click that caused it. Only from
+when the recording started; `recordings({ console: false })` leaves them out. A route change with no load (a router's) is a `page` line too, from a
 custom event tagged `deictic.page` (`href`).
 
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps
