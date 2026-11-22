@@ -80,6 +80,24 @@ test('says why, for a stale target or an unknown plugin', async () => {
   expect(((await (await post('read', { plugin: 'nope', target }))!.json()) as { problem: string }).problem).toMatch(/no plugin "nope"/);
 });
 
+test("finds the element by its line where the page counts columns in other code, and says what the file has where it can't", async () => {
+  const { p, post, target } = setup();
+  // A plugin before deictic's that lengthened the line moves the page's column, not the element.
+  const off = { ...target, loc: { ...target.loc, column: target.loc.column + 52 } };
+  expect(await (await post('read', { plugin: 'tailwind', target: off }))!.json()).toEqual({ model: { editable: true, classes: 'p-2' } });
+
+  const problem = async (body: unknown) => ((await (await post('read', body))!.json()) as { problem: string }).problem;
+  p.write('src/App.tsx', 'export const App = () => <div className="p-2"><div>x</div></div>;\n');
+  expect(await problem({ plugin: 'tailwind', target: off })).toStartWith('line 1 of src/App.tsx has 2 <div>s, none at column 78.');
+  p.write('src/App.tsx', 'export const App = () => <p>x</p>;\n');
+  expect(await problem({ plugin: 'tailwind', target })).toStartWith(
+    'line 1 of src/App.tsx has no <div>: it reads `export const App = () => <p>x</p>;`.',
+  );
+  expect(await problem({ plugin: 'tailwind', target: { ...target, loc: { ...target.loc, line: 9 } } })).toStartWith(
+    'src/App.tsx has no line 9.',
+  );
+});
+
 test('opens a place in the editor, and answers nothing for other paths', async () => {
   const { p, handle } = setup();
   const res = await handle(new Request(`${ORIGIN}/__deictic/open?file=src/App.tsx&line=1&column=26`));

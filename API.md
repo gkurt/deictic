@@ -302,6 +302,9 @@ export default defineClientPlugin<Model, Op>({
   screenshots and recordings.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.
 - Throw a `Refusal` for an op the plugin won't make. The panel shows its message.
+- `read` and `apply` get the element's source, or a `Refusal` saying why it isn't to be found (the file doesn't parse,
+  or the page runs other code than the file has): throw it where the plugin needs the source, or go on without, as
+  tasks do. Text edits without it are refused.
 - A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.
   Where the task outlasts a page load, as a recording does, the page half's `resume` answers it on the next page, and
   the popup comes back there: on the element, or without it (`element.isConnected` is false) where that page has none.

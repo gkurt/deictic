@@ -365,9 +365,8 @@ export function tasks(options: TasksOptions = {}) {
           team.tasks.list({ channel, state: 'claimed' }),
         ]);
         const listed = new Set(inFile.tasks.map(({ message }) => message.id));
-        const line = lineOf(source);
-        // A line the file has twice says nothing of which element a task was about.
-        const once = source.code.split(line).length === 2;
+        // Nothing to tell a moved task by where the file has no such element.
+        const line = source instanceof Refusal ? undefined : onceIn(source);
         const tasks: Task[] = [];
         const elsewhere: (Task & { at: Place })[] = [];
         const about = [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks];
@@ -392,7 +391,7 @@ export function tasks(options: TasksOptions = {}) {
           };
           const at = placeIn(message.labels);
           if (at === undefined || message.labels[AT] === atOf(target)) tasks.push(task);
-          else if (once && at.tag === target.tag && message.labels['deictic.line'] === clip(line, LABEL)) tasks.push({ ...task, at });
+          else if (line !== undefined && at.tag === target.tag && message.labels['deictic.line'] === line) tasks.push({ ...task, at });
           else elsewhere.push({ ...task, at });
         }
         // An agent at work on a task is here too, though its watch may be over until the task is (`deictic watch --once`).
@@ -582,13 +581,14 @@ function nameOf(root: string): string | undefined {
  * filters by. `deictic.line` is the opening tag's first line as the task saw it, to tell later that it moved.
  * `deictic.url` is the page's whole URL, where a label holds it: `textOf` says a longer one.
  */
-function labelsOf({ code, element }: Source, target: Target, op: Op): Record<string, string> {
+function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<string, string> {
   const [shot] = op.screenshots ?? [];
   return {
     [AT]: atOf(target),
     [FILE]: clip(target.loc.file, LABEL),
     'deictic.tag': target.tag,
-    'deictic.line': clip(lineOf({ code, element }), LABEL),
+    // Not where the file has no such element: the task is the page's, and goes without.
+    ...(source instanceof Refusal ? {} : { 'deictic.line': clip(lineOf(source), LABEL) }),
     'deictic.page': clip(new URL(op.page).pathname, LABEL),
     ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
@@ -630,6 +630,12 @@ const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;
 
 /** The opening tag's first line, as written. */
 const lineOf = ({ code, element }: Pick<Source, 'code' | 'element'>) => code.slice(element.start, element.end).split('\n', 1)[0]!.trim();
+
+/** The element's line as a label has it, where the file has it once: a line it has twice says nothing of which element a task was about. */
+function onceIn(source: Source): string | undefined {
+  const line = lineOf(source);
+  return source.code.split(line).length === 2 ? clip(line, LABEL) : undefined;
+}
 
 /** Where a task says its element is, from its labels. */
 function placeIn(labels: Record<string, string>): Place | undefined {

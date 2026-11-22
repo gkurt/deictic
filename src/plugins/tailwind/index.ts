@@ -103,14 +103,18 @@ export function tailwind(options: TailwindOptions = {}) {
       },
       css: async (request, context) => Response.json({ css: (await catalog(context))?.css(await asked(request)) ?? '' }),
     },
-    read({ code, element, program }) {
+    read(source) {
+      if (source instanceof Refusal) throw source;
+      const { code, element, program } = source;
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') return { editable: false, source: spot.source };
       if (spot.kind === 'missing') return { editable: true, classes: '' };
       const others = spot.others?.flatMap((argument) => extrasOf(argument, code, program)).map(({ spot: _, ...extra }) => extra);
       return { editable: true, classes: code.slice(spot.start, spot.end), ...(others === undefined ? {} : { others }) };
     },
-    apply({ file, code, element, program }, _target, { classes, at }) {
+    apply(source, _target, { classes, at }) {
+      if (source instanceof Refusal) throw source;
+      const { file, code, element, program } = source;
       const list = classes.trim().split(/\s+/).filter(Boolean).join(' ');
       const spot = spotOf(element, code, helpers);
       if (spot.kind === 'fixed') throw new Refusal('this class list is built at runtime: edit it in the editor');

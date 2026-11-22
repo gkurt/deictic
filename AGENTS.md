@@ -55,7 +55,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   and plain `.js` modules (`JSX`; `parse` reads JSX in `.js`, and a module with no `<tag` in it isn't parsed).
   Must see the source as written, so integrations run it first. `lineStarts`, `position`, `offsetOf`.
 - `src/tools/source.ts`: `sourceAt`, a target's file parsed (a JSX module, or an `.astro` component, whose `program`
-  is its frontmatter's) and its opening tag found by offset and tag (a `Refusal` saying to reload when the file moved on); `resolveFile`, which refuses anything
+  is its frontmatter's) and its opening tag found by offset and tag, or else the only one of its tag on that line (the page may count columns in code a plugin changed before deictic's), or a `Refusal` saying what the line has; `resolveFile`, which refuses anything
   outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text.
 - `src/tools/packages.ts`: a plugin's `packages`, what it imports that the project installs (deictic's optional peers):
   `missingMessage(root, plugins)`, found from the root as the bundler finds them, which `endpoints` warns as it starts,
@@ -87,7 +87,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   place, as the popup always does), and each plugin's `routes` under `plugins/<name>/<route>` (anything but
   GET and HEAD from the page's origin only, in any content type), over `Request` and `Response`;
   `nodeMiddleware` mounts them on Vite. Every request waits for the plugins' setups. A plugin without
-  `read` reads `null` and isn't checked against the source; one without `apply` refuses ops.
+  `read` reads `null` and isn't checked against the source; one without `apply` refuses ops. `read` and `apply` get
+  the `Source`, or the `Refusal` `sourceAt` threw, for the plugin to throw where it needs it (Tailwind) or do without
+  (tasks, which then leave out `deictic.line`): only text edits are refused for it.
   Writes run one at a time, since a plugin's own change may wait on the network.
 - `src/vite.ts`: `enforce: 'pre'` and its transform `order: 'pre'` (before the React Compiler, also `pre`, compiles the JSX away), `apply: 'serve'`. In the browser each marked module appends
   `import "virtual:deictic/client"`, which starts the overlay with deictic's own shortcut and each plugin that

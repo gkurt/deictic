@@ -15,7 +15,7 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import { type Loc, Refusal, type ServerPlugin, type Target } from '#src/index.ts';
+import { type Loc, Refusal, type ServerPlugin, type Source, type Target } from '#src/index.ts';
 
 import { History, type Scope } from './history.ts';
 import { missingMessage } from './packages.ts';
@@ -63,22 +63,33 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
     apply: async ({ plugin: name, target, op }) => {
       const plugin = pluginOf(name);
       if (plugin.apply === undefined) throw new Refusal(`${name} changes nothing from its panel: it has no \`apply\``);
-      const source = sourceAt(root, target);
-      const before = await readOf(plugin, target);
+      const source = sourceOf(target);
+      const before = await readOf(plugin, target, source);
       const { file, line } = target.loc;
       const label = `${name} ${file}:${line}: ${plugin.describe?.(op, before) ?? 'edit'}`;
       const result = await plugin.apply(source, target, op);
       const scope = scopeOf(name, target.loc);
-      const change = Array.isArray(result)
-        ? history.commit(label, applyEdits(source, result), scope)
-        : history.record(label, name, result.done, scope);
+      if (!Array.isArray(result)) return { change: history.record(label, name, result.done, scope), model: await readOf(plugin, target) };
+      // Edits to a file whose element isn't found would go who knows where: refused, as only they need it.
+      if (source instanceof Refusal) throw source;
+      const change = history.commit(label, applyEdits(source, result), scope);
       return { model: await readOf(plugin, target), change };
     },
     undo: async (body) => ({ change: await history.undo(scopeIn(body)) }),
     redo: async (body) => ({ change: await history.redo(scopeIn(body)) }),
   };
+  // The source or why it can't be had, for the plugin to decide: only an edit to the file needs it, not a task.
+  const sourceOf = (target: Target): Source | Refusal => {
+    try {
+      return sourceAt(root, target);
+    } catch (e) {
+      if (e instanceof Refusal) return e;
+      throw e;
+    }
+  };
   // A plugin without `read` has no model, and no need for its element to be where the page says.
-  const readOf = (plugin: ServerPlugin, target: Target) => (plugin.read === undefined ? null : plugin.read(sourceAt(root, target), target));
+  const readOf = (plugin: ServerPlugin, target: Target, source?: Source | Refusal) =>
+    plugin.read === undefined ? null : plugin.read(source ?? sourceOf(target), target);
   // One write at a time: a plugin's change may wait on the network, and an undo sent meanwhile must
   // take back that change, not the one before it.
   let queue: Promise<unknown> = Promise.resolve();

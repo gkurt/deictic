@@ -131,10 +131,14 @@ export interface ServerPlugin<Model = unknown, Op = unknown, Record = unknown, A
   setup?(context: ServerContext): Maybe<Api>;
   /** Routes of its own, by their first segment under `/__deictic/plugins/<name>/`. */
   routes?: { [route: string]: Route };
-  /** The model its panel shows for an element. Without it, the panel gets none. */
-  read?(source: Source, target: Target): Maybe<Model>;
-  /** Text edits for deictic to write, or a change the plugin made itself. */
-  apply?(source: Source, target: Target, op: Op): Maybe<TextEdit[] | Done<Record>>;
+  /**
+   * The model its panel shows for an element. Without it, the panel gets none. `source` is a `Refusal` where the
+   * element isn't to be found in its file (it doesn't parse, or the page runs other code than it has): throw it where
+   * the plugin needs the source, or go on without it, as a task does.
+   */
+  read?(source: Source | Refusal, target: Target): Maybe<Model>;
+  /** Text edits for deictic to write, which it refuses without the source, or a change the plugin made itself. */
+  apply?(source: Source | Refusal, target: Target, op: Op): Maybe<TextEdit[] | Done<Record>>;
   /**
    * Takes back a change `apply` made itself, or throws a `Refusal` saying why it can't any more. It may
    * answer what the next redo needs, where that differs (what it put back has a new ID).

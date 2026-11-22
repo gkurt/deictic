@@ -29,17 +29,37 @@ export function readSource(root: string, file: string): string {
   }
 }
 
-/** The target's file and element, as they are on disk now. */
+/**
+ * The target's file and element, as they are on disk now. The element is the one the page's mark names, or else the
+ * only one of its tag on that line: the page may count columns in code a plugin before deictic's changed.
+ */
 export function sourceAt(root: string, target: Target): Source {
   const { file, line, column } = target.loc;
   const code = readSource(root, file);
-  const offset = offsetOf(lineStarts(code), line, column);
+  const lines = lineStarts(code);
+  const offset = offsetOf(lines, line, column);
   const { program, elements } = ASTRO.test(file) ? astro(root, file, code) : jsx(file, code);
-  const element = elements.find((el) => el.start === offset && isHost(el));
-  if (element === undefined || (element.name.type === 'JSXIdentifier' && element.name.name !== target.tag))
-    throw new Refusal(`no <${target.tag}> at ${file}:${line}:${column} any more: the file changed since the page loaded, so reload it`);
+  const tagged = elements.filter((el) => isHost(el) && el.name.type === 'JSXIdentifier' && el.name.name === target.tag);
+  const start = lines[line - 1];
+  const onLine = start === undefined ? [] : tagged.filter((el) => el.start >= start && el.start < (lines[line] ?? Infinity));
+  const element = tagged.find((el) => el.start === offset) ?? (onLine.length === 1 ? onLine[0] : undefined);
+  if (element === undefined) throw new Refusal(notThere(target, code, lines, onLine.length));
   return { file, code, program, element, read: (other) => readSource(root, other) };
 }
+
+/** Why the page's element isn't in the file, from what the file has there: it may not have changed at all. */
+function notThere({ loc: { file, line, column }, tag }: Target, code: string, lines: number[], onLine: number): string {
+  const start = lines[line - 1];
+  const found =
+    start === undefined
+      ? `${file} has no line ${line}`
+      : onLine === 0
+        ? `line ${line} of ${file} has no <${tag}>: it reads \`${clip(code.slice(start, (lines[line] ?? code.length + 1) - 1).trim())}\``
+        : `line ${line} of ${file} has ${onLine} <${tag}>s, none at column ${column}`;
+  return `${found}. The page isn't running the file as it is: reload it, and if it says this again, a plugin before deictic's changes the file, so put deictic first`;
+}
+
+const clip = (text: string) => (text.length > 80 ? `${text.slice(0, 79)}…` : text);
 
 function jsx(file: string, code: string): Parsed {
   const { program, errors } = parse(file, code);

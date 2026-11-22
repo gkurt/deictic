@@ -76,6 +76,19 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect(p.read('src/App.tsx')).toContain('className="text-4xl"');
 });
 
+test("adds and lists tasks where the file has no such element, or doesn't parse: the task is the page's", async () => {
+  const { p, post, target } = setup('stale');
+  p.write('src/App.tsx', 'export const App = () => <p>Pricing</p>;\n');
+  const { status, json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
+  expect(status).toBe(200);
+  const { message } = await team.thread(json.model.tasks[0]!.id);
+  expect(message.labels).toMatchObject({ 'deictic.at': 'src/App.tsx:1:26', 'deictic.tag': 'h1' });
+  expect(message.labels['deictic.line']).toBeUndefined();
+
+  p.write('src/App.tsx', 'export const App = () => <h1>Pricing</h1;\n');
+  expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks).toHaveLength(1);
+});
+
 test("names the project: the package.json's name, or the option's", async () => {
   const files = { 'package.json': '{ "name": "@shop/storefront" }' };
   const labelsOf = async (channel: string, options?: TasksOptions) => {
