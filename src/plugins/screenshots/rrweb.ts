@@ -1,7 +1,7 @@
 /**
  * The `rrweb()` renderer's page half: a snapshot of the page's DOM with `rrweb-snapshot` (imported on the
  * first shot), masked as rrweb masks, without deictic's overlay, sent with what the server's browser needs
- * to show it as the page does: the viewport, where it's scrolled to, the pixel density, the page's URL.
+ * to show it as the page does: the viewport and the window around it, where it's scrolled to, the pixel density, the page's URL.
  */
 
 import { boxOf, screenshotsClient } from './client.ts';
@@ -35,6 +35,7 @@ export default screenshotsClient(async (element, { area, masking, overlay }) => 
     snapshot: withoutOurs(taken),
     url: location.href,
     viewport,
+    window: { width: innerWidth, height: innerHeight },
     ...(marks === undefined ? {} : { overlay: marks }),
     scroll: { x: scrollX, y: scrollY },
     scale: Math.min(devicePixelRatio, 2),

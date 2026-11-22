@@ -22,6 +22,8 @@ const server = Bun.serve({
         body { margin: 24px; font: 16px system-ui, sans-serif; }
         code { display: inline-block; padding: 8px 12px; border: 1px solid #ddd; font: 14px ui-monospace, monospace; }
         .tall { height: 1600px; }
+        /* The window is right on this breakpoint, and the page narrower by its scrollbar: it still applies. */
+        @media (min-width: 640px) { h1 { margin-left: 200px; } }
       </style></head><body>
         <h1>Pricing</h1><code>npm install -D deictic</code>
         <p>Signed in as <span class="rr-mask">Ada Lovelace</span></p>
@@ -61,7 +63,12 @@ async function open(): Promise<{ page: Page; snapshot: (scroll?: number) => Prom
               .map(strip),
           }
         : node;
-    return { snapshot: strip(taken!), url: server.url.href, viewport, scroll: { x: 0, y: scroll }, scale: 1 };
+    // The page without its scrollbar, and the window with it, as the page half says them.
+    const inside = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
+    }));
+    return { snapshot: strip(taken!), url: server.url.href, viewport: inside, window: viewport, scroll: { x: 0, y: scroll }, scale: 1 };
   };
   return { page, snapshot };
 }
@@ -101,8 +108,11 @@ test.skipIf(browser === undefined)(
       for (const el of document.querySelectorAll('.rr-mask, deictic-overlay')) el.remove();
     });
     for (const scroll of [0, 900]) {
-      const live = new Uint8Array(await page.evaluate((y) => scrollTo(0, y), scroll).then(() => page.screenshot()));
-      const drawn = await render(await snapshot(scroll), {});
+      const shot = await snapshot(scroll);
+      // The page is tall, so it has a scrollbar, which a shot leaves out.
+      expect(shot.viewport.width).toBeLessThan(viewport.width);
+      const live = new Uint8Array(await page.screenshot({ clip: { x: 0, y: 0, ...shot.viewport } }));
+      const drawn = await render(shot, {});
       const n = await differing(page, live, drawn);
       expect(n).toBeGreaterThanOrEqual(0);
       expect(n).toBeLessThanOrEqual(ALLOWED);

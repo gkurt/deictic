@@ -6,6 +6,11 @@
  * The snapshot is rebuilt into a sandboxed iframe filling a blank page on the page's own origin, which
  * Playwright answers itself, so nothing asks the dev server for it: rrweb has made the snapshot's URLs
  * whole, and its stylesheets' fonts and images load from the dev server as the page's did.
+ *
+ * The browser is as big as the page's window, scrollbars and all, and shows its own: a media query asks the
+ * window's width, and the page is laid out in what the scrollbar leaves. At the width without it, a window
+ * right on a breakpoint (1024 wide, 1009 to lay out in) would render as the narrower layout. The shot is then
+ * cut to the part the page is in.
  */
 import { createRequire } from 'node:module';
 
@@ -22,6 +27,8 @@ export interface Snapshot {
   snapshot: SnapshotNode;
   url: string;
   viewport: { width: number; height: number };
+  /** The window's size, scrollbars included, where it has any: what the page's media queries ask. */
+  window?: { width: number; height: number };
   scroll: { x: number; y: number };
   scale: number;
   /** The part of the viewport to keep, for a shot of an element alone. */
@@ -46,15 +53,18 @@ export function browserOf(options: BrowserOptions): Promise<Browser> {
   return launched;
 }
 
+/** Playwright hides a headless browser's scrollbars, and with them the room they take in the page. */
+const SCROLLBARS = { ignoreDefaultArgs: ['--hide-scrollbars'] };
+
 async function launch({ executablePath, channel }: BrowserOptions): Promise<Browser> {
   const { chromium } = await import('playwright-core').catch((e: unknown) => {
     throw new Error('the rrweb() renderer needs playwright-core: add it to your devDependencies', { cause: e });
   });
-  if (executablePath !== undefined || channel !== undefined) return chromium.launch({ executablePath, channel });
+  if (executablePath !== undefined || channel !== undefined) return chromium.launch({ executablePath, channel, ...SCROLLBARS });
   const tried: string[] = [];
   for (const attempt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
     try {
-      return await chromium.launch(attempt);
+      return await chromium.launch({ ...attempt, ...SCROLLBARS });
     } catch (e) {
       tried.push(
         `${'channel' in attempt ? attempt.channel : "Playwright's Chromium"}: ${(e instanceof Error ? e.message : String(e)).split('\n', 1)[0]}`,
@@ -74,7 +84,7 @@ export async function render(input: unknown, options: BrowserOptions): Promise<U
   if (typeof shot?.url !== 'string' || typeof shot.snapshot !== 'object' || typeof shot.viewport?.width !== 'number')
     throw new Error('screenshots: that is not a snapshot the rrweb() renderer took');
   const browser = await browserOf(options);
-  const context = await browser.newContext({ viewport: shot.viewport, deviceScaleFactor: shot.scale });
+  const context = await browser.newContext({ viewport: shot.window ?? shot.viewport, deviceScaleFactor: shot.scale });
   try {
     const page = await context.newPage();
     const host = new URL('/__deictic/plugins/screenshots/host', shot.url).href;
@@ -102,7 +112,8 @@ export async function render(input: unknown, options: BrowserOptions): Promise<U
       marks.innerHTML = overlay;
       document.body.append(marks);
     }, shot);
-    const clip = shot.clip === undefined ? undefined : clamp(shot.clip, shot.viewport);
+    // Without the scrollbars: a shot is what the page is drawn in, which is what an element's box is from.
+    const clip = clamp(shot.clip ?? { x: 0, y: 0, ...shot.viewport }, shot.viewport);
     return new Uint8Array(await page.screenshot({ type: 'png', ...(clip === undefined ? {} : { clip }) }));
   } finally {
     await context.close();
