@@ -129,8 +129,12 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 
 In the Task tab a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
 
-A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
-`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them.
+A task's text is the words typed, and nothing else. The rest is its attachments and labels: `deictic.project`,
+`deictic.at` (the element's `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your
+own beside them. What's attached and drawn is numbered from 1: `deictic.screenshot.1` is a shot's file, with
+`.position` and `.size` (where the element is in it) and `.note.1` (a note drawn on it); `deictic.note.1` is a note
+drawn on the page; `deictic.recording.1` with `.replay`, and `deictic.voice.1`; `deictic.pointed` is the path to what
+was pointed at inside the element; `deictic.dropped.1` is something attached that wasn't kept any more.
 `deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared
 component's line is the same wherever it's used; these say where: with React in development the components that use
 it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,

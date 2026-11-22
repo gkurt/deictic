@@ -100,13 +100,14 @@ test("names the project: the package.json's name, or the option's", async () => 
   expect((await labelsOf('renamed', { project: 'shop' }))['deictic.project']).toBe('shop');
 });
 
-test("a URL too long for a label stays in the task's text", async () => {
+test('a URL too long for a label goes with its path only', async () => {
   const { post, target } = setup('long');
   const page = `${ORIGIN}/pricing?q=${'x'.repeat(300)}`;
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, page } });
   const { message } = await team.thread(json.model.tasks[0]!.id);
   expect(message.labels['deictic.url']).toBeUndefined();
-  expect(message.text).toBe(`${op.text}\n---\n${page}`);
+  expect(message.labels['deictic.page']).toBe('/pricing');
+  expect(message.text).toBe(op.text);
 });
 
 test('says what was pointed at inside the element, where nothing marked it', async () => {
@@ -115,10 +116,16 @@ test('says what was pointed at inside the element, where nothing marked it', asy
     path: '#shadow-root > div.panel.pinned > div.head > button.tab:nth-of-type(2)',
     html: '<button class="tab">Tailwind</button>',
   };
-  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, pointed } });
+  const html = '<h1 class="text-4xl">Pricing</h1>';
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, pointed, html } });
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.text).toContain(`Pointed at, inside it: \`${pointed.path}\``);
-  expect(message.text).toContain(pointed.html);
+  expect(message.labels['deictic.pointed']).toBe(pointed.path);
+  expect(message.text).toBe(op.text);
+  // Its HTML is in the element's; a file of its own only without that.
+  expect(message.attachments.map((a) => a.name)).toEqual(['element.html']);
+  const alone = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, pointed } });
+  const { attachments } = (await team.thread(alone.json.model.tasks.at(-1)!.id)).message;
+  expect(attachments).toEqual([expect.objectContaining({ name: 'pointed.html', size: pointed.html.length })]);
 });
 
 test('says the source it rendered through, and attaches its HTML as it rendered', async () => {
@@ -210,9 +217,10 @@ test('refuses to undo a task someone has claimed', async () => {
 
 test("edits a task's words, keeping what follows them, and undo puts them back", async () => {
   const { post, target } = setup('edit');
-  const pointed = { path: 'span.icon', html: '<span class="icon"></span>' };
-  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, pointed } });
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;
+  // As a task added before what's attached was labels says it after its words.
+  await team.edit(id, `${op.text}\n---\nPointed at, inside it: \`span.icon\``);
   const before = (await team.thread(id)).message.text;
 
   const edited = await post<{ model: Model; change: { label: string } }>('apply', {

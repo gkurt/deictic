@@ -72,10 +72,14 @@ test('a task attaches the shot it names, and leaves out one no longer kept', asy
     },
   });
   const { message } = await team.thread(model.tasks[0]!.id);
-  // One shot's place is a label; the text has a line for it only when marks are drawn on it.
-  expect(message.labels).toMatchObject({ 'deictic.position': '10,20', 'deictic.size': '300x24' });
-  expect(message.text).not.toContain('The screenshot has');
-  expect(message.text).toContain('2 marks on the page, drawn in the screenshot; the notes say: "Make it red"');
+  // What's attached and drawn is labels, numbered from 1; the text is what was typed.
+  expect(message.labels).toMatchObject({
+    'deictic.screenshot.1': `${id}.png`,
+    'deictic.screenshot.1.position': '10,20',
+    'deictic.screenshot.1.size': '300x24',
+    'deictic.note.1': 'Make it red',
+  });
+  expect(message.text).toBe('Too tight');
   expect(message.attachments).toEqual([expect.objectContaining({ name: `${id}.png`, type: 'image/png', size: PNG.length })]);
 
   const box = { x: 0, y: 0, width: 1, height: 1 };
@@ -95,7 +99,8 @@ test('a task attaches the shot it names, and leaves out one no longer kept', asy
   const sent = partly.model.tasks.at(-1)!;
   expect(sent.dropped).toBe('a screenshot');
   const kept = (await team.thread(sent.id)).message;
-  expect(kept.text).toContain("Not attached, as it wasn't kept any more: a screenshot");
+  expect(kept.labels['deictic.dropped.1']).toBe('screenshot');
+  expect(kept.text).toBe('Too tight');
   expect(kept.attachments.filter((a) => a.type === 'image/png')).toHaveLength(1);
   // With nothing else to say what should change, it's refused.
   const none = [
@@ -139,7 +144,7 @@ test('takes a PNG and nothing else from a renderer without render', async () => 
   expect(await add('{}', 'application/json')).toMatchObject({ status: 415, problem: 'send the shot as image/png' });
 });
 
-test('a task attaches each shot drawn on, saying what was drawn on which', async () => {
+test('a task attaches each shot, labelling where the element is in which and the notes drawn on it', async () => {
   const { p, ask, add } = setup();
   const [one, two] = [await add(), await add()];
   const res = await ask('apply', {
@@ -155,7 +160,7 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
 
         count: 1,
         screenshots: [
-          { id: one.id, box: { x: 10, y: 20, width: 300, height: 24 }, marks: { count: 2, notes: ['Too close'] } },
+          { id: one.id, box: { x: 10, y: 20, width: 300, height: 24 }, marks: { count: 2, notes: ['Too close', 'Two\nlines'] } },
           { id: two.id, box: { x: 0, y: 0, width: 300, height: 24 }, outlined: true },
         ],
       },
@@ -163,9 +168,17 @@ test('a task attaches each shot drawn on, saying what was drawn on which', async
   });
   const { model } = (await res.json()) as { model: Model };
   const { message } = await team.thread(model.tasks.at(-1)!.id);
-  expect(message.text).toContain('In screenshot 1 at x 10, y 20, 300×24, with 2 marks drawn on it; the notes say: "Too close"');
-  expect(message.text).toEndWith('\nIn screenshot 2 at x 0, y 0, 300×24');
-  expect(message.labels['deictic.position']).toBeUndefined();
-  expect(message.labels['deictic.size']).toBeUndefined();
+  expect(message.text).toBe('Too tight');
+  expect(message.labels).toMatchObject({
+    'deictic.screenshot.1': `${one.id}.png`,
+    'deictic.screenshot.1.position': '10,20',
+    'deictic.screenshot.1.note.1': 'Too close',
+    // A board takes no control characters in a label.
+    'deictic.screenshot.1.note.2': 'Two lines',
+    'deictic.screenshot.2': `${two.id}.png`,
+    'deictic.screenshot.2.position': '0,0',
+    'deictic.screenshot.2.size': '300x24',
+  });
+  expect(message.labels['deictic.screenshot.2.note.1']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
 });

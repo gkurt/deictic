@@ -35,6 +35,7 @@ export function run(id: string, values: { out?: string }): void {
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
     ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
+    // A task added before shots were numbered had its one shot's place here.
     ['deictic.position', (v) => `In the screenshot at x,y ${v}, ${label('deictic.size') ?? '?'} (CSS pixels from its top left)`],
   ];
   for (const [key, say] of facts) {
@@ -42,10 +43,16 @@ export function run(id: string, values: { out?: string }): void {
     const line = value === undefined ? undefined : say(value);
     if (line !== undefined) console.log(line);
   }
-  // What no label holds: what's attached and drawn on it.
+  for (const line of drawn(root.labels)) console.log(line);
+  // A task added before these were labels says them after its words.
   const told = (pointed ? where.slice(0, pointed.index) : where).trim();
   if (told !== '') console.log(told);
   if (pointed) console.log(`\nPointed at, inside it: ${pointed[1]}\n  ${pointed[2]}`);
+  const path = label('deictic.pointed');
+  if (path !== undefined) {
+    const file = root.attachments.some((a) => a.name === 'pointed.html') ? 'pointed.html' : 'element.html';
+    console.log(`\nPointed at, inside it: ${path} (its HTML is in ${file})`);
+  }
 
   if (at !== undefined) placeOf(at, label('deictic.line'));
   attachments(root, values.out === undefined ? undefined : resolve(values.out));
@@ -53,6 +60,35 @@ export function run(id: string, values: { out?: string }): void {
   if (replies.length > 0) console.log('\nReplies:');
   for (const r of replies) console.log(`  ${r.author?.handle ?? r.by.actor}: ${r.text}`);
   others(root);
+}
+
+/**
+ * What's attached and drawn, from the numbered labels: where the element is in each shot and the notes on it, the
+ * notes drawn on the page, where each recording replays, and what wasn't kept any more.
+ */
+function drawn(labels: Record<string, string>): string[] {
+  const numbered = (prefix: string) => {
+    const out: string[] = [];
+    for (let n = 1; labels[`${prefix}.${n}`] !== undefined; n++) out.push(`${prefix}.${n}`);
+    return out;
+  };
+  const notes = (prefix: string) => numbered(`${prefix}.note`).map((key) => JSON.stringify(labels[key]));
+  const lines: string[] = [];
+  for (const [i, shot] of numbered('deictic.screenshot').entries()) {
+    const said = notes(shot);
+    lines.push(
+      `Screenshot ${i + 1}, ${labels[shot]}: the element at x,y ${labels[`${shot}.position`] ?? '?'}, ${labels[`${shot}.size`] ?? '?'} (CSS pixels from its top left)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
+    );
+  }
+  const onPage = notes('deictic');
+  if (onPage.length > 0) lines.push(`Notes drawn on the page: ${onPage.join(', ')}`);
+  for (const [i, recording] of numbered('deictic.recording').entries()) {
+    const replay = labels[`${recording}.replay`];
+    lines.push(`Recording ${i + 1}, ${labels[recording]}${replay === undefined ? '' : `: replays at ${replay}`}`);
+  }
+  const dropped = numbered('deictic.dropped').map((key) => labels[key]);
+  if (dropped.length > 0) lines.push(`Not attached, as it wasn't kept any more: ${dropped.join(', ')}`);
+  return lines;
 }
 
 /** The place as the task saw it, against the file now: the element's opening tag may have moved or changed. */

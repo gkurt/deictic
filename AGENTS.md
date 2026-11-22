@@ -256,15 +256,18 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   recordings and voice, in their tabs' order, then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
-  peer, imported when first used). `index.ts` writes the task's text (what was typed, or `See the recording` and the like where
-  only something attached says it, then only what no label
-  holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
-  or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, `source`, and `position` and `size` with one shot), under
-  the user's own `labels`; the source isn't sent. `deictic.source` is the chain it rendered through, out from its own
+  peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where
+  only something attached says it), and the rest as labels (`deictic.project`, from the `project` option
+  or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url` where it fits, `viewport`, `count`, `source`), under
+  the user's own `labels`; the source isn't sent. What's attached and drawn is labels numbered from 1 (`attachedLabels`):
+  `screenshot.N` (its file) with `.position`, `.size` and `.note.M`, `note.M` on the page, `recording.N` with `.replay` and
+  `.voice.M`, `voice.N`, `dropped.N` and `pointed` (the path; its HTML is in `element.html`, or `pointed.html` without
+  it). Control characters become spaces and a value is cut at 256. `deictic task` prints them. A task added before has them
+  after a `---` in its text, which `deictic task` prints as it is and an edit keeps. `deictic.source` is the chain it rendered through, out from its own
   place, `deictic.at` (`Op.chain`, three at most, the farthest left out where they're past a label's 256 characters: with React in development the
   components that wrote it, read off the fibers' owners, each `Name (file:line)` with the line of its nearest element around
   this one, or its name alone where it has none; otherwise `file:line`s read off the marks around it, the nearest of each file
-  in turn: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is never in the text, which stays short: it's attached as `element.html`
+  in turn: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is attached as `element.html`
   (`Op.html`, masked by `screenshots.masked` where that's loaded; sent while the panel's Attach HTML snapshot box is ticked,
   as it is by default, and the `html: false` option, a `clientOptions`, takes the box away), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`, the
   rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
@@ -286,7 +289,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
-  left out, not the task: `keptOf` drops it from the op, the text says so on a `Not attached, …` line, which `read`
+  left out, not the task: `keptOf` drops it from the op, `deictic.dropped.N` says so, which `read`
   gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. With annotations
   loaded, Annotate captures a shot and `edit`s it: saved, each is a chip (removable; removing the last unticks the
   box). Every chip opens one lightbox of all that's attached, at itself: a shot with Change marks, a recording's
@@ -294,7 +297,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   has the element outlined in it (`outlined`, in green dashes `ROOM` off it, drawn on and kept again), which the op says (`outlined`), not the text. `Op.screenshots`
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
-  `Op.recordings` attaches each one's JSON (and its voice clips) and says how long it ran and where it replays.
+  `Op.recordings` attaches each one's JSON (and its voice clips), and its label says where it replays.
   The kept state has `facts` too, what only the element's page says (page, viewport, count, chain, pointed, HTML): a
   recording stopped on a page without the element comes back to a panel with no shot to take, and the task says those.
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its

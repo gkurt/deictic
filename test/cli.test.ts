@@ -74,6 +74,8 @@ test("reads a task on the project's own board, and a watch says what's ready and
           viewport: { width: 390, height: 844 },
           count: 1,
           chain: ['Hero (src/Hero.tsx:4)'],
+          annotations: { count: 1, notes: ['Bolder'] },
+          pointed: { path: 'span.icon', html: '<span class="icon"></span>' },
         },
       }),
     }),
@@ -88,6 +90,8 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(task.out).toContain('Make it bolder');
   expect(task.out).toContain('src/App.tsx:1:');
   expect(task.out).toContain('Source: src/App.tsx:1 ← Hero (src/Hero.tsx:4)');
+  expect(task.out).toContain('Notes drawn on the page: "Bolder"');
+  expect(task.out).toContain('Pointed at, inside it: span.icon (its HTML is in pointed.html)');
   expect(task.out).toContain(`File: ${join(p.root, 'src/App.tsx')}:1, as the task saw it.`);
 
   const watch = deictic(p.root, 'watch', 'cli', '--once');

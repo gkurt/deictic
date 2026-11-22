@@ -48,7 +48,9 @@ export async function loadRecording(ref: string | undefined, nth = 1): Promise<F
     const file = files[nth - 1];
     if (file === undefined) fail(`Task #${root.id} has ${files.length} recording(s), not a ${nth}th.`);
     const id = file.name.slice('recording-'.length, -'.json'.length);
-    const replay = new RegExp(`https?://\\S+/replay/${id}`).exec(root.text)?.[0];
+    // Its `deictic.recording.N.replay` label, or in the text of a task added before that was a label.
+    const where = (text: string) => new RegExp(`https?://\\S+/replay/${id}`).exec(text)?.[0];
+    const replay = Object.values(root.labels).map(where).find(Boolean) ?? where(root.text);
     return { kept: parsed(fetched(root, file.name)), id, replay, task: root };
   }
   if (/^https?:/.test(ref)) {

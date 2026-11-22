@@ -214,8 +214,6 @@ const AT = 'deictic.at';
 const FILE = 'deictic.file';
 /** What parts what was typed from the rest of a task's text. */
 const REST = '\n---\n';
-/** The line that says what was attached but not kept, which the panel reads back to say so. */
-const DROPPED = "Not attached, as it wasn't kept any more: ";
 /** A file for the board, as the plugins that keep them read it. */
 type Upload = { data: Uint8Array<ArrayBuffer>; name: string; type: string };
 const OPEN = new Set(['waiting', 'ready', 'blocked']);
@@ -321,31 +319,40 @@ export function tasks(options: TasksOptions = {}) {
   const keptOf = (op: Op) => {
     const clipOf = (id: string): ReturnType<Clips['read']> => context?.use('voice')?.read(id);
     const files: Upload[] = [];
-    const dropped: string[] = [];
-    const take = (file: Upload | undefined, missing: string) => {
-      if (file === undefined) dropped.push(missing);
-      else files.push(file);
+    // Each file's name on the board, by its ID: the labels say which attachment is which.
+    const names = new Map<string, string>();
+    const dropped: Kind[] = [];
+    const take = (id: string, file: Upload | undefined, missing: Kind) => {
+      if (file === undefined) {
+        dropped.push(missing);
+      } else {
+        files.push(file);
+        names.set(id, file.name);
+      }
       return file !== undefined;
     };
-    const screenshots = (op.screenshots ?? []).filter(({ id }) => take(context?.use('screenshots')?.read(id), 'a screenshot'));
+    const screenshots = (op.screenshots ?? []).filter(({ id }) => take(id, context?.use('screenshots')?.read(id), 'screenshot'));
     const recordings = (op.recordings ?? []).flatMap((recording) => {
       const found: ReturnType<Recordings['read']> = context?.use('recordings')?.read(recording.id);
-      if (!take(found, 'a recording')) return [];
+      if (!take(recording.id, found, 'recording')) return [];
       if (recording.voice === undefined) return [recording];
-      const clipped = (id: string) => take(clipOf(id), 'a voice clip');
+      const clipped = (id: string) => take(id, clipOf(id), 'voice clip');
       return [{ ...recording, voice: recording.voice.filter(clipped) }];
     });
-    const voice = (op.voice ?? []).filter(({ id }) => take(clipOf(id), 'a voice note'));
-    // Last, and a file, not the task's words: it's there to look into, and most tasks are done without it.
-    if (typeof op.html === 'string' && op.html !== '')
-      files.push({ data: new TextEncoder().encode(op.html.slice(0, HTML)), name: 'element.html', type: 'text/html' });
+    const voice = (op.voice ?? []).filter(({ id }) => take(id, clipOf(id), 'voice note'));
+    // Last, and files, not the task's words: there to look into, and most tasks are done without them. What was
+    // pointed at is in the element's HTML, and a file of its own only where that isn't attached.
+    const html = typeof op.html === 'string' && op.html !== '' ? op.html : undefined;
+    if (html !== undefined) files.push({ data: new TextEncoder().encode(html.slice(0, HTML)), name: 'element.html', type: 'text/html' });
+    else if (op.pointed !== undefined)
+      files.push({ data: new TextEncoder().encode(op.pointed.html.slice(0, HTML)), name: 'pointed.html', type: 'text/html' });
     const kept: Op = {
       ...op,
       ...(op.screenshots === undefined ? {} : { screenshots }),
       ...(op.recordings === undefined ? {} : { recordings }),
       ...(op.voice === undefined ? {} : { voice }),
     };
-    return { op: kept, files, dropped };
+    return { op: kept, files, names, dropped };
   };
   /** The files uploaded to the board, or nothing when there are none. */
   const upload = async (files: Upload[]): Promise<string[] | undefined> => {
@@ -396,11 +403,8 @@ export function tasks(options: TasksOptions = {}) {
           const by = actors.get(actorOf(message) ?? '')?.name;
           const text = message.text.split(REST, 1)[0]!;
           const to = taskLink(page, message.id);
-          const dropped = message.text
-            .slice(text.length + REST.length)
-            .split('\n')
-            .find((line) => line.startsWith(DROPPED))
-            ?.slice(DROPPED.length);
+          const missing = Object.entries(message.labels).flatMap(([key, value]) => (/^deictic\.dropped\.\d+$/.test(key) ? [value] : []));
+          const dropped = missing.length === 0 ? undefined : listOf(missing);
           const task = {
             id: message.id,
             title: text.split('\n', 1)[0]!,
@@ -446,24 +450,25 @@ export function tasks(options: TasksOptions = {}) {
       if ('edit' in op) {
         return asked(async () => {
           const before = (await openTask(await boardOf(), op.edit, 'edit')).text;
-          // What follows the words (what's attached, what was pointed at) stays as it was.
+          // What follows the words in a task added before they were labels (what's attached, what was pointed at) stays.
           const rest = before.includes(REST) ? before.slice(before.indexOf(REST)) : '';
           const after = clip(op.text.trim(), 10_000 - rest.length) + rest;
           await rewrite(op.edit, before, after);
           return { done: { kind: 'edited' as const, id: op.edit, before, after } };
         });
       }
-      const { op: kept, files, dropped } = keptOf(op);
+      const { op: kept, files, names, dropped } = keptOf(op);
       const verb = dropped.length === 1 ? "isn't" : "aren't";
       if (wordsOf(kept) === '') throw new Refusal(`${listOf(dropped)} ${verb} kept any more: attach again, or say what should change`);
       const labels = {
         ...options.labels,
         ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
         ...labelsOf(source, target, kept),
+        ...attachedLabels(kept, names, dropped),
       };
       return asked(async () => {
         const attachments = await upload(files);
-        const text = textOf(kept, dropped);
+        const text = clip(wordsOf(kept), 10_000);
         return { done: await create({ channel, text, labels, ...(attachments === undefined ? {} : { attachments }) }) };
       });
     },
@@ -512,58 +517,43 @@ async function localPage(team: TaskBoard, channel: string): Promise<string | und
   return `${url.origin}${url.pathname.slice(0, -'/api/board'.length)}/c/${channel.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
-const said = (notes: string[]) => (notes.length === 0 ? '' : `; the notes say: ${notes.map((n) => JSON.stringify(n)).join(', ')}`);
-
-/** What was marked on the page: how many marks, and what the notes say. */
-function annotated({ count, notes }: Marks, shots: number, recordings: number): string {
-  const where = [
-    ...(shots === 0 ? [] : [shots === 1 ? 'the screenshot' : 'the screenshots']),
-    ...(recordings === 0 ? [] : [recordings === 1 ? 'the recording' : 'the recordings']),
-  ];
-  const drawn = where.length === 0 ? '' : `, drawn in ${where.join(' and ')}`;
-  return `${plural(count, 'mark')} on the page${drawn}${said(notes)}`;
-}
-
-/** How long each recording ran, and where it plays back, while the dev server keeps it. */
-function recordingsOf(recordings: NonNullable<Op['recordings']>): string[] {
-  return recordings.map(({ duration, replay, voice }, i) => {
-    const name = recordings.length === 1 ? 'A recording' : `Recording ${i + 1}`;
-    const spoken = voice === undefined || voice.length === 0 ? '' : `, with the voice (${voice.map((id) => `voice-${id}`).join(', ')})`;
-    return `${name}, ${clock(duration)} long, attached as rrweb events${spoken}; it replays at ${replay}`;
-  });
-}
-
-/** How long each voice note runs, and the attachment it's in. */
-function voicesOf(voice: NonNullable<Op['voice']>): string[] {
-  return voice.map(({ id, duration }, i) => {
-    const name = voice.length === 1 ? 'A voice note' : `Voice note ${i + 1}`;
-    return `${name}, ${clock(duration)} long, attached as voice-${id}`;
-  });
-}
-
-const clock = (ms: number) => {
-  const s = Math.round(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
+/** What may be left out of a task as no longer kept, as `deictic.dropped.N` names it. */
+type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
 
 /**
- * The marks drawn on each shot, and with several, where the element is in each. One shot's place is the
- * `deictic.position` and `deictic.size` labels, so a shot with no marks has no line.
+ * What's attached and drawn, as labels numbered from 1, so each value is short and none is read out of the text:
+ * `deictic.screenshot.1` is a shot's file, its `.position` and `.size` where the element is in it (CSS pixels from
+ * its top left), `.note.1` a note drawn on it; `deictic.note.1` a note drawn on the page; `deictic.recording.1`, its
+ * `.replay`, and `.voice.1` a clip of the mic in it; `deictic.voice.1` a voice note; `deictic.dropped.1` what wasn't
+ * kept any more; `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
  */
-function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
-  const [only] = shots;
-  if (shots.length === 1 && only !== undefined) {
-    const { marks } = only;
-    return marks === undefined || marks.count === 0
-      ? []
-      : [`The screenshot has ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`];
-  }
-  return shots.map(({ box, marks }, i) => {
-    const drawn = marks === undefined || marks.count === 0 ? '' : `, with ${plural(marks.count, 'mark')} drawn on it${said(marks.notes)}`;
+function attachedLabels(op: Op, names: Map<string, string>, dropped: Kind[]): Record<string, string> {
+  const labels: Record<string, string> = {};
+  // A board takes no control characters in a label: a note's lines go on one.
+  const set = (key: string, value: string) => {
+    labels[`deictic.${key}`] = clip(value.replace(/\p{Cc}+/gu, ' '), LABEL);
+  };
+  const fileOf = (id: string) => names.get(id) ?? id;
+  for (const [i, { id, box, marks }] of (op.screenshots ?? []).entries()) {
+    const n = `screenshot.${i + 1}`;
     const [x, y, width, height] = boxOf(box);
-    return `In screenshot ${i + 1} at x ${x}, y ${y}, ${width}×${height}${drawn}`;
-  });
+    set(n, fileOf(id));
+    set(`${n}.position`, `${x},${y}`);
+    set(`${n}.size`, `${width}x${height}`);
+    for (const [j, note] of (marks?.notes ?? []).entries()) set(`${n}.note.${j + 1}`, note);
+  }
+  for (const [j, note] of (op.annotations?.notes ?? []).entries()) set(`note.${j + 1}`, note);
+  for (const [i, { id, replay, voice }] of (op.recordings ?? []).entries()) {
+    const n = `recording.${i + 1}`;
+    set(n, fileOf(id));
+    // Not cut: half a URL leads nowhere.
+    if (replay.length <= LABEL) set(`${n}.replay`, replay);
+    for (const [j, clipId] of (voice ?? []).entries()) set(`${n}.voice.${j + 1}`, fileOf(clipId));
+  }
+  for (const [i, { id }] of (op.voice ?? []).entries()) set(`voice.${i + 1}`, fileOf(id));
+  for (const [i, kind] of dropped.entries()) set(`dropped.${i + 1}`, kind);
+  if (op.pointed !== undefined) set('pointed', op.pointed.path);
+  return labels;
 }
 
 /**
@@ -604,10 +594,9 @@ function nameOf(root: string): string | undefined {
 /**
  * The facts about the element, as labels: short values a script reads without parsing the text, and a watch
  * filters by. `deictic.line` is the opening tag's first line as the task saw it, to tell later that it moved.
- * `deictic.url` is the page's whole URL, where a label holds it: `textOf` says a longer one.
+ * `deictic.url` is the page's whole URL, where a label holds it; `deictic.page` is its path.
  */
 function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<string, string> {
-  const [shot] = op.screenshots ?? [];
   return {
     [AT]: atOf(target),
     [FILE]: clip(target.loc.file, LABEL),
@@ -618,15 +607,8 @@ function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<stri
     ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
     'deictic.count': String(op.count),
-    ...(op.screenshots?.length === 1 && shot !== undefined ? placeOf(shot.box) : {}),
     ...sourceOf(op.chain ?? []),
   };
-}
-
-/** Where the element is in the one shot, from its top left, and how big: `87,387` and `138x32`, as the viewport is written. */
-function placeOf(box: Box): Record<string, string> {
-  const [x, y, width, height] = boxOf(box);
-  return { 'deictic.position': `${x},${y}`, 'deictic.size': `${width}x${height}` };
 }
 
 /**
@@ -670,25 +652,6 @@ function placeIn(labels: Record<string, string>): Place | undefined {
   return { line: Number(line), column: Number(column), tag: labels['deictic.tag'] ?? '' };
 }
 
-/**
- * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, what
- * was pointed at inside it, and a URL too long for a label.
- * A board holds 10,000 characters.
- */
-function textOf(op: Op, dropped: string[]): string {
-  const more = [
-    ...(op.page.length <= LABEL ? [] : [op.page]),
-    ...(dropped.length === 0 ? [] : [`${DROPPED}${listOf(dropped)}`]),
-    ...shotsOf(op.screenshots ?? []),
-    ...recordingsOf(op.recordings ?? []),
-    ...voicesOf(op.voice ?? []),
-    ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
-    ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
-  ];
-  const tail = more.length === 0 ? '' : REST + more.join('\n');
-  return clip(wordsOf(op), 10_000 - tail.length) + tail;
-}
-
 /** The task's words: what was typed, or where nothing was, a line that sends the reader to what's attached. */
 const wordsOf = (op: Op) => (op.text.trim() === '' ? (shown(op) ?? '') : op.text.trim());
 
@@ -701,17 +664,17 @@ function shown(op: Op): string | undefined {
     ...named(op.recordings?.length, 'recording'),
     ...named(op.voice?.length, 'voice note'),
   ];
-  return attached.length === 0 ? undefined : `See ${listOf(attached)}`;
+  return attached.length === 0 ? undefined : `See ${conjunction(attached)}`;
 }
 
-/** `a screenshot and 2 voice notes`. */
-function listOf(things: string[]): string {
-  const counted = Map.groupBy(things, (thing) => thing);
-  const named = [...counted].map(([thing, all]) => (all.length === 1 ? thing : `${all.length} ${thing.replace(/^an? /, '')}s`));
-  return new Intl.ListFormat('en', { type: 'conjunction' }).format(named);
+/** `a screenshot and 2 voice notes`, of `deictic.dropped.N`'s values. */
+function listOf(kinds: string[]): string {
+  return conjunction(
+    [...Map.groupBy(kinds, (kind) => kind)].map(([kind, all]) => (all.length === 1 ? `a ${kind}` : `${all.length} ${kind}s`)),
+  );
 }
 
-const fence = (text: string, lang: string) => `\`\`\`\`${lang}\n${clip(text, 1500)}\n\`\`\`\``;
+const conjunction = (things: string[]) => new Intl.ListFormat('en', { type: 'conjunction' }).format(things);
 
 const clip = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
 
