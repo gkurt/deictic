@@ -174,6 +174,11 @@ export interface TaskAdded {
   page: string;
   /** How many of each were attached; `marks` counts those drawn on shots and on the page. */
   attached: { screenshots: number; recordings: number; voice: number; marks: number };
+  /**
+   * Where each attached shot is, as it was sent (outlined, or as it was drawn on), for the page to show: the
+   * screenshots plugin's `shot` route, or what a `standalone` server answered.
+   */
+  screenshots: string[];
 }
 
 /** Marks, as a task tells of them: how many, and what the notes among them say. */

@@ -132,6 +132,9 @@ interface Chip extends Drawn {
   url: string;
 }
 
+/** A shot as the op attaches it, and where it is, for the page to hear of; the op goes without that. */
+type Sent = NonNullable<Op['screenshots']>[number] & { url: string };
+
 /** What the panel keeps while it's away recording: what's typed, ticked and attached. */
 interface Kept {
   text: string;
@@ -311,7 +314,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<H
 export const TASK_ADDED = 'deictic:task';
 
 /** Tells the page of a task just added: the newest of the element's tasks, as the board answered them. */
-function announce(model: Model, op: Op, target: Target): void {
+function announce(model: Model, op: Op, target: Target, shots: string[]): void {
   const task = model.tasks.at(-1);
   if (task === undefined) return;
   const marks = (op.annotations?.count ?? 0) + (op.screenshots ?? []).reduce((n, shot) => n + (shot.marks?.count ?? 0), 0);
@@ -328,6 +331,7 @@ function announce(model: Model, op: Op, target: Target): void {
       voice: op.voice?.length ?? 0,
       marks,
     },
+    screenshots: shots,
   };
   window.dispatchEvent(new CustomEvent(TASK_ADDED, { detail }));
 }
@@ -795,16 +799,15 @@ export default defineClientPlugin<Model, Change>({
      * box is ticked. Only that one has the element outlined in it (or is as it was taken, where that can't be
      * drawn): nothing else in it says what it's about, while a shot someone annotated says what they marked.
      */
-    const screenshotsOf = async (): Promise<Op['screenshots']> => {
+    const screenshotsOf = async (): Promise<Sent[] | undefined> => {
       if (shots === undefined) return undefined;
       if (chips.length > 0) {
         add.textContent = 'Uploading…';
         return Promise.all(
-          chips.map(async ({ shot: taken, marks, png }) => ({
-            id: (await shots.upload(png, taken)).id,
-            box: taken.box,
-            ...(marks.length === 0 ? {} : { marks: marksOf(marks) }),
-          })),
+          chips.map(async ({ shot: taken, marks, png }) => {
+            const { id, url } = await shots.upload(png, taken);
+            return { id, url, box: taken.box, ...(marks.length === 0 ? {} : { marks: marksOf(marks) }) };
+          }),
         );
       }
       // With a recording attached the box is away, so no shot is asked for.
@@ -812,9 +815,10 @@ export default defineClientPlugin<Model, Change>({
       add.textContent = 'Capturing…';
       const taken = await shots.capture(context.element);
       try {
-        return [{ id: (await shots.upload(await outlined(taken.url, taken), taken)).id, box: taken.box, outlined: true }];
+        const { id, url } = await shots.upload(await outlined(taken.url, taken), taken);
+        return [{ id, url, box: taken.box, outlined: true }];
       } catch {
-        return [{ id: taken.id, box: taken.box }];
+        return [{ id: taken.id, url: taken.url, box: taken.box }];
       }
     };
 
@@ -826,7 +830,7 @@ export default defineClientPlugin<Model, Change>({
       sending = true;
       able();
       problem.textContent = '';
-      let screenshots: Op['screenshots'];
+      let screenshots: Sent[] | undefined;
       try {
         screenshots = await screenshotsOf();
       } catch (e) {
@@ -844,7 +848,7 @@ export default defineClientPlugin<Model, Change>({
           text: text.value,
           ...said,
           ...(sendsHtml && withHtml.checked ? { html } : {}),
-          ...(screenshots === undefined ? {} : { screenshots }),
+          ...(screenshots === undefined ? {} : { screenshots: screenshots.map(({ url: _, ...shot }) => shot) }),
           ...(recordings.length === 0
             ? {}
             : {
@@ -860,7 +864,12 @@ export default defineClientPlugin<Model, Change>({
         };
         const model = await context.apply(op);
         render(model);
-        announce(model, op, context.target);
+        announce(
+          model,
+          op,
+          context.target,
+          (screenshots ?? []).map((shot) => shot.url),
+        );
         text.value = '';
         reset();
         const dropped = model.tasks.at(-1)?.dropped;

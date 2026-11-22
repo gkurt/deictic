@@ -262,11 +262,11 @@ and `end/<id>` (the `url`) or `discard/<id>`. A recording's is a replay page for
 
 The page hears these on `window`:
 
-| Event           | When                          | `detail`                                               |
-| --------------- | ----------------------------- | ------------------------------------------------------ |
-| `deictic:open`  | the popup opens over the page | the element and the tab                                |
-| `deictic:close` | it closes                     | none                                                   |
-| `deictic:task`  | a task is added               | its ID, title, state, channel, element and attachments |
+| Event           | When                          | `detail`                                                                |
+| --------------- | ----------------------------- | ----------------------------------------------------------------------- |
+| `deictic:open`  | the popup opens over the page | the element and the tab                                                 |
+| `deictic:close` | it closes                     | none                                                                    |
+| `deictic:task`  | a task is added               | its ID, title, state, channel, element, attachments and its shots' URLs |
 
 `openPopup(element, { tab })`, from `deictic/client`, opens the popup from a gesture of your own.
 

@@ -60,29 +60,6 @@ function Guide() {
   );
 }
 
-/** A page in miniature, standing in for the task's screenshot: the board would show the real one. */
-function Shot({ marked }: { marked: boolean }) {
-  return (
-    <svg viewBox="0 0 160 100" className="w-full rounded-md border border-line bg-surface" aria-hidden="true">
-      <rect x="10" y="10" width="60" height="8" rx="2" className="fill-zinc-300 dark:fill-zinc-700" />
-      <rect x="10" y="26" width="110" height="5" rx="2" className="fill-zinc-200 dark:fill-zinc-800" />
-      {[10, 60, 110].map((x) => (
-        <rect
-          key={x}
-          x={x}
-          y="42"
-          width="42"
-          height="48"
-          rx="3"
-          className="fill-zinc-100 stroke-zinc-300 dark:fill-zinc-900 dark:stroke-zinc-700"
-        />
-      ))}
-      <rect x="58" y="40" width="46" height="52" rx="4" fill="none" strokeWidth="2" className="stroke-signal" />
-      {marked && <ellipse cx="81" cy="66" rx="34" ry="32" fill="none" stroke="#ef4444" strokeWidth="2" />}
-    </svg>
-  );
-}
-
 /** Tasks added on this page, newest first, as a board shows them. The Task tab tells of each on `window`. */
 function Board() {
   const [tasks, setTasks] = useState<TaskAdded[]>([]);
@@ -104,7 +81,9 @@ function Board() {
         <ul className="mt-2 space-y-3">
           {tasks.map((task) => (
             <li key={task.id} className="space-y-2 rounded-xl border border-line bg-surface p-3">
-              {task.attached.screenshots > 0 && <Shot marked={task.attached.marks > 0} />}
+              {task.screenshots.map((url) => (
+                <img key={url} src={url} alt="" className="w-full rounded-md border border-line bg-surface" />
+              ))}
               <div className="flex items-start justify-between gap-2">
                 <p className="font-medium">{task.title}</p>
                 <span className="shrink-0 rounded-full bg-signal/15 px-2 py-0.5 font-mono text-[11px] text-signal-text">{task.state}</span>

@@ -301,7 +301,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   The kept state has `facts` too, what only the element's page says (page, viewport, count, chain, pointed, HTML): a
   recording stopped on a page without the element comes back to a panel with no shot to take, and the task says those.
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
-  `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached), which the playground lists as a board.
+  `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached, and each shot's URL as sent),
+  which the playground lists as a board, its shots shown.
   With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
   `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
   project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
