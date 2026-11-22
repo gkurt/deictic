@@ -17,6 +17,8 @@ import { recommended } from '#src/plugins/recommended/index.ts';
 import { installCommand, packageManager, readJson, runnerOf } from '#src/tools/packages.ts';
 
 import { fail, parseArgs } from './board.ts';
+import { addToBunfig, addToServer, BY_HAND, MODULE, PLUGIN, serverOf } from './bun.ts';
+import { addFirst, addImports, eolOf, indentAt } from './edit.ts';
 
 export type Bundler = 'next' | 'astro' | 'vite' | 'rspack' | 'webpack' | 'bun';
 
@@ -80,19 +82,6 @@ const SETUPS: Record<Exclude<Bundler, 'bun'>, Setup> = {
   },
 };
 
-const BUN = `// deictic.plugin.ts
-import { recommended } from 'deictic/recommended';
-import { deictic } from 'deictic/bun';
-export default deictic(${PLUGINS});
-
-# bunfig.toml
-[serve.static]
-plugins = ["./deictic.plugin.ts"]
-
-// where you call Bun.serve
-import tools from './deictic.plugin.ts';
-Bun.serve({ routes: { ...tools.routes, '/*': index } });`;
-
 /** The project's root: the nearest folder with a package.json, from `dir` up. */
 export function rootOf(dir: string): string | undefined {
   for (let at = dir; ; at = dirname(at)) {
@@ -115,7 +104,8 @@ export function bundlerOf(root: string): Bundler | undefined {
   if (has.has('vite') || SETUPS.vite.files.some((f) => existsSync(join(root, f)))) return 'vite';
   if (has.has('@rspack/core') || has.has('@rspack/cli')) return 'rspack';
   if (has.has('webpack')) return 'webpack';
-  if (has.has('@types/bun') || existsSync(join(root, 'bunfig.toml'))) return 'bun';
+  // Bun's own bundler only where a server of the project's has it bundle a page: not every project Bun runs.
+  if (serverOf(root) !== undefined) return 'bun';
   return undefined;
 }
 
@@ -127,7 +117,11 @@ export function packagesFor(bundler: Bundler | undefined): string[] {
 
 type Node = Expression | ObjectExpression;
 
-/** The object an expression comes to: through `defineConfig(…)`, `(…)`, `satisfies`, a function's return and a top-level `const`. */
+/**
+ * The object an expression comes to: through `defineConfig(…)`, `(…)`, `satisfies`, a function's return and a top-level
+ * `const`. Not through another call: in `mergeConfig(base, {…})` or webpack-merge's `merge(common, {…})` the first
+ * argument is a base the project may build with too, and the plugin isn't the base's.
+ */
 function objectOf(node: Node | null | undefined, program: Program, depth = 0): ObjectExpression | undefined {
   if (node == null || depth > 8) return undefined;
   const next = (n: Node | null | undefined) => objectOf(n, program, depth + 1);
@@ -135,8 +129,12 @@ function objectOf(node: Node | null | undefined, program: Program, depth = 0): O
   if (node.type === 'ParenthesizedExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
     return next(node.expression);
   if (node.type === 'CallExpression') {
+    const { callee } = node;
+    const named = (callee.type === 'Identifier' ? callee : callee.type === 'MemberExpression' ? callee.property : undefined) as
+      { type: string; name?: string } | undefined;
     const [first] = node.arguments;
-    return first === undefined || first.type === 'SpreadElement' ? undefined : next(first);
+    if (named?.name !== 'defineConfig' || first === undefined || first.type === 'SpreadElement') return undefined;
+    return next(first);
   }
   if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
     const body = node.body;
@@ -188,7 +186,7 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
   if (errors.length > 0) return undefined;
   const exported = exportedOf(program);
   if (exported === undefined) return undefined;
-  const eol = code.includes('\r\n') ? '\r\n' : '\n';
+  const eol = eolOf(code);
   const out = new MagicString(code);
 
   if (setup.wrap) {
@@ -199,28 +197,12 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
     if (object === undefined || !addTo(out, code, object, setup.list!, setup.value, eol)) return undefined;
   }
 
-  const imports = program.body.filter((s) => s.type === 'ImportDeclaration');
-  const quote = imports[0] === undefined ? "'" : code[imports[0].source.start]!;
-  const semi = imports[0] === undefined || code.slice(imports[0].start, imports[0].end).trimEnd().endsWith(';') ? ';' : '';
-  const q = (s: string) => `${quote}${s}${quote}`;
-  const lines = exported.commonjs
-    ? [`const { recommended } = require(${q('deictic/recommended')})${semi}`, `const { ${setup.name} } = require(${q(setup.from)})${semi}`]
-    : [`import { recommended } from ${q('deictic/recommended')}${semi}`, `import { ${setup.name} } from ${q(setup.from)}${semi}`];
-  const after = imports.at(-1) ?? requiresOf(program).at(-1);
-  if (after === undefined) out.prepend(`${lines.join(eol)}${eol}${eol}`);
-  else out.appendLeft(after.end, `${eol}${lines.join(eol)}`);
+  const lines: [string, string][] = [
+    ['{ recommended }', 'deictic/recommended'],
+    [`{ ${setup.name} }`, setup.from],
+  ];
+  addImports(out, program, code, lines, exported.commonjs);
   return out.toString();
-}
-
-/** The top-level `const … = require(…)` statements of a CommonJS config, to put deictic's after. */
-function requiresOf(program: Program) {
-  return program.body.filter(
-    (s) =>
-      s.type === 'VariableDeclaration' &&
-      s.declarations.some(
-        (d) => d.init?.type === 'CallExpression' && d.init.callee.type === 'Identifier' && d.init.callee.name === 'require',
-      ),
-  );
 }
 
 /** Adds `value` last in the object's array `list`, or the list with it, as the object is laid out. False where `list` isn't an array. */
@@ -245,20 +227,8 @@ function addTo(out: MagicString, code: string, object: ObjectExpression, list: s
     out.appendLeft(last.end, multiline ? `,${eol}${indentAt(code, last.start)}${value}` : `, ${value}`);
     return true;
   }
-  const first = object.properties[0];
-  if (first === undefined) {
-    out.overwrite(object.start, object.end, `{ ${list}: [${value}] }`);
-    return true;
-  }
-  const multiline = code.slice(object.start, first.start).includes('\n');
-  out.appendLeft(first.start, multiline ? `${list}: [${value}],${eol}${indentAt(code, first.start)}` : `${list}: [${value}], `);
+  addFirst(out, code, object.start, object.properties[0], `${list}: [${value}]`);
   return true;
-}
-
-/** The whitespace a line starts with, for the line `offset` is on. */
-function indentAt(code: string, offset: number): string {
-  const start = code.lastIndexOf('\n', offset - 1) + 1;
-  return /^[ \t]*/.exec(code.slice(start))![0];
 }
 
 export interface InitOptions {
@@ -321,7 +291,7 @@ function configure(root: string, bundler: Bundler | undefined, dryRun: boolean, 
     return;
   }
   if (bundler === 'bun') {
-    log(`deictic: for Bun, add these by hand:\n\n${BUN}\n`);
+    configureBun(root, dryRun, log);
     return;
   }
   const setup = SETUPS[bundler];
@@ -344,6 +314,47 @@ function configure(root: string, bundler: Bundler | undefined, dryRun: boolean, 
   }
   if (!dryRun) writeFileSync(file, added);
   log(`deictic: ${dryRun ? 'would add' : 'added'} it to ${name}`);
+}
+
+/** Bun's three steps: the plugin's module, bunfig.toml, and its routes in the server. Each says what to add where it can't. */
+function configureBun(root: string, dryRun: boolean, log: (line: string) => void): void {
+  const write = (file: string, text: string) => !dryRun && writeFileSync(file, text);
+  const did = dryRun ? 'would add' : 'added';
+  const plugin = join(root, MODULE);
+  if (!existsSync(plugin)) {
+    write(plugin, PLUGIN);
+    log(`deictic: ${dryRun ? 'would write' : 'wrote'} ${MODULE}`);
+  } else if (!readFileSync(plugin, 'utf8').includes('deictic/bun')) {
+    log(`deictic: ${MODULE} is a module of yours: add deictic by hand, as API.md#bundlers says for Bun`);
+    return;
+  }
+
+  const bunfig = join(root, 'bunfig.toml');
+  const before = existsSync(bunfig) ? readFileSync(bunfig, 'utf8') : undefined;
+  const after = addToBunfig(before);
+  if (after === undefined) {
+    log(`deictic: couldn't tell where it goes in bunfig.toml: add it yourself:\n\n${BY_HAND.bunfig}\n`);
+  } else if (after === before) {
+    log('deictic: bunfig.toml has it already');
+  } else {
+    write(bunfig, after);
+    log(`deictic: ${did} it to bunfig.toml`);
+  }
+
+  const server = serverOf(root)!;
+  const name = relative(root, server).replaceAll('\\', '/');
+  const code = readFileSync(server, 'utf8');
+  if (code.includes(MODULE.replace(/\.ts$/, ''))) {
+    log(`deictic: ${name} has its routes already`);
+    return;
+  }
+  const added = addToServer(server, code, root);
+  if (added === undefined) {
+    log(`deictic: couldn't tell where its routes go in ${name}: add them yourself:\n\n${BY_HAND.server}\n`);
+    return;
+  }
+  write(server, added);
+  log(`deictic: ${did} its routes to ${name}`);
 }
 
 export const usage = `init [--dry-run] [--no-install] [--skill | --no-skill]   sets deictic up in this project

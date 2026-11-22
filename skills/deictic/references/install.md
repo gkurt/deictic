@@ -18,8 +18,8 @@ other options so they can add or drop some:
 
 On yes, in the project: `npx deictic init --no-skill` (`pnpm dlx`, `bunx` for those package managers). It installs
 deictic and what its plugins use with the project's package manager, and adds `recommended()` to the bundler's config
-(Vite, Next.js, Astro, webpack, Rspack); for Bun, or a config it can't read, it prints what to add, and the package's
-`API.md` has each bundler's setup. React Native isn't supported.
+(Vite, Next.js, Astro, webpack, Rspack, or a `Bun.serve` with HTML imports: `deictic.plugin.ts`, `bunfig.toml` and its
+routes); for a config it can't read it prints what to add, and the package's `API.md` has each bundler's setup. React Native isn't supported.
 
 To fit what they choose instead, edit the config `init` wrote: a plugin's options go under its name, `false` leaves
 one out (`recommended({ tasks: { channel: 'ui' }, voice: false })`), and one outside the preset goes beside it

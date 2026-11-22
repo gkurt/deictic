@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 
+import { addToBunfig, addToServer, PLUGIN } from '#src/cli/bun.ts';
 import { addToConfig, bundlerOf, init, packagesFor } from '#src/cli/init.ts';
 import { definePlugin } from '#src/index.ts';
 import { recommended } from '#src/plugins/recommended/index.ts';
@@ -116,6 +117,106 @@ test("finds the config through a function, a const and satisfies, and adds the l
   expect(addToConfig('vite', 'vite.config.ts', `export default { plugins: list };`)).toBeUndefined();
   expect(addToConfig('vite', 'vite.config.ts', `export default make();`)).toBeUndefined();
   expect(addToConfig('vite', 'vite.config.ts', `export default {`)).toBeUndefined();
+});
+
+test("looks inside defineConfig only: a merge's first argument is a base, and the plugin isn't the base's", () => {
+  expect(
+    addToConfig('vite', 'vite.config.ts', `export default mergeConfig({ plugins: [] }, defineConfig({ plugins: [] }));`),
+  ).toBeUndefined();
+  expect(
+    addToConfig(
+      'webpack',
+      'webpack.config.js',
+      `const { merge } = require('webpack-merge');\nmodule.exports = merge({ plugins: [] }, { mode: 'development' });`,
+    ),
+  ).toBeUndefined();
+  expect(addToConfig('vite', 'vite.config.ts', `export default vite.defineConfig({});`)).toContain(
+    'vite.defineConfig({ plugins: [deictic(',
+  );
+});
+
+const server = `import index from './index.html';
+
+Bun.serve({
+  routes: {
+    '/*': index,
+  },
+  development: true,
+});
+`;
+
+test("is Bun's only where a server has Bun bundle a page, and Vite's or Next's where the project runs those on Bun", () => {
+  // Bun runs it, but serves no page of its own: an API, a script.
+  const api = {
+    'package.json': manifest({ '@types/bun': '1' }),
+    'bunfig.toml': '',
+    'src/index.ts': 'Bun.serve({ fetch: () => new Response("ok") });\n',
+  };
+  expect(bundlerOf(project(api).root)).toBeUndefined();
+  expect(bundlerOf(project({ 'package.json': manifest({ '@types/bun': '1' }), 'src/server.ts': server }).root)).toBe('bun');
+  expect(bundlerOf(project({ 'package.json': manifest({ vite: '8', '@types/bun': '1' }), 'server.ts': server }).root)).toBe('vite');
+  expect(bundlerOf(project({ 'package.json': manifest({ next: '16' }), 'bunfig.toml': '' }).root)).toBe('next');
+  // Not in a dependency's server.
+  expect(bundlerOf(project({ 'package.json': manifest(), 'node_modules/x/server.ts': server }).root)).toBeUndefined();
+});
+
+test("puts the plugin's module first in bunfig's [serve.static] plugins, as bunfig is written", () => {
+  const entry = '"./deictic.plugin.ts"';
+  expect(addToBunfig(undefined)).toBe(`[serve.static]\nplugins = [${entry}]\n`);
+  expect(addToBunfig('[install]\nlinker = "isolated"\n')).toBe(`[install]\nlinker = "isolated"\n\n[serve.static]\nplugins = [${entry}]\n`);
+  expect(addToBunfig('[serve.static]\nplugins = ["./tailwind.ts"]\n')).toBe(`[serve.static]\nplugins = [${entry}, "./tailwind.ts"]\n`);
+  expect(addToBunfig('[serve.static]\nplugins = []\n')).toBe(`[serve.static]\nplugins = [${entry}]\n`);
+  expect(addToBunfig('[serve.static]\nplugins = [\n  "./tailwind.ts",\n]\n')).toBe(
+    `[serve.static]\nplugins = [\n  ${entry},\n  "./tailwind.ts",\n]\n`,
+  );
+  expect(addToBunfig('[serve.static]\nenv = "PUBLIC_*"\n\n[test]\nplugins = []\n')).toBe(
+    `[serve.static]\nplugins = [${entry}]\nenv = "PUBLIC_*"\n\n[test]\nplugins = []\n`,
+  );
+  expect(addToBunfig(`[serve.static]\nplugins = [${entry}]\n`)).toBe(`[serve.static]\nplugins = [${entry}]\n`);
+  // Said another way: where, it can't tell.
+  expect(addToBunfig('serve.static.plugins = []\n')).toBeUndefined();
+});
+
+test("spreads the plugin's routes first in Bun.serve's, and imports its module from where the server is", () => {
+  const root = join('/app');
+  expect(addToServer(join(root, 'server.ts'), server, root)).toBe(`import index from './index.html';
+import tools from './deictic.plugin.ts';
+
+Bun.serve({
+  routes: {
+    ...tools.routes,
+    '/*': index,
+  },
+  development: true,
+});
+`);
+  const nested = addToServer(
+    join(root, 'src', 'server.ts'),
+    `import page from "./page.html"\nconst tools = 1\nBun.serve({ port: 3000 })\n`,
+    root,
+  );
+  expect(nested).toBe(
+    `import page from "./page.html"\nimport deicticTools from "../deictic.plugin.ts"\nconst tools = 1\nBun.serve({ routes: { ...deicticTools.routes }, port: 3000 })\n`,
+  );
+  // Two servers, or routes it can't see: where, it can't tell.
+  expect(addToServer(join(root, 'server.ts'), `${server}Bun.serve({});\n`, root)).toBeUndefined();
+  expect(addToServer(join(root, 'server.ts'), `import index from './index.html';\nBun.serve({ routes });\n`, root)).toBeUndefined();
+});
+
+test('init sets a Bun server up: the plugin module, bunfig and the routes, and leaves them as they are the next time', async () => {
+  const app = project({ 'package.json': manifest({ '@types/bun': '1' }), 'bun.lock': '', 'server.ts': server });
+  const lines: string[] = [];
+  await init({ cwd: app.root, install: false, skill: false, log: (l) => lines.push(l) });
+  expect(app.read('deictic.plugin.ts')).toBe(PLUGIN);
+  expect(app.read('bunfig.toml')).toBe('[serve.static]\nplugins = ["./deictic.plugin.ts"]\n');
+  expect(app.read('server.ts')).toContain('...tools.routes,');
+  expect(lines).toContain('deictic: added its routes to server.ts');
+  expect(lines.find((l) => l.startsWith('deictic: install them'))).not.toContain('launch-editor');
+
+  lines.length = 0;
+  await init({ cwd: app.root, install: false, skill: false, log: (l) => lines.push(l) });
+  expect(lines).toContain('deictic: bunfig.toml has it already');
+  expect(lines).toContain('deictic: server.ts has its routes already');
 });
 
 test("wraps Next's config, and requires in a CommonJS one", () => {

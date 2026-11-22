@@ -185,7 +185,7 @@ function Tokens({ line }: { line: Line }) {
 /** What `init` does, each beside its own: it's the whole setup. */
 const INIT = [
   'installs deictic and what its plugins use, with your package manager',
-  'adds it to your Vite, Next.js, Astro, webpack or Rspack config',
+  'adds it to your Vite, Next.js, Astro, webpack, Rspack or Bun setup',
   'offers the skill your agent works the tasks with',
 ];
 

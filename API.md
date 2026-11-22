@@ -17,8 +17,10 @@ types are the full reference: every option is documented where it's declared.
 
 `npx deictic init` sets a project up: it installs deictic and what its plugins use with the project's package manager,
 adds it to the bundler's config, and offers the agent skill (`--dry-run`, `--no-install`, `--skill`, `--no-skill`).
-This is what it adds, and what to add by hand where it can't (Bun, or a config it can't read). Every integration
-takes the same options and runs in the dev server only.
+For Bun it writes `deictic.plugin.ts`, names it in `bunfig.toml` and spreads its routes into `Bun.serve`'s, where a
+server of the project's has Bun bundle an HTML page (a Bun project that runs Vite or Next.js is theirs). This is what
+it adds, and what to add by hand where it can't (a config it can't read). Every integration takes the same options
+and runs in the dev server only.
 
 ```ts
 // Vite, and anything on it (React Router, TanStack Start…): vite.config.ts

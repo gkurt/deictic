@@ -65,10 +65,14 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/cli/init.ts`: `deictic init` (`--dry-run`, `--no-install`, `--skill`/`--no-skill`), one of the bin's commands
   (below): installs `deictic` and the recommended plugins' `packages` (and `launch-editor` for webpack
   and Rspack) the project lacks, as its own dev dependencies, since deictic's imports, the page's bundle and the skill
-  all look in the project; `bundlerOf` from the dependencies; `addToConfig` adds deictic to Vite's or Astro's list or
-  webpack's and Rspack's `plugins`, or wraps Next's export, with oxc and `magic-string` (through `defineConfig`, a
-  function, a `const`, `satisfies`; ESM or CommonJS; the config's quotes, semicolons and line endings), and nothing
-  where it can't tell, where it prints the snippet; it offers the skill on a terminal. `test/init.test.ts`.
+  all look in the project; `bundlerOf` from the dependencies, and Bun only where a module of the project's calls
+  `Bun.serve` and imports an HTML file (`serverOf`), as Bun may run Vite or Next.js, or no page at all; `addToConfig`
+  adds deictic to Vite's or Astro's list or webpack's and Rspack's `plugins`, or wraps Next's export, with oxc and
+  `magic-string` (through `defineConfig`, never another call, as a merge's first argument is a base, a function, a
+  `const`, `satisfies`; ESM or CommonJS), and nothing where it can't tell, where it prints the snippet. `cli/bun.ts`
+  is Bun's: `deictic.plugin.ts` written, it first in bunfig's `[serve.static] plugins` (`addToBunfig`), its routes first
+  in `Bun.serve`'s (`addToServer`). `cli/edit.ts` writes in the file's own quotes, semicolons, line endings and
+  layout. It offers the skill on a terminal. `test/init.test.ts`.
 - `src/tools/kept.ts`: `keptIn(root, …parts)`, a path under the project's `.deictic/`, made with a
   `.gitignore` of `*` the first time. Every default data path goes through it.
 - `src/tools/history.ts`: every change as each file's whole text before and after, or as a plugin's
