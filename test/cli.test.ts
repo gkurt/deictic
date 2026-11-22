@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { profileOf } from '#src/cli/board.ts';
 import type { Kept } from '#src/plugins/recordings/index.ts';
 import { type Model, tasks } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
@@ -12,12 +13,32 @@ import { project } from './fixture.ts';
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts');
 const ORIGIN = 'http://localhost:5173';
 
-/** The `deictic` command, run in `cwd` as an agent would, with no board but the project's. */
+/** What says who runs it: none of the environment's, so a test's is all there is. */
+const WHO =
+  /^(BOARD_URL|BOARD_PROFILE|AI_AGENT|CLAUDECODE|CLAUDE_CODE|CODEX_.*|GEMINI_CLI|CURSOR_AGENT|COPILOT_.*|OPENCODE|AUGMENT_AGENT|GOOSE_PROVIDER|JUNIE_.*)$/;
+
+/** The `deictic` command, run in `cwd` as Claude Code would (`CLAUDECODE`), with no board but the project's. */
 function deictic(cwd: string, ...args: string[]) {
-  const { BOARD_URL: _, ...env } = process.env;
-  const run = Bun.spawnSync([process.execPath, CLI, ...args], { cwd, env: { ...env, BOARD_PROFILE: 'claude' } });
+  return as({ CLAUDECODE: '1' }, cwd, ...args);
+}
+
+function as(who: Record<string, string>, cwd: string, ...args: string[]) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !WHO.test(name)));
+  const run = Bun.spawnSync([process.execPath, CLI, ...args], { cwd, env: { ...env, ...who } });
   return { code: run.exitCode, out: run.stdout.toString(), err: run.stderr.toString() };
 }
+
+test('writes as the agent its environment names, as BOARD_PROFILE says where set, and as the person at a terminal', () => {
+  expect(profileOf({ CLAUDECODE: '1' })).toBe('claude');
+  expect(profileOf({ CODEX_THREAD_ID: 'x', AI_AGENT: 'other' })).toBe('codex');
+  expect(profileOf({ AI_AGENT: 'claude-code_2-1-330_agent' })).toBe('claude');
+  expect(profileOf({ AI_AGENT: 'github_copilot_vscode_agent' })).toBe('copilot');
+  expect(profileOf({ AI_AGENT: 'amp' })).toBe('amp');
+  expect(profileOf({ BOARD_PROFILE: 'reviewer', CLAUDECODE: '1' })).toBe('reviewer');
+  // Not a name a board takes: none, and the watch says to set one.
+  expect(profileOf({ AI_AGENT: '9lives' })).toBeUndefined();
+  expect(profileOf({ CLAUDECODE: '', TERM_PROGRAM: 'vscode' })).toBeUndefined();
+});
 
 test('says its commands, and refuses one it has not', () => {
   const { root } = project({ 'package.json': '{}' });
@@ -59,8 +80,14 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(watch.code).toBe(0);
   expect(watch.out).toContain('watching cli on http://127.0.0.1:');
   expect(watch.out).toContain(`ready: #${id}`);
+  // As the agent, with nothing set but what its harness sets: its replies are left out, and nothing says to set a name.
+  expect(watch.out).not.toContain('BOARD_PROFILE');
   // Gone with the watch: the page doesn't go on saying someone watches.
   expect(readdirSync(join(p.root, '.deictic', 'watchers'))).toEqual([]);
+
+  expect(JSON.parse(deictic(p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: 'claude' });
+  expect(JSON.parse(as({}, p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: null });
+  expect(as({}, p.root, 'watch', 'cli', '--once').out).toContain('set BOARD_PROFILE=<your name>');
 }, 60_000);
 
 test('a recording kept in the project as a timeline, and the part of it asked for', () => {

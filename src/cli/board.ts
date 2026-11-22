@@ -79,13 +79,54 @@ export function boardUrl(): string | undefined {
 }
 
 /**
+ * The coding agents a shell of theirs says it is, by a variable each sets only there. Not one a person's terminal has
+ * too (Replit's `REPL_ID`, a `TERM_PROGRAM`): a person writes as themselves.
+ */
+const AGENTS: [name: string, variables: string[]][] = [
+  ['claude', ['CLAUDECODE', 'CLAUDE_CODE']],
+  ['codex', ['CODEX_SANDBOX', 'CODEX_THREAD_ID']],
+  ['gemini', ['GEMINI_CLI']],
+  ['cursor', ['CURSOR_AGENT']],
+  ['copilot', ['COPILOT_AGENT', 'COPILOT_CLI']],
+  ['opencode', ['OPENCODE']],
+  ['auggie', ['AUGMENT_AGENT']],
+  ['goose', ['GOOSE_PROVIDER']],
+  ['junie', ['JUNIE_DATA', 'JUNIE_SHIM_PATH']],
+];
+
+/** A board's profile name: a letter, then up to 31 letters, digits and hyphens. */
+const PROFILE = /^[A-Za-z][A-Za-z0-9-]{0,31}$/;
+
+/**
+ * Who the board's CLI writes as: `BOARD_PROFILE` where it's set, or else the coding agent this runs in, so its claims,
+ * replies and results are its own, not the person's, without its setting anything on each command. By the variable
+ * its harness sets, then by `AI_AGENT` (`claude-code_2-1-330_agent` is `claude`). Nothing at a person's terminal.
+ */
+export function profileOf(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (env.BOARD_PROFILE !== undefined && env.BOARD_PROFILE !== '') return env.BOARD_PROFILE;
+  const known = AGENTS.find(([, variables]) => variables.some((v) => env[v] !== undefined && env[v] !== ''));
+  if (known !== undefined) return known[0];
+  const named = env.AI_AGENT?.toLowerCase();
+  if (named === undefined || named === '') return undefined;
+  if (named.startsWith('github_copilot')) return 'copilot';
+  // The agent's name, without its version, its kind or what it is (`-code`, `-cli`).
+  const name = (named.split('_')[0] ?? '').replace(/-(code|cli|agent)$/, '');
+  return PROFILE.test(name) ? name : undefined;
+}
+
+/**
  * How to run the board's CLI, as `spawn`'s command, arguments and options, on the environment's board or the
- * project's own: the project's `@vercel/board`, run by this runtime, so it needn't be on the PATH and no shell reads
- * the arguments; with none installed, `vb` from the PATH.
+ * project's own, as the agent running it (`profileOf`): the project's `@vercel/board`, run by this runtime, so it
+ * needn't be on the PATH and no shell reads the arguments; with none installed, `vb` from the PATH.
  */
 export function vbCommand(args: string[]): [string, string[], SpawnSyncOptions] {
   const url = boardUrl();
-  const env = { ...process.env, ...(url === undefined ? {} : { BOARD_URL: url }) };
+  const profile = profileOf();
+  const env = {
+    ...process.env,
+    ...(url === undefined ? {} : { BOARD_URL: url }),
+    ...(profile === undefined ? {} : { BOARD_PROFILE: profile }),
+  };
   const script = vbScript();
   if (script !== undefined) return [process.execPath, [script, ...args], { env }];
   // npm's shims on Windows are .cmd files, which only a shell runs; the arguments here are IDs and names.

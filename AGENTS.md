@@ -313,7 +313,9 @@ is the version that wrote them. In this repository, `bun src/cli.ts <command>` (
 The commands are `src/cli.ts`, the `deictic` bin (`dist/cli.js`), each in `src/cli/` and imported when run (`run(args)`,
 and a `usage` line for `--help`). `board.ts` is what they share: `vb`, run as the project's `@vercel/board` script
 (`vbScript`, from `tasks/local.ts`) on the dev server's board (`BOARD_URL`, or the nearest `.deictic/board.json`'s,
-read with `runningAt`), the `.deictic/` folders near here, `parseArgs` (Node's, strict, failing with the message), and
+read with `runningAt`) as the agent running it (`profileOf`: `BOARD_PROFILE`, else the variable its harness sets,
+`CLAUDECODE` and the like, else `AI_AGENT` cut to a profile's name; none at a person's terminal, who writes as
+themselves), the `.deictic/` folders near here, `parseArgs` (Node's, strict, failing with the message), and
 `ME` (`npx deictic`, how output names other commands); `find.ts` finds a recording or clip by task, URL, ID or path,
 and runs ffmpeg and the project's Playwright. `init` (above); `vb` (that CLI, for the agent's own commands); `watch` (a
 line per task event, over `vb tail`, without the replies of the watcher's own profile; it ends, exit 2, once the

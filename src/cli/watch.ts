@@ -122,10 +122,11 @@ export function run(args: string[]): void {
   setInterval(() => orphaned() && end(0), 5000);
 
   say(`watching ${channel} on ${url ?? "the team's board"} as ${me.handle ?? me.actor}`);
-  // With no profile, the person's replies and the watcher's own are one actor's: none can be left out.
+  // With no profile (an agent `profileOf` doesn't know), the person's replies and the watcher's own are one actor's:
+  // none can be left out.
   if (me.profile === null) {
     say(
-      `you write as ${me.handle ?? me.actor}, the person's own identity: set BOARD_PROFILE=<your name> (claude, codex) for every vb command, this watch too, and start it again`,
+      `you write as ${me.handle ?? me.actor}, the person's own identity, as nothing here says which agent you are: set BOARD_PROFILE=<your name> (claude, codex) on every command, this watch too, and start it again`,
     );
   }
   const waiting = (ready ? ready.split('\n') : []).filter((line) => /^#\d+/.test(line));
