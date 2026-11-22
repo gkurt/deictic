@@ -285,7 +285,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   button that shows the task's whole text in place. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
-  attachment's ID for redo. With annotations
+  attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
+  left out, not the task: `keptOf` drops it from the op, the text says so on a `Not attached, …` line, which `read`
+  gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. With annotations
   loaded, Annotate captures a shot and `edit`s it: saved, each is a chip (removable; removing the last unticks the
   box). Every chip opens one lightbox of all that's attached, at itself: a shot with Change marks, a recording's
   replay (`?embed`) with New tab, a voice note's player; and sending uploads each `flatten`ed PNG with `screenshots.upload`, as it was drawn. Only the shot the box takes as the task goes

@@ -88,21 +88,25 @@ test('a task attaches the shot it names, and refuses one no longer kept', async 
   const wordless = await post({ plugin: 'tasks', target, op: { ...op, text: ' ', screenshots: [{ id, box }] } });
   expect(wordless.model.tasks.map((t) => t.title)).toContain('See the screenshot');
   expect((await post({ plugin: 'tasks', target, op: { ...op, text: ' ' } })).problem).toBe('say what should change first');
-  expect(
-    (
-      await post({
-        plugin: 'tasks',
-        target,
-        op: {
-          ...op,
-          screenshots: [
-            { id, box },
-            { id: 'gone-123', box },
-          ],
-        },
-      })
-    ).problem,
-  ).toBe("screenshot gone-123 isn't kept any more: take it again");
+  // One no longer kept is left out, and the task says so, as the panel does.
+  const shots = [
+    { id, box },
+    { id: 'gone-123', box },
+  ];
+  const partly = await post({ plugin: 'tasks', target, op: { ...op, screenshots: shots } });
+  const sent = partly.model.tasks.at(-1)!;
+  expect(sent.dropped).toBe('a screenshot');
+  const kept = (await team.thread(sent.id)).message;
+  expect(kept.text).toContain("Not attached, as it wasn't kept any more: a screenshot");
+  expect(kept.attachments.filter((a) => a.type === 'image/png')).toHaveLength(1);
+  // With nothing else to say what should change, it's refused.
+  const none = [
+    { id: 'gone-1', box },
+    { id: 'gone-2', box },
+  ];
+  expect((await post({ plugin: 'tasks', target, op: { ...op, text: ' ', screenshots: none } })).problem).toBe(
+    "2 screenshots aren't kept any more: attach again, or say what should change",
+  );
 });
 
 test('loads its renderer in the page, rrweb() by default, with the masking by rrweb’s names and defaults', () => {

@@ -866,6 +866,8 @@ export default defineClientPlugin<Model, Change>({
         announce(model, op, context.target);
         text.value = '';
         reset();
+        const dropped = model.tasks.at(-1)?.dropped;
+        if (dropped !== undefined) problem.textContent = `Sent without ${dropped}: it wasn't kept any more`;
       } catch {
         // The panel's status says why; what was typed and drawn stays, to send again.
       }

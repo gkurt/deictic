@@ -81,6 +81,8 @@ export interface Task {
   open: boolean;
   /** Its page on the board, when there's one to link to. */
   link?: string;
+  /** What was attached to it but not kept by the time it was sent, so it went without: `a screenshot`. */
+  dropped?: string;
   /**
    * Where it was added, where that isn't the element's place: for one of `tasks`, where the element was before
    * it moved; for one of `elsewhere`, the element it's about.
@@ -213,6 +215,10 @@ const AT = 'deictic.at';
 const FILE = 'deictic.file';
 /** What parts what was typed from the rest of a task's text. */
 const REST = '\n---\n';
+/** The line that says what was attached but not kept, which the panel reads back to say so. */
+const DROPPED = "Not attached, as it wasn't kept any more: ";
+/** A file for the board, as the plugins that keep them read it. */
+type Upload = { data: Uint8Array<ArrayBuffer>; name: string; type: string };
 const OPEN = new Set(['waiting', 'ready', 'blocked']);
 
 export function tasks(options: TasksOptions = {}) {
@@ -309,30 +315,41 @@ export function tasks(options: TasksOptions = {}) {
   // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
   let project = options.project;
-  /** The screenshots, recordings and the element's HTML to attach, uploaded to the board, or nothing when there are none. */
-  const attach = async (op: Op): Promise<string[] | undefined> => {
-    // All read first, so one no longer kept uploads none.
-    const files = [
-      ...(op.screenshots ?? []).map(({ id }) => {
-        const shot = context?.use('screenshots')?.read(id);
-        if (shot === undefined) throw new Refusal(`screenshot ${id} isn't kept any more: take it again`);
-        return shot;
-      }),
-      ...(op.recordings ?? []).map(({ id }) => {
-        const recording: ReturnType<Recordings['read']> = context?.use('recordings')?.read(id);
-        if (recording === undefined) throw new Refusal(`recording ${id} isn't kept any more: record it again`);
-        return recording;
-      }),
-      ...[...(op.recordings ?? []).flatMap((r) => r.voice ?? []), ...(op.voice ?? []).map((v) => v.id)].map((id) => {
-        const clip: ReturnType<Clips['read']> = context?.use('voice')?.read(id);
-        if (clip === undefined) throw new Refusal(`voice clip ${id} isn't kept any more: record it again`);
-        return clip;
-      }),
-      // Last, and a file, not the task's words: it's there to look into, and most tasks are done without it.
-      ...(typeof op.html !== 'string' || op.html === ''
-        ? []
-        : [{ data: new TextEncoder().encode(op.html.slice(0, HTML)), name: 'element.html', type: 'text/html' }]),
-    ];
+  /**
+   * The op with only the screenshots, recordings and voice clips still kept, their files, and what's left out: a file
+   * goes once newer ones pass its plugin's `keep`, or `deictic clean` takes it, and that's no reason to lose the task.
+   */
+  const keptOf = (op: Op) => {
+    const clipOf = (id: string): ReturnType<Clips['read']> => context?.use('voice')?.read(id);
+    const files: Upload[] = [];
+    const dropped: string[] = [];
+    const take = (file: Upload | undefined, missing: string) => {
+      if (file === undefined) dropped.push(missing);
+      else files.push(file);
+      return file !== undefined;
+    };
+    const screenshots = (op.screenshots ?? []).filter(({ id }) => take(context?.use('screenshots')?.read(id), 'a screenshot'));
+    const recordings = (op.recordings ?? []).flatMap((recording) => {
+      const found: ReturnType<Recordings['read']> = context?.use('recordings')?.read(recording.id);
+      if (!take(found, 'a recording')) return [];
+      if (recording.voice === undefined) return [recording];
+      const clipped = (id: string) => take(clipOf(id), 'a voice clip');
+      return [{ ...recording, voice: recording.voice.filter(clipped) }];
+    });
+    const voice = (op.voice ?? []).filter(({ id }) => take(clipOf(id), 'a voice note'));
+    // Last, and a file, not the task's words: it's there to look into, and most tasks are done without it.
+    if (typeof op.html === 'string' && op.html !== '')
+      files.push({ data: new TextEncoder().encode(op.html.slice(0, HTML)), name: 'element.html', type: 'text/html' });
+    const kept: Op = {
+      ...op,
+      ...(op.screenshots === undefined ? {} : { screenshots }),
+      ...(op.recordings === undefined ? {} : { recordings }),
+      ...(op.voice === undefined ? {} : { voice }),
+    };
+    return { op: kept, files, dropped };
+  };
+  /** The files uploaded to the board, or nothing when there are none. */
+  const upload = async (files: Upload[]): Promise<string[] | undefined> => {
     if (files.length === 0) return undefined;
     const team = await boardOf();
     return Promise.all(files.map(async (file) => (await team.upload(file)).id));
@@ -380,6 +397,11 @@ export function tasks(options: TasksOptions = {}) {
           const by = actors.get(actorOf(message) ?? '')?.name;
           const text = message.text.split(REST, 1)[0]!;
           const to = taskLink(page, message.id);
+          const dropped = message.text
+            .slice(text.length + REST.length)
+            .split('\n')
+            .find((line) => line.startsWith(DROPPED))
+            ?.slice(DROPPED.length);
           const task = {
             id: message.id,
             title: text.split('\n', 1)[0]!,
@@ -388,6 +410,7 @@ export function tasks(options: TasksOptions = {}) {
             ...(by === undefined ? {} : { by }),
             open: OPEN.has(state),
             ...(to === undefined ? {} : { link: to }),
+            ...(dropped === undefined ? {} : { dropped }),
           };
           const at = placeIn(message.labels);
           if (at === undefined || message.labels[AT] === atOf(target)) tasks.push(task);
@@ -431,16 +454,18 @@ export function tasks(options: TasksOptions = {}) {
           return { done: { kind: 'edited' as const, id: op.edit, before, after } };
         });
       }
+      const { op: kept, files, dropped } = keptOf(op);
+      const verb = dropped.length === 1 ? "isn't" : "aren't";
+      if (wordsOf(kept) === '') throw new Refusal(`${listOf(dropped)} ${verb} kept any more: attach again, or say what should change`);
       const labels = {
         ...options.labels,
         ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
-        ...labelsOf(source, target, op),
+        ...labelsOf(source, target, kept),
       };
       return asked(async () => {
-        const attachments = await attach(op);
-        return {
-          done: await create({ channel, text: textOf(op, target), labels, ...(attachments === undefined ? {} : { attachments }) }),
-        };
+        const attachments = await upload(files);
+        const text = textOf(kept, target, dropped);
+        return { done: await create({ channel, text, labels, ...(attachments === undefined ? {} : { attachments }) }) };
       });
     },
     undo: (record) =>
@@ -649,9 +674,10 @@ function placeIn(labels: Record<string, string>): Place | undefined {
  * source it rendered through, what was pointed at inside it, and a URL too long for a label.
  * A board holds 10,000 characters.
  */
-function textOf(op: Op, target: Target): string {
+function textOf(op: Op, target: Target, dropped: string[]): string {
   const more = [
     ...(op.page.length <= LABEL ? [] : [op.page]),
+    ...(dropped.length === 0 ? [] : [`${DROPPED}${listOf(dropped)}`]),
     ...shotsOf(op.screenshots ?? []),
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
@@ -675,7 +701,14 @@ function shown(op: Op): string | undefined {
     ...named(op.recordings?.length, 'recording'),
     ...named(op.voice?.length, 'voice note'),
   ];
-  return attached.length === 0 ? undefined : `See ${new Intl.ListFormat('en', { type: 'conjunction' }).format(attached)}`;
+  return attached.length === 0 ? undefined : `See ${listOf(attached)}`;
+}
+
+/** `a screenshot and 2 voice notes`. */
+function listOf(things: string[]): string {
+  const counted = Map.groupBy(things, (thing) => thing);
+  const named = [...counted].map(([thing, all]) => (all.length === 1 ? thing : `${all.length} ${thing.replace(/^an? /, '')}s`));
+  return new Intl.ListFormat('en', { type: 'conjunction' }).format(named);
 }
 
 const fence = (text: string, lang: string) => `\`\`\`\`${lang}\n${clip(text, 1500)}\n\`\`\`\``;

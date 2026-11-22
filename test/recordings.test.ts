@@ -157,9 +157,11 @@ test('a task attaches the recording, saying how long it ran and where it replays
   expect(message.text).toContain(`A recording, 0:12 long, attached as rrweb events; it replays at ${replay}`);
   expect(message.attachments).toEqual([expect.objectContaining({ name: `recording-${id}.json`, type: 'application/json' })]);
 
-  expect((await post({ recordings: [{ id: 'gone-123', duration: 1, replay }] })).problem).toBe(
-    "recording gone-123 isn't kept any more: record it again",
-  );
+  const gone = await post({ recordings: [{ id: 'gone-123', duration: 1, replay }] });
+  expect(gone.model.tasks.at(-1)!.dropped).toBe('a recording');
+  const left = await team.thread(gone.model.tasks.at(-1)!.id);
+  expect(left.message.text).not.toContain('gone-123');
+  expect(left.message.attachments).toEqual([]);
 });
 
 test('masks as rrweb does, by its names and defaults, in the page', () => {
