@@ -63,7 +63,7 @@ test('local() is the board even where BOARD_URL names another, which is left as 
         body: JSON.stringify({ plugin: 'tasks', target: p.target('src/App.tsx', 'h1') }),
       }),
     ))!;
-    expect(await res.json()).toEqual({ model: { channel: 'deictic', tasks: [] } });
+    expect(await res.json()).toEqual({ model: { channel: 'deictic', tasks: [], elsewhere: [] } });
     expect(process.env.BOARD_URL).toBe('http://127.0.0.1:9/api/board');
   } finally {
     if (before === undefined) delete process.env.BOARD_URL;

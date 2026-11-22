@@ -39,6 +39,13 @@ const STYLE = `
 .tasks .act { align-self: center; display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
 .tasks .act:hover { color: var(--deictic-fg); }
 .tasks .act svg { width: 12px; height: 12px; }
+.tasks .place { flex: none; padding: 0; border: 0; font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
+.tasks button.place:hover { color: var(--deictic-fg); text-decoration: underline; }
+.more { margin: 0 0 8px; }
+.more[hidden] { display: none; }
+.more summary { cursor: pointer; font-size: 12px; color: var(--deictic-muted); }
+.more summary:hover { color: var(--deictic-fg); }
+.more .tasks { margin: 4px 0 0; }
 .tasks li.editing { display: grid; }
 .tasks li.editing .row { margin-top: 0; }
 .tasks li.editing .actions { display: flex; gap: 6px; }
@@ -178,7 +185,12 @@ export default defineClientPlugin<Model, Change>({
     const hint = element('span', { className: 'hint' });
     const row = element('div', { className: 'row' });
     row.append(hint, add);
-    panel.append(style, list, text);
+    // The file's other tasks, folded away: the panel is about this element. It stays as it's left while the panel is up.
+    const fold = element('details', { className: 'more' });
+    const count = element('summary');
+    const others = element('ul', { className: 'tasks' });
+    fold.append(count, others);
+    panel.append(style, list, fold, text);
 
     const shots = context.use('screenshots');
     const notes = context.use('annotations');
@@ -471,27 +483,58 @@ export default defineClientPlugin<Model, Change>({
       shown = model;
       // A task being changed is drawn again with its words as they were.
       edited = undefined;
-      const { channel, link, tasks } = model;
+      const { channel, link, tasks, elsewhere } = model;
       const name =
         link === undefined
           ? element('span')
           : element('a', { href: link, target: '_blank', rel: 'noreferrer', title: 'Open the channel on the board' });
       name.textContent = `#${channel}`;
       hint.replaceChildren('to ', name);
+      /** A task's row: its ID, a link where it has a page, its title, where it's from when that's said, and its state. */
+      const rowOf = (t: Task, from?: HTMLElement) => {
+        const item = element('li');
+        const id = element('code', { textContent: `#${t.id}` });
+        const title = element('span', { className: 'title', textContent: t.title, title: t.title });
+        const state = element('span', { className: `state ${t.state}`, textContent: t.state });
+        const to =
+          t.link === undefined
+            ? id
+            : element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
+        if (to !== id) to.append(id);
+        item.append(to, title, ...(from === undefined ? [] : [from]), state);
+        return item;
+      };
+      const { file } = context.target.loc;
+      fold.hidden = elsewhere.length === 0;
+      count.textContent = `${elsewhere.length} elsewhere in ${file.split('/').at(-1)}`;
+      others.replaceChildren(
+        ...elsewhere.map((t) => {
+          if (t.at === undefined) return rowOf(t);
+          const { line, column, tag } = t.at;
+          const name = `<${tag}> :${line}`;
+          // Only an element the page shows now has a popup to open: its place is from the task, which may be old.
+          const there = document.querySelector(`[data-deictic="${CSS.escape(`${file}:${line}:${column}`)}"]`);
+          if (there === null)
+            return rowOf(t, element('span', { className: 'place', textContent: name, title: `Line ${line}, not on this page now` }));
+
+          const go = element('button', { type: 'button', className: 'place', textContent: name, title: `Open the tasks of line ${line}` });
+          go.addEventListener('click', () => void context.open('tasks', there));
+          return rowOf(t, go);
+        }),
+      );
       list.replaceChildren(
         ...tasks.map((t) => {
           if (t.id === editing && t.open) return editor(t);
-          const item = element('li');
-          const id = element('code', { textContent: `#${t.id}` });
-          const title = element('span', { className: 'title', textContent: t.title, title: t.title });
-          const state = element('span', { className: `state ${t.state}`, textContent: t.state });
-          if (t.link === undefined) {
-            item.append(id, title, state);
-          } else {
-            const to = element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
-            to.append(id);
-            item.append(to, title, state);
-          }
+          const item = rowOf(
+            t,
+            t.at === undefined
+              ? undefined
+              : element('span', {
+                  className: 'place',
+                  textContent: `was :${t.at.line}`,
+                  title: `Added when this was on line ${t.at.line}: it has moved since`,
+                }),
+          );
           if (!t.open) return item;
           const edit = element('button', { type: 'button', className: 'act', innerHTML: EDIT, title: 'Edit the task' });
           edit.addEventListener('click', () => {

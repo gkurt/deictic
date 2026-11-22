@@ -21,6 +21,7 @@ The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deictic.project`  | The project: its `package.json`'s name, or what the config says. On a shared board, work only your project's                                  |
 | `deictic.at`       | `src/pages/home.tsx:42:9`: the element's opening tag, from the dev server's root (the folder its `.deictic/` is in), in UTF-16 columns from 1 |
+| `deictic.file`     | `src/pages/home.tsx`: that file alone, to list every task about it (`vb tail --label`)                                                        |
 | `deictic.tag`      | `p`                                                                                                                                           |
 | `deictic.line`     | The opening tag's first line as the task saw it, up to 256 characters                                                                         |
 | `deictic.page`     | The page's path                                                                                                                               |

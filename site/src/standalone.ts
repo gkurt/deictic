@@ -45,7 +45,20 @@ function stepsOf(plugin: string, place: string) {
   return steps;
 }
 
-const readTasks = (place: string): Tasks => ({ channel: 'deictic', tasks: tasks.get(place) ?? [] });
+/** A place's file, and its line and column. */
+const PLACE = /^(.*):(\d+):(\d+)$/;
+
+function readTasks(place: string): Tasks {
+  const file = PLACE.exec(place)?.[1];
+  // The file's other elements' tasks, each with its place: the tag is the page's to say, with no source to read.
+  const elsewhere = [...tasks].flatMap(([other, list]) => {
+    const [, its, line, column] = PLACE.exec(other) ?? [];
+    if (other === place || its !== file) return [];
+    const at = { line: Number(line), column: Number(column), tag: elementsAt(other)[0]?.localName ?? '' };
+    return list.map((task) => ({ ...task, at }));
+  });
+  return { channel: 'deictic', tasks: tasks.get(place) ?? [], elsewhere: elsewhere.sort((a, b) => a.at.line - b.at.line) };
+}
 
 function changeTasks(place: string, change: Change): Step {
   const before = tasks.get(place) ?? [];

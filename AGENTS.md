@@ -206,8 +206,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   peer, imported when first used). `index.ts` writes the task's text (what was typed, or `See the recording` and the like where
   only something attached says it, then only what no label
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
-  or the root's `package.json`, `at`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
-  the user's own `labels`; the source and the rendered HTML aren't sent. `read` lists the element's tasks by that label, and the channel's page
+  or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
+  the user's own `labels`; the source and the rendered HTML aren't sent. `read` lists the element's tasks by `deictic.at`, the
+  rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
+  that opens that element's tasks where the page has it), a task whose place moved still the element's own where its tag and `deictic.line`
+  are the element's and the file has that line once (its `at` is where it was), and the channel's page
   (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`), each task with its own
   (`?thread=<id>` there, or `link(channel, id)`), its whole typed text and whether it's `open`. Undo cancels the task
   unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` takes a `Change`: a new task (`Op`),

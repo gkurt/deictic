@@ -6,8 +6,10 @@
  * from there; deictic only adds them.
  *
  * Adding one is a change like any other: undo cancels the task, while no one has claimed it, and redo
- * adds it again, as a new task. Each task carries `deictic.at=<file:line:column>`, so the panel
- * lists the ones about the element clicked, until its line moves.
+ * adds it again, as a new task. Each task carries `deictic.at=<file:line:column>` and `deictic.file`, so
+ * the panel lists the ones about the element clicked, and after them the rest of its file's. One whose
+ * place is no longer the element's is still its own where the tag and the line it saw (`deictic.line`) are
+ * the element's, and that line is in the file once: the element has moved, as lines above it changed.
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -67,14 +69,28 @@ export interface Task {
   open: boolean;
   /** Its page on the board, when there's one to link to. */
   link?: string;
+  /**
+   * Where it was added, where that isn't the element's place: for one of `tasks`, where the element was before
+   * it moved; for one of `elsewhere`, the element it's about.
+   */
+  at?: Place;
+}
+
+/** A place in the element's file: a line and a column, from 1, and the tag there as the task saw it. */
+export interface Place {
+  line: number;
+  column: number;
+  tag: string;
 }
 
 export interface Model {
   channel: string;
   /** The channel's page, when there's one to link to. */
   link?: string;
-  /** Tasks about this element, oldest first, canceled ones left out. */
+  /** Tasks about this element, oldest first, canceled ones left out: also those added before it moved. */
   tasks: Task[];
+  /** Tasks about the file's other elements, by line, canceled ones left out: each with its `at`. */
+  elsewhere: Task[];
 }
 
 /**
@@ -165,6 +181,7 @@ export interface Removed extends Added {
 export type Kept = Added | Edited | Removed;
 
 const AT = 'deictic.at';
+const FILE = 'deictic.file';
 /** What parts what was typed from the rest of a task's text. */
 const REST = '\n---\n';
 const OPEN = new Set(['waiting', 'ready', 'blocked']);
@@ -300,30 +317,46 @@ export function tasks(options: TasksOptions = {}) {
       // Not waited for: a failure is the first request's to tell.
       void boardOf().catch(() => {});
     },
-    read: (_source, target) =>
+    read: (source, target) =>
       asked(async () => {
-        const [{ tasks: found }, page] = await Promise.all([
-          (await boardOf()).tasks.list({ channel, label: { [AT]: atOf(target) }, state: 'all' }),
+        const team = await boardOf();
+        const labelled = (label: Record<string, string>) => team.tasks.list({ channel, label, state: 'all' });
+        // By place too: a task added before there was a `deictic.file` has none, and is still its element's.
+        const [here, inFile, page] = await Promise.all([
+          labelled({ [AT]: atOf(target) }),
+          labelled({ [FILE]: clip(target.loc.file, LABEL) }),
           linkOf(),
         ]);
+        const listed = new Set(inFile.tasks.map(({ message }) => message.id));
+        const line = lineOf(source);
+        // A line the file has twice says nothing of which element a task was about.
+        const once = source.code.split(line).length === 2;
+        const tasks: Task[] = [];
+        const elsewhere: (Task & { at: Place })[] = [];
+        for (const { message } of [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks]) {
+          const state = message.task?.state ?? 'ready';
+          if (state === 'canceled') continue;
+          const text = message.text.split(REST, 1)[0]!;
+          const to = taskLink(page, message.id);
+          const task = {
+            id: message.id,
+            title: text.split('\n', 1)[0]!,
+            text,
+            state,
+            open: OPEN.has(state),
+            ...(to === undefined ? {} : { link: to }),
+          };
+          const at = placeIn(message.labels);
+          if (at === undefined || message.labels[AT] === atOf(target)) tasks.push(task);
+          else if (once && at.tag === target.tag && message.labels['deictic.line'] === clip(line, LABEL)) tasks.push({ ...task, at });
+          else elsewhere.push({ ...task, at });
+        }
         return {
           channel,
           ...(page === undefined ? {} : { link: page }),
-          tasks: found
-            .map(({ message }) => {
-              const text = message.text.split(REST, 1)[0]!;
-              const state = message.task?.state ?? 'ready';
-              const to = taskLink(page, message.id);
-              return {
-                id: message.id,
-                title: text.split('\n', 1)[0]!,
-                text,
-                state,
-                open: OPEN.has(state),
-                ...(to === undefined ? {} : { link: to }),
-              };
-            })
-            .filter((t) => t.state !== 'canceled'),
+          tasks,
+          // The board's order (oldest first) among those of one place.
+          elsewhere: elsewhere.sort((a, b) => (a.at.line === b.at.line ? a.at.column - b.at.column : a.at.line - b.at.line)),
         };
       }),
     apply: (source, target, op) => {
@@ -485,8 +518,9 @@ function labelsOf({ code, element }: Source, target: Target, op: Op): Record<str
   const [shot] = op.screenshots ?? [];
   return {
     [AT]: atOf(target),
+    [FILE]: clip(target.loc.file, LABEL),
     'deictic.tag': target.tag,
-    'deictic.line': clip(code.slice(element.start, element.end).split('\n', 1)[0]!.trim(), LABEL),
+    'deictic.line': clip(lineOf({ code, element }), LABEL),
     'deictic.page': clip(new URL(op.page).pathname, LABEL),
     ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
@@ -502,6 +536,16 @@ function placeOf(box: Box): Record<string, string> {
 }
 
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;
+
+/** The opening tag's first line, as written. */
+const lineOf = ({ code, element }: Pick<Source, 'code' | 'element'>) => code.slice(element.start, element.end).split('\n', 1)[0]!.trim();
+
+/** Where a task says its element is, from its labels. */
+function placeIn(labels: Record<string, string>): Place | undefined {
+  const [, line, column] = /:(\d+):(\d+)$/.exec(labels[AT] ?? '') ?? [];
+  if (line === undefined || column === undefined) return undefined;
+  return { line: Number(line), column: Number(column), tag: labels['deictic.tag'] ?? '' };
+}
 
 /**
  * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, what

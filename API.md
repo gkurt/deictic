@@ -116,7 +116,11 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 `args`, more of `vb serve`'s.
 
 A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
-`file:line:column`), `deictic.url`, `deictic.viewport` and more, with your own beside them.
+`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them.
+
+The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
+that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening
+tag's first line is still the same and the file has it once.
 
 In the Task tab:
 

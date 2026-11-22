@@ -42,7 +42,11 @@ function setup(channel: string, options: TasksOptions = {}, files: Record<string
 
 test('adds a task saying what and where, and lists it on the element', async () => {
   const { p, post, target } = setup('add');
-  expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model).toEqual({ channel: 'add', tasks: [] });
+  expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model).toEqual({
+    channel: 'add',
+    tasks: [],
+    elsewhere: [],
+  });
 
   const { json } = await post<{ model: Model; change: { label: string; files: string[] } }>('apply', { plugin: 'tasks', target, op });
   expect(json.change).toMatchObject({ label: 'tasks src/App.tsx:1: task "The headline wraps on phones"', files: [] });
@@ -54,6 +58,7 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect(message.labels).toEqual({
     team: 'web',
     'deictic.at': 'src/App.tsx:1:26',
+    'deictic.file': 'src/App.tsx',
     'deictic.tag': 'h1',
     'deictic.line': '<h1 className="text-4xl">',
     'deictic.page': '/pricing',
@@ -98,6 +103,39 @@ test('says what was pointed at inside the element, where nothing marked it', asy
   const { message } = await team.thread(json.model.tasks[0]!.id);
   expect(message.text).toContain(`Pointed at, inside it: \`${pointed.path}\``);
   expect(message.text).toContain(pointed.html);
+});
+
+test("lists the file's other tasks apart, and keeps an element's own as it moves", async () => {
+  const page = (above: string) =>
+    `${above}export const App = () => (\n  <main>\n    <h1 className="text-4xl">Pricing</h1>\n    <li>One</li>\n    <li>One</li>\n  </main>\n);\n`;
+  const { p, post } = setup(
+    'file',
+    {},
+    { 'src/App.tsx': page(''), 'src/Other.tsx': 'export const Other = () => <h1 className="text-4xl">Other</h1>;\n' },
+  );
+  const read = async (tag: string, file = 'src/App.tsx') =>
+    (await post<{ model: Model }>('read', { plugin: 'tasks', target: p.target(file, tag) })).json.model;
+  const add = (tag: string, text: string) => post('apply', { plugin: 'tasks', target: p.target('src/App.tsx', tag), op: { ...op, text } });
+  await add('h1', 'The headline');
+  await add('li', 'The first row');
+  // One added before tasks said their file is still its element's, by its place.
+  await team.tasks.create('file', { text: 'An old one', labels: { 'deictic.at': 'src/App.tsx:3:5', 'deictic.tag': 'h1' } });
+
+  const before = await read('h1');
+  expect(before.tasks.map((t) => [t.title, t.at])).toEqual([
+    ['An old one', undefined],
+    ['The headline', undefined],
+  ]);
+  expect(before.elsewhere).toEqual([expect.objectContaining({ title: 'The first row', at: { line: 4, column: 5, tag: 'li' } })]);
+  expect((await read('h1', 'src/Other.tsx')).elsewhere).toEqual([]);
+
+  // Lines above change, and the page is loaded again: the headline's task is still its own, by its tag and line.
+  p.write('src/App.tsx', page('// Prices\n\n'));
+  const after = await read('h1');
+  expect(after.tasks).toEqual([expect.objectContaining({ title: 'The headline', open: true, at: { line: 3, column: 5, tag: 'h1' } })]);
+  // A row's line is there twice, so its task can't be told to be either's; the old one, with no file, is found at its place only.
+  expect(after.elsewhere.map((t) => t.title)).toEqual(['The first row']);
+  expect((await read('li')).tasks).toEqual([]);
 });
 
 test('undo cancels the task and redo adds it again, as a new one', async () => {
