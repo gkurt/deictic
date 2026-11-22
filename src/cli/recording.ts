@@ -6,7 +6,7 @@
  */
 import type { Shape } from '#src/plugins/annotations/index.ts';
 
-import { clock, fail, parseArgs } from './board.ts';
+import { clock, fail, ME, parseArgs } from './board.ts';
 import { loadRecording } from './find.ts';
 
 export const usage = `recording <task | replay URL | recording ID | file> [--nth 2] [--json]   a recording as a timeline
@@ -373,4 +373,11 @@ export async function run(args: string[]): Promise<void> {
     if (r.responseBody !== undefined) under(`response body  ${r.responseBody}`);
   }
   if (shown.length === 0) console.log(timeline.length === 0 ? 'Nothing in it.' : 'No line of it is what was asked for.');
+  // Where something went wrong, how to get to it: what led up to it, and what the page looked like.
+  const problems = timeline.filter((e) => e.problem === true).length;
+  if (problems === 0 || shown.length < timeline.length) return;
+  const ref = task?.id ?? id;
+  console.log(
+    `\n${problems} problem${problems === 1 ? '' : 's'}: --problems lists them, --around <seconds> shows what led to one, and ${ME} frame ${ref} --at <seconds> the page then.`,
+  );
 }

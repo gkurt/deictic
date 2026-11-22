@@ -108,6 +108,7 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
   expect(all.out).toContain('console.error Save failed');
   expect(all.out).toContain('marks         + note at (1,2): "here"');
   expect(all.out).toContain('end           recording stopped');
+  expect(all.out).toContain('1 problem: --problems lists them');
 
   const problems = deictic(p.root, 'recording', 'rec-1', '--problems');
   expect(problems.out).toContain('1 of its 5 lines, as asked');

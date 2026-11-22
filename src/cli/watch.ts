@@ -178,7 +178,8 @@ export function run(args: string[]): void {
       const by = e.message?.author?.handle ?? p.by?.actor ?? 'someone';
       event(`reply on #${p.re} by ${by}: ${first(p.text ?? '')}`);
     }
-    if (e.type === 'task.canceled') event(`task #${p.id} canceled: ${p.reason ?? ''}. Stop work on it.`);
+    if (e.type === 'task.canceled')
+      event(`task #${p.id} canceled: ${p.reason ?? ''}. Stop work on it, and put back what you changed for it.`);
   };
 
   const over = (code: number | null) => {

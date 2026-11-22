@@ -79,7 +79,8 @@ export async function run(args: string[]): Promise<void> {
     fail(
       `Local transcription isn't set up${installed ? ` with the ${size} model` : ''}. Ask the person first: it downloads ` +
         `${installed ? '' : `${TRANSFORMERS} (with ONNX Runtime, ~470 MB) and `}Whisper ${size} into ${dir}, outside ` +
-        `the project; after that, audio is transcribed on this machine. On yes: ${again} --setup${sized}`,
+        `the project; after that, audio is transcribed on this machine. On yes: ${again} --setup${sized} (--model small ` +
+        `hears better, ~250 MB more). On no, don't ask again this session: work from ${ME} voice's times.`,
     );
   }
 
