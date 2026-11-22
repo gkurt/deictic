@@ -259,9 +259,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where
   only something attached says it), and the rest as labels (`deictic.project`, from the `project` option
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url` where it fits, `viewport`, `count`, `source`), under
-  the user's own `labels`; the source isn't sent. What's attached and drawn is labels numbered from 1 (`attachedLabels`):
-  `screenshot.N` (its file) with `.position`, `.size` and `.note.M`, `note.M` on the page, `recording.N` with `.replay` and
-  `.voice.M`, `voice.N`, `dropped.N` and `pointed` (the path; its HTML is in `element.html`, or `pointed.html` without
+  the user's own `labels`; the source isn't sent. What the attached files don't say is labels numbered from 1
+  (`attachedLabels`): `screenshot.N.position`, `.size` and `.note.M` for the Nth PNG attached, `note.M` on the page,
+  `recording.N.replay` for the Nth recording, `dropped.N` and `pointed` (the path; its HTML is in `element.html`, or `pointed.html` without
   it). Control characters become spaces and a value is cut at 256. `deictic task` prints them. A task added before has them
   after a `---` in its text, which `deictic task` prints as it is and an edit keeps. `deictic.source` is the chain it rendered through, out from its own
   place, `deictic.at` (`Op.chain`, three at most, the farthest left out where they're past a label's 256 characters: with React in development the
@@ -297,7 +297,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   has the element outlined in it (`outlined`, in green dashes `ROOM` off it, drawn on and kept again), which the op says (`outlined`), not the text. `Op.screenshots`
   is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
   `away` with what's typed and attached, and the panel comes back with the recording as a chip;
-  `Op.recordings` attaches each one's JSON (and its voice clips), and its label says where it replays.
+  `Op.recordings` attaches each one's JSON (and its voice clips, which the JSON names), and a label says where it replays.
   The kept state has `facts` too, what only the element's page says (page, viewport, count, chain, pointed, HTML): a
   recording stopped on a page without the element comes back to a panel with no shot to take, and the task says those.
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its

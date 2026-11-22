@@ -74,7 +74,6 @@ test('a task attaches the shot it names, and leaves out one no longer kept', asy
   const { message } = await team.thread(model.tasks[0]!.id);
   // What's attached and drawn is labels, numbered from 1; the text is what was typed.
   expect(message.labels).toMatchObject({
-    'deictic.screenshot.1': `${id}.png`,
     'deictic.screenshot.1.position': '10,20',
     'deictic.screenshot.1.size': '300x24',
     'deictic.note.1': 'Make it red',
@@ -169,13 +168,12 @@ test('a task attaches each shot, labelling where the element is in which and the
   const { model } = (await res.json()) as { model: Model };
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toBe('Too tight');
+  // The Nth PNG attached is `deictic.screenshot.N`'s.
   expect(message.labels).toMatchObject({
-    'deictic.screenshot.1': `${one.id}.png`,
     'deictic.screenshot.1.position': '10,20',
     'deictic.screenshot.1.note.1': 'Too close',
     // A board takes no control characters in a label.
     'deictic.screenshot.1.note.2': 'Two lines',
-    'deictic.screenshot.2': `${two.id}.png`,
     'deictic.screenshot.2.position': '0,0',
     'deictic.screenshot.2.size': '300x24',
   });

@@ -136,7 +136,7 @@ test('says what to send, and keeps the latest few', async () => {
   expect((await ask(`plugins/recordings/recording/${third.id}`)).status).toBe(200);
 });
 
-test('a task attaches the recording, labelled with its file and where it replays', async () => {
+test('a task attaches the recording, labelled with where it replays', async () => {
   const { p, ask, add } = setup();
   const { id } = await add();
   const post = (op: object) =>
@@ -154,10 +154,7 @@ test('a task attaches the recording, labelled with its file and where it replays
   const { model } = await post({ recordings: [{ id, duration: 12_400, replay }], annotations: { count: 1, notes: [] } });
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toBe('Flickers');
-  expect(message.labels).toMatchObject({
-    'deictic.recording.1': `recording-${id}.json`,
-    'deictic.recording.1.replay': replay,
-  });
+  expect(message.labels['deictic.recording.1.replay']).toBe(replay);
   expect(message.attachments).toEqual([expect.objectContaining({ name: `recording-${id}.json`, type: 'application/json' })]);
 
   const gone = await post({ recordings: [{ id: 'gone-123', duration: 1, replay }] });

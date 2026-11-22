@@ -43,7 +43,7 @@ export function run(id: string, values: { out?: string }): void {
     const line = value === undefined ? undefined : say(value);
     if (line !== undefined) console.log(line);
   }
-  for (const line of drawn(root.labels)) console.log(line);
+  for (const line of drawn(root)) console.log(line);
   // A task added before these were labels says them after its words.
   const told = (pointed ? where.slice(0, pointed.index) : where).trim();
   if (told !== '') console.log(told);
@@ -63,30 +63,34 @@ export function run(id: string, values: { out?: string }): void {
 }
 
 /**
- * What's attached and drawn, from the numbered labels: where the element is in each shot and the notes on it, the
+ * What the attached files don't say, from the numbered labels: where the element is in each shot and the notes on it, the
  * notes drawn on the page, where each recording replays, and what wasn't kept any more.
  */
-function drawn(labels: Record<string, string>): string[] {
+function drawn({ labels, attachments }: Message): string[] {
   const numbered = (prefix: string) => {
     const out: string[] = [];
-    for (let n = 1; labels[`${prefix}.${n}`] !== undefined; n++) out.push(`${prefix}.${n}`);
+    for (let n = 1; labels[`${prefix}.${n}`] !== undefined; n++) out.push(labels[`${prefix}.${n}`]!);
     return out;
   };
-  const notes = (prefix: string) => numbered(`${prefix}.note`).map((key) => JSON.stringify(labels[key]));
+  const notes = (prefix: string) => numbered(`${prefix}.note`).map((note) => JSON.stringify(note));
   const lines: string[] = [];
-  for (const [i, shot] of numbered('deictic.screenshot').entries()) {
+  // `deictic.screenshot.N` is the Nth PNG attached, `deictic.recording.N` the Nth recording.
+  for (const [i, { name }] of attachments.filter((a) => a.type === 'image/png').entries()) {
+    const shot = `deictic.screenshot.${i + 1}`;
+    const position = labels[`${shot}.position`];
+    if (position === undefined) continue;
     const said = notes(shot);
     lines.push(
-      `Screenshot ${i + 1}, ${labels[shot]}: the element at x,y ${labels[`${shot}.position`] ?? '?'}, ${labels[`${shot}.size`] ?? '?'} (CSS pixels from its top left)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
+      `${name}: the element at x,y ${position}, ${labels[`${shot}.size`] ?? '?'} (CSS pixels from its top left)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
     );
   }
   const onPage = notes('deictic');
   if (onPage.length > 0) lines.push(`Notes drawn on the page: ${onPage.join(', ')}`);
-  for (const [i, recording] of numbered('deictic.recording').entries()) {
-    const replay = labels[`${recording}.replay`];
-    lines.push(`Recording ${i + 1}, ${labels[recording]}${replay === undefined ? '' : `: replays at ${replay}`}`);
+  for (const [i, { name }] of attachments.filter((a) => a.name.startsWith('recording-')).entries()) {
+    const replay = labels[`deictic.recording.${i + 1}.replay`];
+    if (replay !== undefined) lines.push(`${name} replays at ${replay}`);
   }
-  const dropped = numbered('deictic.dropped').map((key) => labels[key]);
+  const dropped = numbered('deictic.dropped');
   if (dropped.length > 0) lines.push(`Not attached, as it wasn't kept any more: ${dropped.join(', ')}`);
   return lines;
 }

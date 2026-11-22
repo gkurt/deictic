@@ -318,28 +318,23 @@ export function tasks(options: TasksOptions = {}) {
    */
   const keptOf = (op: Op) => {
     const clipOf = (id: string): ReturnType<Clips['read']> => context?.use('voice')?.read(id);
+    // In the op's order, each kind's: the Nth PNG is `deictic.screenshot.N`'s, the Nth recording `deictic.recording.N`'s.
     const files: Upload[] = [];
-    // Each file's name on the board, by its ID: the labels say which attachment is which.
-    const names = new Map<string, string>();
     const dropped: Kind[] = [];
-    const take = (id: string, file: Upload | undefined, missing: Kind) => {
-      if (file === undefined) {
-        dropped.push(missing);
-      } else {
-        files.push(file);
-        names.set(id, file.name);
-      }
+    const take = (file: Upload | undefined, missing: Kind) => {
+      if (file === undefined) dropped.push(missing);
+      else files.push(file);
       return file !== undefined;
     };
-    const screenshots = (op.screenshots ?? []).filter(({ id }) => take(id, context?.use('screenshots')?.read(id), 'screenshot'));
+    const screenshots = (op.screenshots ?? []).filter(({ id }) => take(context?.use('screenshots')?.read(id), 'screenshot'));
     const recordings = (op.recordings ?? []).flatMap((recording) => {
       const found: ReturnType<Recordings['read']> = context?.use('recordings')?.read(recording.id);
-      if (!take(recording.id, found, 'recording')) return [];
+      if (!take(found, 'recording')) return [];
       if (recording.voice === undefined) return [recording];
-      const clipped = (id: string) => take(id, clipOf(id), 'voice clip');
+      const clipped = (id: string) => take(clipOf(id), 'voice clip');
       return [{ ...recording, voice: recording.voice.filter(clipped) }];
     });
-    const voice = (op.voice ?? []).filter(({ id }) => take(id, clipOf(id), 'voice note'));
+    const voice = (op.voice ?? []).filter(({ id }) => take(clipOf(id), 'voice note'));
     // Last, and files, not the task's words: there to look into, and most tasks are done without them. What was
     // pointed at is in the element's HTML, and a file of its own only where that isn't attached.
     const html = typeof op.html === 'string' && op.html !== '' ? op.html : undefined;
@@ -352,7 +347,7 @@ export function tasks(options: TasksOptions = {}) {
       ...(op.recordings === undefined ? {} : { recordings }),
       ...(op.voice === undefined ? {} : { voice }),
     };
-    return { op: kept, files, names, dropped };
+    return { op: kept, files, dropped };
   };
   /** The files uploaded to the board, or nothing when there are none. */
   const upload = async (files: Upload[]): Promise<string[] | undefined> => {
@@ -457,14 +452,14 @@ export function tasks(options: TasksOptions = {}) {
           return { done: { kind: 'edited' as const, id: op.edit, before, after } };
         });
       }
-      const { op: kept, files, names, dropped } = keptOf(op);
+      const { op: kept, files, dropped } = keptOf(op);
       const verb = dropped.length === 1 ? "isn't" : "aren't";
       if (wordsOf(kept) === '') throw new Refusal(`${listOf(dropped)} ${verb} kept any more: attach again, or say what should change`);
       const labels = {
         ...options.labels,
         ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
         ...labelsOf(source, target, kept),
-        ...attachedLabels(kept, names, dropped),
+        ...attachedLabels(kept, dropped),
       };
       return asked(async () => {
         const attachments = await upload(files);
@@ -521,36 +516,28 @@ async function localPage(team: TaskBoard, channel: string): Promise<string | und
 type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
 
 /**
- * What's attached and drawn, as labels numbered from 1, so each value is short and none is read out of the text:
- * `deictic.screenshot.1` is a shot's file, its `.position` and `.size` where the element is in it (CSS pixels from
- * its top left), `.note.1` a note drawn on it; `deictic.note.1` a note drawn on the page; `deictic.recording.1`, its
- * `.replay`, and `.voice.1` a clip of the mic in it; `deictic.voice.1` a voice note; `deictic.dropped.1` what wasn't
- * kept any more; `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
+ * What the attached files don't say, as labels numbered from 1, so each value is short and none is read out of the
+ * text. `deictic.screenshot.N` is the Nth PNG attached: its `.position` and `.size` where the element is in it (CSS
+ * pixels from its top left), `.note.M` a note drawn on it. `deictic.recording.N.replay` is where the Nth recording
+ * plays back; `deictic.note.M` a note drawn on the page; `deictic.dropped.N` what wasn't kept any more;
+ * `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
  */
-function attachedLabels(op: Op, names: Map<string, string>, dropped: Kind[]): Record<string, string> {
+function attachedLabels(op: Op, dropped: Kind[]): Record<string, string> {
   const labels: Record<string, string> = {};
   // A board takes no control characters in a label: a note's lines go on one.
   const set = (key: string, value: string) => {
     labels[`deictic.${key}`] = clip(value.replace(/\p{Cc}+/gu, ' '), LABEL);
   };
-  const fileOf = (id: string) => names.get(id) ?? id;
-  for (const [i, { id, box, marks }] of (op.screenshots ?? []).entries()) {
+  for (const [i, { box, marks }] of (op.screenshots ?? []).entries()) {
     const n = `screenshot.${i + 1}`;
     const [x, y, width, height] = boxOf(box);
-    set(n, fileOf(id));
     set(`${n}.position`, `${x},${y}`);
     set(`${n}.size`, `${width}x${height}`);
     for (const [j, note] of (marks?.notes ?? []).entries()) set(`${n}.note.${j + 1}`, note);
   }
   for (const [j, note] of (op.annotations?.notes ?? []).entries()) set(`note.${j + 1}`, note);
-  for (const [i, { id, replay, voice }] of (op.recordings ?? []).entries()) {
-    const n = `recording.${i + 1}`;
-    set(n, fileOf(id));
-    // Not cut: half a URL leads nowhere.
-    if (replay.length <= LABEL) set(`${n}.replay`, replay);
-    for (const [j, clipId] of (voice ?? []).entries()) set(`${n}.voice.${j + 1}`, fileOf(clipId));
-  }
-  for (const [i, { id }] of (op.voice ?? []).entries()) set(`voice.${i + 1}`, fileOf(id));
+  // Not cut: half a URL leads nowhere.
+  for (const [i, { replay }] of (op.recordings ?? []).entries()) if (replay.length <= LABEL) set(`recording.${i + 1}.replay`, replay);
   for (const [i, kind] of dropped.entries()) set(`dropped.${i + 1}`, kind);
   if (op.pointed !== undefined) set('pointed', op.pointed.path);
   return labels;

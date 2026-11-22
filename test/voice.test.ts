@@ -104,12 +104,8 @@ test('a task attaches voice notes, and a recording’s voice, saying what each i
   const { model } = (await res.json()) as { model: Model };
   const { message } = await team.thread(model.tasks.at(-1)!.id);
   expect(message.text).toBe('Too quiet');
-  expect(message.labels).toMatchObject({
-    'deictic.recording.1': `recording-${recorded}.json`,
-    'deictic.recording.1.replay': replay,
-    'deictic.recording.1.voice.1': `voice-${spoken.id}.webm`,
-    'deictic.voice.1': `voice-${note.id}.webm`,
-  });
+  // The files say what they are: the recording's JSON names its clips.
+  expect(Object.keys(message.labels).filter((key) => /^deictic\.(recording|voice)/.test(key))).toEqual(['deictic.recording.1.replay']);
   expect(message.attachments?.map((a) => [a.name, a.type])).toEqual([
     [`recording-${recorded}.json`, 'application/json'],
     [`voice-${spoken.id}.webm`, 'audio/webm'],
