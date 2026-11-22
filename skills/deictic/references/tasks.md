@@ -40,8 +40,8 @@ The short facts are labels, which `task.mjs` prints (or `vb read 68 --json`):
 | `deictic.size`     | `138x32`: its width and height there                                                                                                             |
 
 `deictic.position` and `deictic.size` are there with one screenshot; with several, each one's place is in the text.
-You rarely need them: the element is outlined in the screenshot, in green dashes, which the text says
-(`the element outlined in dashes`). The source isn't in the task: read the file.
+You rarely need them for a screenshot taken with the task: the element is outlined in it, in green dashes, which
+the text says (`the element outlined in dashes`). One the person annotated has their marks and no outline. The source isn't in the task: read the file.
 
 Attached to most tasks is `element.html`: the element's HTML when the task was left, masked as the screenshots
 are. Don't read it by default; download it (`vb download <attachment> element.html`) when the task and the
@@ -59,7 +59,7 @@ others the change answers.
 - The typed text is the request. When it's short ("fix this", "solve it") or stands in for none typed ("See the
   recording"), the attachments carry it: look at every screenshot, and for a recording, its timeline, frames and voice ([recordings.md](recordings.md)).
 - A screenshot is a PNG: download it to a file's path, not a folder's (`vb download <attachment> shot.png`, or
-  all of a task's with `task.mjs 68 --out <dir>`), and look at it. The element is outlined in green dashes, and
+  all of a task's with `task.mjs 68 --out <dir>`), and look at it. The element is outlined in green dashes, unless the person drew on the shot, and
   the person's marks are drawn in; the notes are in the task's text too.
 - The element is one place; what the person means may be its component, its parent, a sibling (the next card in a
   row), or every element that line renders (a list item). The marks and the words decide.

@@ -122,7 +122,7 @@ words comes what a label can't hold: the chain of source it rendered through, as
 `src/ui/label.tsx:6 ← src/Field.tsx:20 ← src/Panel.tsx:880` (a shared component's line is the same wherever it's
 used; the rest say where). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
-Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. An attached screenshot has the element outlined in it.
+Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the box has the element outlined in it; one you annotated is as you drew it.
 
 The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
 that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening

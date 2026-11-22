@@ -7,7 +7,8 @@
  * annotations plugin is loaded, what's marked on the page.
  *
  * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked, the element
- * outlined in it as the task goes: nothing else says which of two rows alike was meant. With
+ * outlined in it as the task goes: nothing else says which of two rows alike was meant (a shot drawn on is
+ * left as it was drawn). With
  * the annotations plugin too, Annotate takes the shot now and opens it to draw on: saved, it's a chip
  * under the field, which opens it again to change the marks, and Add another takes one more. Any chip
  * (a recording's too) takes the box's place; removing the last brings it back unticked, so a task goes
@@ -687,23 +688,17 @@ export default defineClientPlugin<Model, Change>({
     };
 
     /**
-     * The shots to attach: each chip's PNG, kept as a shot, or a shot taken now where the box is ticked. Each
-     * with the element outlined in it, or as it is where that can't be drawn.
+     * The shots to attach: each chip's PNG, kept as a shot, as the person drew it, or a shot taken now where the
+     * box is ticked. Only that one has the element outlined in it (or is as it was taken, where that can't be
+     * drawn): nothing else in it says what it's about, while a shot someone annotated says what they marked.
      */
     const screenshotsOf = async (): Promise<Op['screenshots']> => {
       if (shots === undefined) return undefined;
-      const kept = async (png: Blob | string, taken: Shot): Promise<{ id: string; outlined?: boolean } | undefined> => {
-        try {
-          return { id: (await shots.upload(await outlined(png, taken), taken)).id, outlined: true };
-        } catch {
-          return undefined;
-        }
-      };
       if (chips.length > 0) {
         add.textContent = 'Uploading…';
         return Promise.all(
           chips.map(async ({ shot: taken, marks, png }) => ({
-            ...((await kept(png, taken)) ?? { id: (await shots.upload(png, taken)).id }),
+            id: (await shots.upload(png, taken)).id,
             box: taken.box,
             ...(marks.length === 0 ? {} : { marks: marksOf(marks) }),
           })),
@@ -713,7 +708,11 @@ export default defineClientPlugin<Model, Change>({
       if (!attach.checked || recordings.length > 0) return undefined;
       add.textContent = 'Capturing…';
       const taken = await shots.capture(context.element);
-      return [{ ...((await kept(taken.url, taken)) ?? { id: taken.id }), box: taken.box }];
+      try {
+        return [{ id: (await shots.upload(await outlined(taken.url, taken), taken)).id, box: taken.box, outlined: true }];
+      } catch {
+        return [{ id: taken.id, box: taken.box }];
+      }
     };
 
     const send = async () => {
