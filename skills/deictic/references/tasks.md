@@ -103,4 +103,5 @@ The result is what the person reads first: what changed, where, and anything you
 - `vb tasks fail 68 "<why>"`: it can't be done as asked; say what would make it possible.
 - `vb reply 68 "…"`: a note on it without changing its state.
 
-Then go back to the watch, and say in one line which task you closed and what changed.
+Then go back to the watch (start it again if it ended while you worked), and say in one line which task you closed
+and what changed.

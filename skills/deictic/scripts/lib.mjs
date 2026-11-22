@@ -1,7 +1,7 @@
 // What the scripts share: the board's CLI, the project's `.deictic/` folders, and finding a recording or a
 // voice clip by a task's ID, a recording's ID, a replay URL or a path. Node 20 or Bun; no dependencies.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -69,6 +69,51 @@ export function boardUrl() {
     }
   }
   return undefined;
+}
+
+/** How often a watch says it's still there, and so how soon the page knows of one that was killed (three missed). */
+const BEAT = 20_000;
+
+/**
+ * Tells the project's dev server that `name` watches `channel`, which a board can't say: a file under
+ * `.deictic/watchers`, written again every `BEAT`, that the Task tab reads. In the `.deictic/` whose board this
+ * is, or in each one near here where the board is the environment's. Answers what takes it back.
+ */
+export function watching(channel, name) {
+  const url = boardUrl();
+  const dirs = deicticDirs();
+  const boardIn = (dir) => {
+    try {
+      return JSON.parse(readFileSync(join(dir, 'board.json'), 'utf8')).url;
+    } catch {
+      return undefined;
+    }
+  };
+  const own = dirs.filter((dir) => boardIn(dir) === url);
+  const files = (own.length > 0 ? own : dirs).map((dir) => join(dir, 'watchers', `${process.pid}.json`));
+  const beat = () => {
+    for (const file of files) {
+      try {
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, `${JSON.stringify({ name, channel, pid: process.pid, at: Date.now() })}\n`);
+      } catch {
+        // A folder that can't be written to: the watch goes on, unseen.
+      }
+    }
+  };
+  beat();
+  const timer = setInterval(beat, BEAT);
+  return () => {
+    clearInterval(timer);
+    for (const file of files) rmSync(file, { force: true });
+  };
+}
+
+/** `30m`, `45s`, `1h` or a bare number of seconds, as milliseconds. */
+export function duration(text) {
+  const [, n, unit = 's'] = /^(\d+(?:\.\d+)?)([smh])?$/.exec(text) ?? [];
+  if (n === undefined) fail(`"${text}" isn't a duration: 30m, 45s, 1h, or seconds as a number.`);
+  return Number(n) * { s: 1000, m: 60_000, h: 3_600_000 }[unit];
 }
 
 /** The project's own `@vercel/board` CLI, as a script: from here, above, or beside a `.deictic/` near here. */

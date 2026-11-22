@@ -31,7 +31,9 @@ test("starts the project's own board, says where in .deictic/board.json, and fin
 test('takes a port, a folder and no inspector, and replaces a board running with other options', async () => {
   const { root } = project({ 'package.json': '{ "name": "shop" }\n' });
   const first = await localBoard(root);
-  const port = Number(new URL(first.url).port) + 1000;
+  // Another port, and one there is: with 4100 taken the first is any free one, which may be near the last.
+  const taken = Number(new URL(first.url).port);
+  const port = taken > 60_000 ? taken - 1000 : taken + 1000;
   const second = await localBoard(root, { port, dir: 'kept/board', inspect: false });
   try {
     expect(second).toMatchObject({ url: `http://127.0.0.1:${port}/api/board`, fresh: true });
@@ -63,7 +65,7 @@ test('local() is the board even where BOARD_URL names another, which is left as 
         body: JSON.stringify({ plugin: 'tasks', target: p.target('src/App.tsx', 'h1') }),
       }),
     ))!;
-    expect(await res.json()).toEqual({ model: { channel: 'deictic', tasks: [], elsewhere: [] } });
+    expect(await res.json()).toEqual({ model: { channel: 'deictic', tasks: [], elsewhere: [], watching: [] } });
     expect(process.env.BOARD_URL).toBe('http://127.0.0.1:9/api/board');
   } finally {
     if (before === undefined) delete process.env.BOARD_URL;

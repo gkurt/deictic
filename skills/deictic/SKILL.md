@@ -17,29 +17,30 @@ Assume deictic is installed and the person wants its tasks worked as they come, 
    none, the one `.deictic/board.json` names). Set `BOARD_PROFILE=<your name>` (`claude`, `codex`) for every
    command, the watch too: `vb whoami` then answers `<them>/<you>`, and without it all you post is the person's
    own. Not installed or not set up: [references/install.md](references/install.md).
-2. **Watch.** Start a watch that wakes you on each new task, so no one has to prompt you:
-   [references/watch.md](references/watch.md).
+2. **Watch.** Start a watch that wakes you on each new task, so no one has to prompt you; the person's Task tab
+   shows you're watching while it runs. It ends after 20 quiet minutes, and then you stop, and say so, rather than
+   watch for ever: [references/watch.md](references/watch.md).
 3. **Work each task**: claim it, read it, look at what's attached, change the source, check the page, complete it
    with what changed: [references/tasks.md](references/tasks.md).
 4. **Recordings and voice**: what happened when, frames at any moment, when something was said:
    [references/recordings.md](references/recordings.md).
 
-Then go back to watching. Say in a line what each task was and what you changed.
+Then go back to watching, unless the watch ended idle. Say in a line what each task was and what you changed.
 
 ## Scripts
 
 In `scripts/` beside this file; Node 20+ or Bun, no dependencies of their own. Each takes a task ID (`68`), and the
 recording ones also a replay URL, a recording ID or a JSON file.
 
-| Script           | What                                                                        | Needs                                                |
-| ---------------- | --------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `vb.mjs`         | The board's CLI, found in the project, on the dev server's board            | `@vercel/board` in the project, or `vb` on the PATH  |
-| `watch.mjs`      | One line per new task, reply and cancellation, for a monitor                | `vb`                                                 |
-| `task.mjs`       | A task briefly: the ask, where, attachments, the page's other open tasks    | `vb`                                                 |
-| `recording.mjs`  | A recording as a timeline: clicks with their source lines, typing, marks…   |                                                      |
-| `frame.mjs`      | PNGs of a recording at moments of it, marks and pointer included            | dev server, Playwright                               |
-| `voice.mjs`      | When speech happens in each voice clip, in the recording's time; WAV export | ffmpeg                                               |
-| `transcribe.mjs` | What was said, with times, by Whisper on this machine                       | ffmpeg; `--setup` once, only after the person agrees |
+| Script           | What                                                                         | Needs                                                |
+| ---------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `vb.mjs`         | The board's CLI, found in the project, on the dev server's board             | `@vercel/board` in the project, or `vb` on the PATH  |
+| `watch.mjs`      | One line per new task, reply and cancellation; ends when the channel's idle  | `vb`                                                 |
+| `task.mjs`       | A task briefly: the ask, where, attachments, the page's other open tasks     | `vb`                                                 |
+| `recording.mjs`  | A recording as a timeline: clicks, typing, marks, console, requests; filters |                                                      |
+| `frame.mjs`      | PNGs of a recording at moments of it, marks and pointer included             | dev server, Playwright                               |
+| `voice.mjs`      | When speech happens in each voice clip, in the recording's time; WAV export  | ffmpeg                                               |
+| `transcribe.mjs` | What was said, with times, by Whisper on this machine                        | ffmpeg; `--setup` once, only after the person agrees |
 
 ## Rules
 

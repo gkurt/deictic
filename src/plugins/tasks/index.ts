@@ -25,11 +25,12 @@ import type { Box } from '#src/plugins/screenshots/index.ts';
 import type { Clips } from '#src/plugins/voice/index.ts';
 
 import { type LocalBoard, localBoard } from './local.ts';
+import { watchersOf } from './watchers.ts';
 
 export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit'>;
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'>;
 
 export interface TasksOptions {
   /**
@@ -100,6 +101,13 @@ export interface Model {
   tasks: Task[];
   /** Tasks about the file's other elements, by line, canceled ones left out: each with its `at`. */
   elsewhere: Task[];
+  /**
+   * Who watches the channel, by name (`claude`): the agents whose watch (the skill's `watch.mjs`) is running in
+   * this project, as a board can't say, and those holding a claim on one of the channel's tasks, which it can.
+   * Empty where none is and the board is this machine's own;
+   * left out where none is and the board is another, which an agent may watch from elsewhere.
+   */
+  watching?: string[];
 }
 
 /**
@@ -345,10 +353,11 @@ export function tasks(options: TasksOptions = {}) {
         const team = await boardOf();
         const labelled = (label: Record<string, string>) => team.tasks.list({ channel, label, state: 'all' });
         // By place too: a task added before there was a `deictic.file` has none, and is still its element's.
-        const [here, inFile, page] = await Promise.all([
+        const [here, inFile, page, held] = await Promise.all([
           labelled({ [AT]: atOf(target) }),
           labelled({ [FILE]: clip(target.loc.file, LABEL) }),
           linkOf(),
+          team.tasks.list({ channel, state: 'claimed' }),
         ]);
         const listed = new Set(inFile.tasks.map(({ message }) => message.id));
         const line = lineOf(source);
@@ -374,9 +383,18 @@ export function tasks(options: TasksOptions = {}) {
           else if (once && at.tag === target.tag && message.labels['deictic.line'] === clip(line, LABEL)) tasks.push({ ...task, at });
           else elsewhere.push({ ...task, at });
         }
+        // An agent at work on a task is here too, though its watch may be over until the task is (`watch.mjs --once`).
+        const working = await agentsOf(
+          team,
+          held.tasks.flatMap(({ message }) => message.task?.claim ?? []),
+        );
+        const watching = [...new Set([...watchersOf(root ?? process.cwd(), channel), ...working])].sort();
+        // A board of this machine's own is watched from here or not at all.
+        const ours = own !== undefined || (options.board === undefined && process.env.BOARD_URL === undefined);
         return {
           channel,
           ...(page === undefined ? {} : { link: page }),
+          ...(watching.length > 0 || ours ? { watching } : {}),
           tasks,
           // The board's order (oldest first) among those of one place.
           elsewhere: elsewhere.sort((a, b) => (a.at.line === b.at.line ? a.at.column - b.at.column : a.at.line - b.at.line)),
@@ -571,6 +589,17 @@ function labelsOf({ code, element }: Source, target: Target, op: Op): Record<str
 function placeOf(box: Box): Record<string, string> {
   const [x, y, width, height] = boxOf(box);
   return { 'deictic.position': `${x},${y}`, 'deictic.size': `${width}x${height}` };
+}
+
+/**
+ * The agents holding these claims, by name, while their leases run. An actor's ID isn't read for it (each board
+ * writes them its own way), so the board is asked who they are, and only when a claim is held. A person holding
+ * one is left out: they needn't be told they're there. (Whatever else holds one works tasks: an agent, a workflow.)
+ */
+async function agentsOf(team: TaskBoard, claims: { actor: string; until: string }[]): Promise<string[]> {
+  const holders = new Set(claims.filter((claim) => Date.parse(claim.until) > Date.now()).map((claim) => claim.actor));
+  if (holders.size === 0) return [];
+  return (await team.actors()).filter((actor) => holders.has(actor.id) && actor.kind !== 'person').map((actor) => actor.name);
 }
 
 const atOf = ({ loc }: Target) => `${loc.file}:${loc.line}:${loc.column}`;

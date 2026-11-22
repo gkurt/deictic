@@ -1,5 +1,8 @@
 import { afterAll, expect, test } from 'bun:test';
 
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
@@ -276,6 +279,7 @@ test("links the channel to a local board's page, to the page `link` names, or no
     tasks: team.tasks,
     thread: team.thread,
     edit: team.edit,
+    actors: team.actors,
     upload: (input: Parameters<typeof team.upload>[0]) => team.upload(input),
     discovery: async () => ({ ...(await team.discovery()), url }),
   });
@@ -318,4 +322,30 @@ test("links the channel to a local board's page, to the page `link` names, or no
     link: (c, id) => `https://boards.test/${c}/${id ?? ''}`,
   });
   expect(named.link).toBe(`https://boards.test/ui/links/${named.id}`);
+});
+
+test('says who watches the channel from the project, while their watch still says so', async () => {
+  const { p, post, target } = setup('watched');
+  const watching = async () => (await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.watching;
+  const watch = (pid: number, name: string, channel: string, at: number) => {
+    const file = join(p.root, '.deictic', 'watchers', `${pid}.json`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ name, channel, pid, at }));
+    return file;
+  };
+  // A board that isn't this machine's own may be watched from elsewhere: nothing is said of it.
+  expect(await watching()).toBeUndefined();
+
+  watch(1, 'claude', 'watched', Date.now());
+  watch(2, 'codex', 'another', Date.now());
+  const killed = watch(3, 'gone', 'watched', Date.now() - 5 * 60_000);
+  expect(await watching()).toEqual(['claude']);
+  expect(existsSync(killed)).toBe(false);
+
+  // An agent at work on a task is there too, with no watch running, until the task is done.
+  const added = async () => (await post<{ model: Model }>('apply', { plugin: 'tasks', target, op })).json.model.tasks.at(-1)!.id;
+  const claim = await team.as('codex').tasks.claim(await added());
+  expect(await watching()).toEqual(['claude', 'codex']);
+  await claim.complete('done');
+  expect(await watching()).toEqual(['claude']);
 });

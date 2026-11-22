@@ -2,6 +2,7 @@
  * The tasks panel: the tasks already about this element and their state, and a field to add one. Each
  * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
  * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
+ * Beside the channel it says who watches it (`Model.watching`), or that no agent does.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
  * the source can't tell: the chain of source it rendered through, its HTML (a file attached), and where the
  * annotations plugin is loaded, what's marked on the page.
@@ -73,7 +74,11 @@ const STYLE = `
 .tasks li.editing .actions { display: flex; gap: 6px; }
 textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-serif; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; align-items: center; }
-.hint { color: var(--deictic-muted); font-size: 12px; }
+/* Cut short before it pushes Add out: a channel's name and its watchers' may be long. */
+.hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--deictic-muted); font-size: 12px; }
+/* A dot as a task's state is: a ring while no one watches, green while someone does. */
+.watch::before { content: ''; display: inline-block; box-sizing: border-box; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
+.watch.on::before { border-color: #4ade80; background: #4ade80; }
 .hint a { color: inherit; }
 .hint a:hover { color: var(--deictic-fg); }
 .shot { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--deictic-muted); }
@@ -604,13 +609,26 @@ export default defineClientPlugin<Model, Change>({
       shown = model;
       // A task being changed is drawn again with its words as they were.
       edited = undefined;
-      const { channel, link, tasks, elsewhere } = model;
+      const { channel, link, tasks, elsewhere, watching } = model;
       const name =
         link === undefined
           ? element('span')
           : element('a', { href: link, target: '_blank', rel: 'noreferrer', title: 'Open the channel on the board' });
       name.textContent = `#${channel}`;
       hint.replaceChildren('to ', name);
+      // Whether a task added now is taken up: who watches the channel, or that no one does, where that's known.
+      if (watching !== undefined) {
+        const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(watching);
+        const on = watching.length > 0;
+        const who = element('span', {
+          className: on ? 'watch on' : 'watch',
+          textContent: on ? `${names} watching` : 'no agent watching',
+          title: on
+            ? `${names} ${watching.length === 1 ? 'is' : 'are'} watching #${channel}, and take${watching.length === 1 ? 's' : ''} each task as it's added`
+            : `A task waits on the board until an agent watches #${channel}: ask yours to watch deictic's tasks`,
+        });
+        hint.append(' · ', who);
+      }
       /** A task's row: its state, its ID, a link where it has a page, its title, and where it's from when that's said. */
       const rowOf = (t: Task, from?: HTMLElement) => {
         const item = element('li');

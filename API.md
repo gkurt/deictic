@@ -139,11 +139,16 @@ In the Task tab:
 - **Voice** records a note.
 - The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed
   can be edited or deleted. Undo takes any of it back.
+- Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
+  now is taken up. It knows of an agent watching with the skill from the project's folder, and of one holding a
+  claim on a task of the channel's; with a board that isn't this machine's own it says nothing where it knows of
+  none, as one may watch from elsewhere.
 
 ### The agent skill
 
 deictic ships a skill that watches the channel and works each task as it arrives, with scripts that read a task,
-turn a recording into a timeline, screenshot it at any moment and transcribe its voice notes:
+turn a recording into a timeline, screenshot it at any moment and transcribe its voice notes. Its watch ends once
+the channel has been quiet for 20 minutes, and the agent then stops and says so, so none watches for ever:
 
 ```bash
 npx skills add gkurt/deictic
