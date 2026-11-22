@@ -398,7 +398,9 @@ export function tasks(options: TasksOptions = {}) {
         const elsewhere: (Task & { at: Place })[] = [];
         const about = [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks];
         // Who has each, or ended it, and who holds any claim on the channel: asked of the board at once.
-        const actorOf = ({ id, task }: (typeof about)[number]['message']) => task?.claim?.actor ?? enders.get(id);
+        // An ender only for a task that's over: one failed and reopened is no one's again.
+        const actorOf = ({ id, task }: (typeof about)[number]['message']) =>
+          task?.claim?.actor ?? (task?.state === 'completed' || task?.state === 'failed' ? enders.get(id) : undefined);
         const claims = held.tasks.flatMap(({ message }) => message.task?.claim ?? []);
         const actors = await actorsOf(team, [...about.flatMap(({ message }) => actorOf(message) ?? []), ...claims.map((c) => c.actor)]);
         for (const { message } of about) {
