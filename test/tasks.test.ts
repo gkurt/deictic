@@ -128,13 +128,18 @@ test('says the source it rendered through, and attaches its HTML as it rendered'
   const html = '<h1 class="text-4xl" data-deictic="src/App.tsx:1:26">Pricing</h1>';
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, chain, html } });
   const { message } = await team.thread(json.model.tasks[0]!.id);
-  expect(message.text).toBe(
-    `${op.text}\n---\nSource: src/App.tsx:1 ← ParticipantsField (src/ParticipantsField.tsx:20) ← WorkflowPanel ← src/SidePanel.tsx:12`,
-  );
+  // A label, from the element's own place (`deictic.at`) out; the words are what was typed.
+  expect(message.labels['deictic.source']).toBe('ParticipantsField (src/ParticipantsField.tsx:20) ← WorkflowPanel ← src/SidePanel.tsx:12');
+  expect(message.text).toBe(op.text);
   // The HTML is a file, for whoever looks into it: the task's words stay short.
   expect(message.attachments).toEqual([expect.objectContaining({ name: 'element.html', type: 'text/html', size: html.length })]);
   // What was typed is all the panel lists.
   expect(json.model.tasks[0]).toMatchObject({ text: op.text });
+
+  // Past what a label holds, the farthest are left out, not cut.
+  const long = [`Field (src/${'f'.repeat(140)}.tsx:1)`, `Panel (src/${'p'.repeat(140)}.tsx:2)`];
+  const cut = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, chain: long } });
+  expect((await team.thread(cut.json.model.tasks.at(-1)!.id)).message.labels['deictic.source']).toBe(long[0]);
 
   // With the HTML alone, the text is what was typed.
   const plain = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, html } });

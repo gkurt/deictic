@@ -130,11 +130,10 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 In the Task tab a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
 
 A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
-`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them. After the
-words comes what a label can't hold: the chain of source it rendered through, as
-`src/ui/label.tsx:6 ← Field (src/Field.tsx:20) ← Panel` (a shared component's line is the same wherever it's
-used; the rest say where: with React in development the components that use it, three at most, and otherwise the
-files around it). The element's HTML as it rendered is attached as `element.html`,
+`file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them.
+`deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared
+component's line is the same wherever it's used; these say where: with React in development the components that use
+it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
 Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the box has the element outlined in it; one you annotated is as you drew it.
 

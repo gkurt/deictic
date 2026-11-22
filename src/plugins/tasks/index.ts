@@ -2,8 +2,7 @@
  * `deictic/tasks`: open its tab on an element to add a task about it to a Vercel Board
  * (`@vercel/board`). The task says what to change, in the words typed, and where: the element's file,
  * line and tag, the page and the project, all as labels beside the short facts (viewport, how many, where
- * it is in the shot), and after the words what a label can't hold: the chain of source it rendered through, from
- * its own line out to the files that use its component. Its HTML as it rendered is a file attached, `element.html`, for whoever
+ * it is in the shot) and the chain of source it rendered through, out to the files that use its component. Its HTML as it rendered is a file attached, `element.html`, for whoever
  * wants more than the task says: a task stays short. Whatever works the board's tasks (a person, or an agent of theirs claiming them) takes it
  * from there; deictic only adds them.
  *
@@ -464,7 +463,7 @@ export function tasks(options: TasksOptions = {}) {
       };
       return asked(async () => {
         const attachments = await upload(files);
-        const text = textOf(kept, target, dropped);
+        const text = textOf(kept, dropped);
         return { done: await create({ channel, text, labels, ...(attachments === undefined ? {} : { attachments }) }) };
       });
     },
@@ -568,13 +567,17 @@ function shotsOf(shots: NonNullable<Op['screenshots']>): string[] {
 }
 
 /**
- * `Source: src/ui/label.tsx:6 ← Field (src/Field.tsx:20) ← Panel`: from the element's line out, as the page said
- * it: the components that use it, where the page knows them, or the files around it.
+ * `deictic.source`, `Field (src/Field.tsx:20) ← Panel`: what the element rendered through, out from its own place
+ * (`deictic.at`), as the page said it: the components that use it, where the page knows them, or the files around
+ * it. As many as a label holds, the farthest left out first.
  */
-function chainOf({ loc }: Target, chain: NonNullable<Op['chain']>): string[] {
-  const places = chain.slice(0, CHAIN).map((place) => clip(String(place), LABEL));
-  return places.length === 0 ? [] : [`Source: ${[`${loc.file}:${loc.line}`, ...places].join(' ← ')}`];
+function sourceOf(chain: NonNullable<Op['chain']>): Record<string, string> {
+  let places = chain.slice(0, CHAIN).map(String);
+  while (places.length > 1 && places.join(THROUGH).length > LABEL) places = places.slice(0, -1);
+  return places.length === 0 ? {} : { 'deictic.source': clip(places.join(THROUGH), LABEL) };
 }
+
+const THROUGH = ' ← ';
 
 /** How many places a chain names after the element's own: the first few say which use of a component it is. */
 const CHAIN = 3;
@@ -616,6 +619,7 @@ function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<stri
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
     'deictic.count': String(op.count),
     ...(op.screenshots?.length === 1 && shot !== undefined ? placeOf(shot.box) : {}),
+    ...sourceOf(op.chain ?? []),
   };
 }
 
@@ -667,11 +671,11 @@ function placeIn(labels: Record<string, string>): Place | undefined {
 }
 
 /**
- * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, the
- * source it rendered through, what was pointed at inside it, and a URL too long for a label.
+ * The task's text: what was typed, and after a `---` only what no label holds: what's attached and drawn, what
+ * was pointed at inside it, and a URL too long for a label.
  * A board holds 10,000 characters.
  */
-function textOf(op: Op, target: Target, dropped: string[]): string {
+function textOf(op: Op, dropped: string[]): string {
   const more = [
     ...(op.page.length <= LABEL ? [] : [op.page]),
     ...(dropped.length === 0 ? [] : [`${DROPPED}${listOf(dropped)}`]),
@@ -679,7 +683,6 @@ function textOf(op: Op, target: Target, dropped: string[]): string {
     ...recordingsOf(op.recordings ?? []),
     ...voicesOf(op.voice ?? []),
     ...(op.annotations === undefined ? [] : [annotated(op.annotations, op.screenshots?.length ?? 0, op.recordings?.length ?? 0)]),
-    ...chainOf(target, op.chain ?? []),
     ...(op.pointed === undefined ? [] : [`Pointed at, inside it: \`${op.pointed.path}\``, fence(op.pointed.html, 'html')]),
   ];
   const tail = more.length === 0 ? '' : REST + more.join('\n');

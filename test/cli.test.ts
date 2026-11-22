@@ -68,7 +68,13 @@ test("reads a task on the project's own board, and a watch says what's ready and
       body: JSON.stringify({
         plugin: 'tasks',
         target: p.target('src/App.tsx', 'h1'),
-        op: { text: 'Make it bolder', page: `${ORIGIN}/pricing`, viewport: { width: 390, height: 844 }, count: 1 },
+        op: {
+          text: 'Make it bolder',
+          page: `${ORIGIN}/pricing`,
+          viewport: { width: 390, height: 844 },
+          count: 1,
+          chain: ['Hero (src/Hero.tsx:4)'],
+        },
       }),
     }),
   );
@@ -81,6 +87,7 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(task.out).toContain(`#${id} ready, asked by`);
   expect(task.out).toContain('Make it bolder');
   expect(task.out).toContain('src/App.tsx:1:');
+  expect(task.out).toContain('Source: src/App.tsx:1 ← Hero (src/Hero.tsx:4)');
   expect(task.out).toContain(`File: ${join(p.root, 'src/App.tsx')}:1, as the task saw it.`);
 
   const watch = deictic(p.root, 'watch', 'cli', '--once');

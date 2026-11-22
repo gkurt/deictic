@@ -30,6 +30,8 @@ export function run(id: string, values: { out?: string }): void {
   const facts: [string, (v: string) => string | undefined][] = [
     ['deictic.project', (v) => `Project ${v}`],
     ['deictic.at', (v) => `${v} <${label('deictic.tag') ?? '?'}>`],
+    // From its own line out: before the label, tasks said it in their text, which is printed below as it is.
+    ['deictic.source', (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v}`],
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
     ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],

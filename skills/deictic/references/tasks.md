@@ -3,7 +3,8 @@
 `npx deictic task 68` prints what was asked, where, the page and viewport, what's attached with the command to read
 each, and whether the line still reads as the task saw it.
 
-- **`Source:`** is the chain the element rendered through, from its own line out:
+- **`Source:`** (the `deictic.source` label, after its own place) is the chain the element rendered through, from its
+  own line out:
   `src/ui/label.tsx:6 ← ParticipantsField (src/ParticipantsField.tsx:20) ← WorkflowPanel`. When the first is a shared
   component (`ui/label.tsx`), the change is usually at the next one. A name alone is a component to find by name.
 - **`Pointed at, inside it:`** is markup inside the element that no line marks (a dependency's): what they mean. Find

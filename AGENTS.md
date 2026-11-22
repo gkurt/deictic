@@ -259,9 +259,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   peer, imported when first used). `index.ts` writes the task's text (what was typed, or `See the recording` and the like where
   only something attached says it, then only what no label
   holds: what's attached, and what was pointed at) and the facts as labels (`deictic.project`, from the `project` option
-  or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, and `position` and `size` with one shot), under
-  the user's own `labels`; the source isn't sent. After the words, what the page says and no label holds: `Source:`,
-  the chain of source it rendered through, from its own line out (`Op.chain`, three at most: with React in development the
+  or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url`, `viewport`, `count`, `source`, and `position` and `size` with one shot), under
+  the user's own `labels`; the source isn't sent. `deictic.source` is the chain it rendered through, out from its own
+  place, `deictic.at` (`Op.chain`, three at most, the farthest left out where they're past a label's 256 characters: with React in development the
   components that wrote it, read off the fibers' owners, each `Name (file:line)` with the line of its nearest element around
   this one, or its name alone where it has none; otherwise `file:line`s read off the marks around it, the nearest of each file
   in turn: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is never in the text, which stays short: it's attached as `element.html`
