@@ -6,15 +6,8 @@
  */
 import type { Shape } from '#src/plugins/annotations/index.ts';
 
-import { clock, fail, ME, parseArgs } from './board.ts';
+import { clock, fail, ME } from './board.ts';
 import { loadRecording } from './find.ts';
-
-export const usage = `recording <task | replay URL | recording ID | file> [--nth 2] [--json]   a recording as a timeline
-      --only console,request   these kinds of line (also page, click, input, scroll, resize, marks, voice)
-      --problems               errors, warnings and requests that failed
-      --from 10 --to 15        a stretch, in seconds; --around 12 is the 3 seconds either side
-      --grep text              lines with this in them, in any case
-      --full                   all of each line: where it was logged from, a request's headers and bodies`;
 
 /** A node of rrweb's snapshot. */
 interface SnapNode {
@@ -302,19 +295,20 @@ function timelineOf(events: Event[], voice: { id: string; at: number; duration: 
   return timeline.sort((a, b) => a.t - b.t);
 }
 
-export async function run(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs(args, {
-    nth: { type: 'string', default: '1' },
-    json: { type: 'boolean' },
-    only: { type: 'string', multiple: true },
-    problems: { type: 'boolean' },
-    from: { type: 'string' },
-    to: { type: 'string' },
-    around: { type: 'string' },
-    grep: { type: 'string' },
-    full: { type: 'boolean' },
-  });
-  const { kept, id, replay, task } = await loadRecording(positionals[0], Number(values.nth));
+export interface Options {
+  nth: string;
+  json?: boolean;
+  only?: string[];
+  problems?: boolean;
+  from?: string;
+  to?: string;
+  around?: string;
+  grep?: string;
+  full?: boolean;
+}
+
+export async function run(named: string, values: Options): Promise<void> {
+  const { kept, id, replay, task } = await loadRecording(named, Number(values.nth));
   const events = kept.events as Event[];
   if (!Array.isArray(events) || events.length === 0) fail(`Recording ${id} has no events.`);
   const timeline = timelineOf(events, kept.voice ?? []);

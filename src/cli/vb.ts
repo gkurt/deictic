@@ -4,8 +4,6 @@
  */
 import { vbHere } from './board.ts';
 
-export const usage = 'vb <anything vb takes>     the board on the dev server: vb whoami, vb tasks claim 68 --lease 30m';
-
 export function run(args: string[]): void {
   process.exit(vbHere(args));
 }

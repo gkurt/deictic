@@ -11,16 +11,12 @@ import { createInterface } from 'node:readline/promises';
 
 import { alive, runningAt } from '#src/plugins/tasks/local.ts';
 
-import { deicticDirs, fail, ME, parseArgs } from './board.ts';
+import { deicticDirs, fail, ME } from './board.ts';
 import { transcribeDir } from './transcribe.ts';
-
-export const usage = `clean [screenshots] [recordings] [voice] [history] [board] [all] [transcribe] [--yes]   deletes what deictic kept, after asking
-  (shots, recordings and voice by default; history and board with the dev server stopped; transcribe is the machine's)`;
 
 const CAPTURES = ['screenshots', 'recordings', 'voice'] as const;
 const PROJECT = [...CAPTURES, 'history', 'board'] as const;
 type Part = (typeof PROJECT)[number] | 'transcribe';
-const PARTS: readonly string[] = [...PROJECT, 'transcribe', 'all'];
 
 /** What one part of a `.deictic/` is on disk: the paths to delete. */
 function pathsOf(dir: string, part: Part): string[] {
@@ -66,12 +62,9 @@ async function ask(question: string): Promise<boolean> {
   }
 }
 
-export async function run(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs(args, { yes: { type: 'boolean', short: 'y' } });
-  const wrong = positionals.find((p) => !PARTS.includes(p));
-  if (wrong !== undefined) fail(`clean: no "${wrong}" to clean. It cleans ${PARTS.join(', ')}.`);
-  const named = positionals.filter((p): p is Part => p !== 'all');
-  const parts = positionals.length === 0 ? [...CAPTURES] : [...new Set([...(positionals.includes('all') ? PROJECT : []), ...named])];
+export async function run(asked: string[], values: { yes?: boolean }): Promise<void> {
+  const named = asked.filter((p): p is Part => p !== 'all');
+  const parts = asked.length === 0 ? [...CAPTURES] : [...new Set([...(asked.includes('all') ? PROJECT : []), ...named])];
 
   const found: Found[] = [];
   for (const dir of deicticDirs()) {
@@ -92,7 +85,7 @@ export async function run(args: string[]): Promise<void> {
 
   if (found.length === 0) {
     console.log(
-      `Nothing to clean near here${positionals.length === 0 ? ` (no shots, recordings or voice clips; ${ME} clean all for the rest)` : ''}.`,
+      `Nothing to clean near here${asked.length === 0 ? ` (no shots, recordings or voice clips; ${ME} clean all for the rest)` : ''}.`,
     );
     return;
   }
@@ -102,7 +95,7 @@ export async function run(args: string[]): Promise<void> {
 
   const yes = values.yes === true || (process.stdin.isTTY && process.stdout.isTTY ? await ask(`Delete these, ${total}?`) : undefined);
   if (yes === undefined) {
-    console.log(`Nothing deleted. ${ME} clean ${[...positionals, '--yes'].join(' ')} deletes these (${total}).`);
+    console.log(`Nothing deleted. ${ME} clean ${[...asked, '--yes'].join(' ')} deletes these (${total}).`);
     return;
   }
   if (!yes) return;

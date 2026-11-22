@@ -9,11 +9,8 @@ import { join, resolve } from 'node:path';
 
 import type { Browser, chromium } from 'playwright-core';
 
-import { clock, fail, parseArgs } from './board.ts';
+import { clock, fail } from './board.ts';
 import { fromProject, loadRecording } from './find.ts';
-
-export const usage =
-  'frame <task | replay URL | recording ID | file> [--at 4.2 ...] [--every 2] [--out dir] [--base url]   PNGs of a recording';
 
 interface Marks {
   type: number;
@@ -21,15 +18,8 @@ interface Marks {
   data: { tag?: string; payload?: { svg?: string } };
 }
 
-export async function run(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs(args, {
-    nth: { type: 'string', default: '1' },
-    at: { type: 'string', multiple: true },
-    every: { type: 'string' },
-    out: { type: 'string' },
-    base: { type: 'string' },
-  });
-  const { kept, id, replay } = await loadRecording(positionals[0], Number(values.nth));
+export async function run(ref: string, values: { nth: string; at?: string[]; every?: string; out?: string; base?: string }): Promise<void> {
+  const { kept, id, replay } = await loadRecording(ref, Number(values.nth));
   // The replay is served by the dev server that recorded it, under deictic's routes.
   const page =
     values.base === undefined

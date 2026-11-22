@@ -14,11 +14,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { clock, fail, ME, parseArgs } from './board.ts';
+import { clock, fail, ME } from './board.ts';
 import { ffmpeg, voiceClips } from './find.ts';
-
-export const usage = `transcribe <task | replay URL | recording ID | file | clip ID> [--model base] [--language en] [--json]   what was said
-  transcribe --setup [--model base]   installs it, outside the project: ask the person first`;
 
 // Pinned, so a setup installs what this was written against; move it on deliberately.
 const TRANSFORMERS = '@huggingface/transformers@4.3.2';
@@ -47,13 +44,10 @@ interface Transformers {
 /** Where `--setup` installs it, outside any project: `deictic clean transcribe` deletes it. */
 export const transcribeDir = () => join(process.env.DEICTIC_CACHE ?? join(homedir(), '.cache', 'deictic'), 'transcribe');
 
-export async function run(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs(args, {
-    setup: { type: 'boolean' },
-    json: { type: 'boolean' },
-    model: { type: 'string', default: 'base' },
-    language: { type: 'string' },
-  });
+export async function run(
+  ref: string | undefined,
+  values: { setup?: boolean; json?: boolean; model: string; language?: string },
+): Promise<void> {
   const size = values.model;
   const named = MODELS[size];
   if (!size.includes('/') && named === undefined) fail(`--model is one of ${Object.keys(MODELS).join(', ')}, or a model ID`);
@@ -96,11 +90,11 @@ export async function run(args: string[]): Promise<void> {
   const asr = await transformers.pipeline('automatic-speech-recognition', model, { dtype: 'q8' });
   if (values.setup) {
     console.log(`Ready: ${again} <task>${sized}. ${ME} clean transcribe deletes it.`);
-    if (positionals[0] === undefined) return;
+    if (ref === undefined) return;
   }
 
   const results = [];
-  for (const c of await voiceClips(positionals[0])) {
+  for (const c of await voiceClips(ref)) {
     // Whisper takes 16 kHz mono samples; ffmpeg decodes the clip (webm, ogg or mp4) to them.
     const raw = ffmpeg(['-loglevel', 'error', '-i', c.file, '-f', 'f32le', '-ac', '1', '-ar', '16000', '-']).stdout;
     const audio = new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength - (raw.byteLength % 4)));

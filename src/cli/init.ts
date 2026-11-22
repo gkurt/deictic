@@ -16,7 +16,7 @@ import { recommended } from '#src/plugins/recommended/index.ts';
 
 import { installCommand, packageManager, readJson, runnerOf } from '#src/tools/packages.ts';
 
-import { fail, parseArgs } from './board.ts';
+import { fail } from './board.ts';
 import { addToBunfig, addToServer, BY_HAND, MODULE, PLUGIN, serverOf } from './bun.ts';
 import { addFirst, addImports, eolOf, indentAt } from './edit.ts';
 
@@ -357,11 +357,6 @@ function configureBun(root: string, dryRun: boolean, log: (line: string) => void
   log(`deictic: ${did} its routes to ${name}`);
 }
 
-export const usage = `init [--dry-run] [--no-install] [--skill | --no-skill]   sets deictic up in this project
-      --dry-run     says what it would do, and does none of it
-      --no-install  doesn't install: says the command instead
-      --skill       adds the agent skill without asking; --no-skill says the command instead`;
-
 /** Asks a yes-or-no question on the terminal, yes by default. */
 async function ask(question: string): Promise<boolean> {
   const lines = createInterface({ input: process.stdin, output: process.stdout });
@@ -372,14 +367,13 @@ async function ask(question: string): Promise<boolean> {
   }
 }
 
-export async function run(args: string[]): Promise<void> {
-  const { values } = parseArgs(args, { 'dry-run': { type: 'boolean' }, install: { type: 'boolean' }, skill: { type: 'boolean' } });
+export async function run(values: { dryRun?: boolean; install: boolean; skill?: boolean }): Promise<void> {
   try {
     await init({
       cwd: process.cwd(),
       install: values.install,
       skill: values.skill,
-      dryRun: values['dry-run'],
+      dryRun: values.dryRun,
       ask: process.stdin.isTTY && process.stdout.isTTY ? ask : undefined,
     });
   } catch (e) {

@@ -16,9 +16,7 @@ import { createInterface } from 'node:readline';
 
 import { watcherAt } from '#src/plugins/tasks/watchers.ts';
 
-import { answers, boardIn, boardUrl, deicticDirs, duration, parseArgs, vb, vbCommand, whoami } from './board.ts';
-
-export const usage = 'watch [channel] [--idle 20m] [--once] [--label k=v]   a line per new task, reply and cancellation';
+import { answers, boardIn, boardUrl, deicticDirs, duration, vb, vbCommand, whoami } from './board.ts';
 
 /** What `vb tail --json` prints, one per line. */
 interface Tailed {
@@ -83,13 +81,7 @@ function gone(pid: number): boolean {
   }
 }
 
-export function run(args: string[]): void {
-  const { values, positionals } = parseArgs(args, {
-    idle: { type: 'string', default: '20m' },
-    once: { type: 'boolean' },
-    label: { type: 'string', multiple: true },
-  });
-  const channel = positionals[0] ?? 'deictic';
+export function run(channel: string, values: { idle: string; once?: boolean; label?: string[] }): void {
   const labels = (values.label ?? []).flatMap((l) => ['--label', l]);
   const idle = duration(values.idle);
   const say = (line: string) => console.log(line.replace(/\s+/g, ' ').trim());

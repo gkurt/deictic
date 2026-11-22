@@ -48,8 +48,8 @@ test('says its commands, and refuses one it has not', () => {
     expect(help.out).toContain(`  ${name} `);
   const wrong = deictic(root, 'nope');
   expect(wrong.code).toBe(1);
-  expect(wrong.err).toContain('no command "nope"');
-  expect(deictic(root, 'task', '--nope').err).toContain("Unknown option '--nope'");
+  expect(wrong.err).toContain("unknown command 'nope'");
+  expect(deictic(root, 'task', '--nope').err).toContain("unknown option '--nope'");
 });
 
 test("reads a task on the project's own board, and a watch says what's ready and that it watches", async () => {
@@ -184,7 +184,7 @@ test('cleans what deictic kept after saying what and how big, and leaves the his
   const refused = clean('board', '--yes');
   expect(refused.code).toBe(1);
   expect(refused.err).toContain("is the running dev server's: stop it");
-  expect(clean('nope').err).toContain('no "nope" to clean');
+  expect(clean('nope').err).toContain("'nope' is invalid for argument 'parts'");
 
   const ended = Bun.spawnSync([process.execPath, '--version']).pid;
   p.write('.deictic/board.json', JSON.stringify({ url: 'http://127.0.0.1:4100/api/board', pid: ended, as: '' }));

@@ -310,12 +310,13 @@ read only when needed. What a command's output can say (what to do on an event, 
 problem), it says there, not in the skill. Setting deictic up is `npx deictic init`. It has no scripts: the agent runs the project's installed deictic, `npx deictic <command>`, so what reads the tasks and recordings
 is the version that wrote them. In this repository, `bun src/cli.ts <command>` (the root package has no bin of its own).
 
-The commands are `src/cli.ts`, the `deictic` bin (`dist/cli.js`), each in `src/cli/` and imported when run (`run(args)`,
-and a `usage` line for `--help`). `board.ts` is what they share: `vb`, run as the project's `@vercel/board` script
+The commands are `src/cli.ts`, the `deictic` bin (`dist/cli.js`): commander, each command declared there with its
+arguments and options and what they do (all `--help` shows: never write help by hand), and run from `src/cli/`,
+imported only when it's run (`run(<arguments>, options)`, typed in the module). `vb` passes everything through. `board.ts` is what they share: `vb`, run as the project's `@vercel/board` script
 (`vbScript`, from `tasks/local.ts`) on the dev server's board (`BOARD_URL`, or the nearest `.deictic/board.json`'s,
 read with `runningAt`) as the agent running it (`profileOf`: `BOARD_PROFILE`, else the variable its harness sets,
 `CLAUDECODE` and the like, else `AI_AGENT` cut to a profile's name; none at a person's terminal, who writes as
-themselves), the `.deictic/` folders near here, `parseArgs` (Node's, strict, failing with the message), and
+themselves), the `.deictic/` folders near here, `fail` (the message, exit 1), and
 `ME` (`npx deictic`, how output names other commands); `find.ts` finds a recording or clip by task, URL, ID or path,
 and runs ffmpeg and the project's Playwright. `init` (above); `clean` (for the person, like `init`: the `.deictic/`
 folders near here, the shots, recordings and voice clips, or `history`, `board`, `all`, refused while a local board's

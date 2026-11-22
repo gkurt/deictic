@@ -5,17 +5,13 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import { deicticDirs, download, fail, ME, type Message, parseArgs, read, vbJson } from './board.ts';
-
-export const usage = 'task <id> [--out dir]       a task briefly; --out downloads what is attached';
+import { deicticDirs, download, ME, type Message, read, vbJson } from './board.ts';
 
 /** An actor by the profile its ID ends in (`…+claude`), or the ID of one that writes as itself. */
 const nameOf = (actor: string) => (actor.includes('+') ? actor.slice(actor.lastIndexOf('+') + 1) : actor);
 
-export function run(args: string[]): void {
-  const { values, positionals } = parseArgs(args, { out: { type: 'string' } });
-  if (positionals[0] === undefined) fail(`Name a task: ${ME} task 68`);
-  const { message: root, replies } = read(positionals[0]);
+export function run(id: string, values: { out?: string }): void {
+  const { message: root, replies } = read(id);
   const [asked = '', where = ''] = root.text.split(/\n---\n/);
   const label = (key: string) => root.labels[key];
   const at = label('deictic.at');

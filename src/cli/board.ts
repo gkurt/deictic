@@ -5,7 +5,6 @@
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { parseArgs as parse, type ParseArgsConfig } from 'node:util';
 
 import { runningAt, vbScript } from '#src/plugins/tasks/local.ts';
 
@@ -15,15 +14,6 @@ export const ME = 'npx deictic';
 export function fail(message: string): never {
   console.error(message);
   process.exit(1);
-}
-
-/** A command's options and arguments, or a failure saying what's wrong with them. */
-export function parseArgs<T extends NonNullable<ParseArgsConfig['options']>>(args: string[], options: T) {
-  try {
-    return parse({ args, options, allowPositionals: true, allowNegative: true, strict: true });
-  } catch (e) {
-    return fail((e as Error).message);
-  }
 }
 
 /** `1:02.5`, from milliseconds. */

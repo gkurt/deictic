@@ -255,6 +255,7 @@
     "tegami": "bun scripts/tegami.mts"
   },
   "dependencies": {
+    "commander": "^15.1.0",
     "magic-string": "^1.4.5",
     "oxc-parser": "^0.159.0"
   },

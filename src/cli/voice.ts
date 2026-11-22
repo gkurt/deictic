@@ -6,25 +6,16 @@
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { clock, parseArgs } from './board.ts';
+import { clock } from './board.ts';
 import { ffmpeg, voiceClips } from './find.ts';
 
-export const usage =
-  'voice <task | replay URL | recording ID | file | clip ID> [--noise -35] [--gap 0.4] [--wav dir] [--json]   when speech happens';
-
-export async function run(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs(args, {
-    noise: { type: 'string', default: '-35' },
-    gap: { type: 'string', default: '0.4' },
-    wav: { type: 'string' },
-    json: { type: 'boolean' },
-  });
+export async function run(ref: string, values: { noise: string; gap: string; wav?: string; json?: boolean }): Promise<void> {
   const noise = Number(values.noise);
   const gap = Number(values.gap);
   const wav = values.wav === undefined ? undefined : resolve(values.wav);
 
   const results = [];
-  for (const c of await voiceClips(positionals[0])) {
+  for (const c of await voiceClips(ref)) {
     // ffmpeg reports silence; speech is what's between. MediaRecorder's webm has no duration, so it's measured.
     const log = ffmpeg(['-i', c.file, '-af', `silencedetect=noise=${noise}dB:d=${gap}`, '-f', 'null', '-']).log;
     const starts = [...log.matchAll(/silence_start: (-?[\d.]+)/g)].map((m) => Number(m[1]) * 1000);
