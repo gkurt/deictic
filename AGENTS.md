@@ -327,7 +327,7 @@ channel's had no event for `--idle`, 20m, and the agent then stops watching and 
 `--once` ends at the first event, for a harness woken by an exit; it ends when its parent process or one of the three
 above it does, as a runner like `npx` sits between it and the shell and outlives it, so one a session left behind isn't
 watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the
-last event's cursor; while it runs it's in `.deictic/watchers`, `watcherAt` in `tasks/watchers.ts`, beside what reads
+last event's cursor, where `.deictic/board.json` says it now is (it follows from a cursor taken as it starts, so it never lists what's ready again); while it runs it's in `.deictic/watchers`, `watcherAt` in `tasks/watchers.ts`, beside what reads
 it); `task` (the task, who asked, who holds it, and the page's other open ones); `recording` (a timeline, or the part
 of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`); `frame` (PNGs through the
 replay's `?t=`, with the project's Playwright); `voice` (speech times, with ffmpeg) and `transcribe` (Whisper through a

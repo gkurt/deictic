@@ -126,6 +126,55 @@ test('a watch on a fresh board waits for its first task, and a task not over say
   }
 }, 60_000);
 
+test('a watch follows a board started again from where it was, saying it went and came back', async () => {
+  const p = project({ 'package.json': '{}' });
+  let board = await localBoard(p.root, { inspect: false });
+  try {
+    const create = (text: string) =>
+      (JSON.parse(deictic(p.root, 'vb', 'tasks', 'create', 'deictic', text, '--json').out) as { task: { id: string } }).task.id;
+    const done = create('Done before the restart');
+    const watch = Bun.spawn([process.execPath, CLI, 'watch'], { cwd: p.root, env: agent(), stderr: 'pipe' });
+    const out = new Response(watch.stdout).text();
+    const err = new Response(watch.stderr).text();
+    await Bun.sleep(3000);
+    deictic(p.root, 'vb', 'tasks', 'claim', done, '--lease', '5m');
+    deictic(p.root, 'vb', 'tasks', 'complete', done, 'done');
+
+    // As the dev server restarting does: its board stops, and another starts, whose token is new. On the same port the
+    // tail is refused; on another, it's left asking the old one, so the watch goes there itself.
+    const restart = async (port: number) => {
+      board.stop();
+      await Bun.sleep(2000);
+      board = await localBoard(p.root, { inspect: false, port });
+      await Bun.sleep(5000);
+    };
+    await restart(Number(new URL(board.url).port));
+    const between = create('Made between the restarts');
+    await Bun.sleep(2000);
+    const elsewhere = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() {} } });
+    const port = elsewhere.port;
+    elsewhere.stop(true);
+    await restart(port);
+    const after = create('Made after the restarts');
+    await Bun.sleep(3000);
+    watch.kill();
+
+    const lines = (await out).split('\n');
+    expect(lines.filter((l) => l.startsWith('ready:'))).toEqual([expect.stringContaining(`#${done}`)]);
+    expect(lines).toContainEqual(
+      expect.stringMatching(/^the board went away \(vb tail exited 1: The board didn't accept your credentials\.\): waiting for it/),
+    );
+    expect(lines).toContainEqual(`the board went away (started again on http://127.0.0.1:${port}/api/board): waiting for it to come back`);
+    expect(lines.filter((l) => l.startsWith('the board is back on '))).toHaveLength(2);
+    expect(lines).toContainEqual(expect.stringContaining(`new task #${between}: "Made between the restarts"`));
+    expect(lines).toContainEqual(expect.stringContaining(`new task #${after}: "Made after the restarts"`));
+    // The CLI's own error is the watch's line above, not a line of its own.
+    expect(await err).toBe('');
+  } finally {
+    board.stop();
+  }
+}, 60_000);
+
 test('a recording kept in the project as a timeline, and the part of it asked for', () => {
   const button = {
     id: 5,

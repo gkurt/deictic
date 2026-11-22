@@ -1,8 +1,8 @@
 /**
  * `deictic watch`: the board's tasks for deictic, one line per thing to act on: the tasks ready now as it starts,
  * then each new task, a reply on one, and one canceled (undone in the page, say). Made for an agent's monitor (each
- * line an event). A board that goes away (the dev server restarted, and its board with it) is waited for and followed
- * again from where it was left; it says so, and ends only if none comes back. It ends by itself once nothing has
+ * line an event). A board that goes away (the dev server restarted, and its board with it, maybe on another port) is
+ * waited for and followed again from where it was left; it says so, and ends only if none comes back. It ends by itself once nothing has
  * happened on the channel for `--idle` (20m): a watch nobody feeds isn't started again, so no agent watches for ever.
  * With `--once` it ends at the first thing to act on, for a harness that's woken only when a command exits. It ends,
  * too, when the process that started it does: nobody reads its lines then.
@@ -16,7 +16,7 @@ import { createInterface } from 'node:readline';
 
 import { watcherAt } from '#src/plugins/tasks/watchers.ts';
 
-import { answers, boardIn, boardUrl, deicticDirs, duration, ME, vb, vbCommand, whoami } from './board.ts';
+import { answers, boardIn, boardUrl, deicticDirs, duration, ME, vb, vbCommand, vbJson, whoami } from './board.ts';
 
 /** What `vb tail --json` prints, one per line. */
 interface Tailed {
@@ -81,6 +81,18 @@ function gone(pid: number): boolean {
   }
 }
 
+/** What `vb` said as it failed: its JSON's `message`, or its last line. */
+function reasonOf(said: string): string | undefined {
+  const last = said.trim().split('\n').at(-1)?.trim();
+  if (last === undefined || last === '') return undefined;
+  try {
+    const { message } = JSON.parse(last) as { message?: unknown };
+    return typeof message === 'string' ? message : last;
+  } catch {
+    return last;
+  }
+}
+
 export function run(channel: string, values: { idle: string; once?: boolean; label?: string[] }): void {
   const labels = (values.label ?? []).flatMap((l) => ['--label', l]);
   const idle = duration(values.idle);
@@ -94,6 +106,9 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
     spawnSync(command, argv, options);
   };
   made();
+  // Where the channel is now, taken before what's ready is: followed from here, nothing posted between is missed, and
+  // a tail started again after the board went away follows on from what this one heard, never from a list taken earlier.
+  let cursor = vbJson<{ cursor: string }>(['read', channel, '--limit', '1']).cursor;
   const ready = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
   const me = whoami();
   // In the `.deictic/` whose board this is, or in each one near here where the board is the environment's.
@@ -129,6 +144,8 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
     );
   }
   const waiting = (ready ? ready.split('\n') : []).filter((line) => /^#\d+/.test(line));
+  // The tasks said, by ID: one made after the cursor above and listed as ready is said once.
+  const told = new Set(waiting.map((line) => /^#(\d+)/.exec(line)?.[1]));
   for (const line of waiting) say(`ready: ${line}`);
   if (values.once && waiting.length > 0) end(0);
 
@@ -153,8 +170,6 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
 
   // What the board says about each thread: its root's first line and where, to name it when a task is made.
   const roots = new Map<number, string>();
-  // The last event heard, which a tail started again follows from: nothing left while the board was away is missed.
-  let cursor: string | undefined;
   const heardOf = (line: string) => {
     let e: Tailed;
     try {
@@ -162,6 +177,7 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
     } catch {
       return;
     }
+    // The last event heard, which a tail started again follows from: nothing left while the board was away is missed.
     if (e.cursor !== undefined) cursor = e.cursor;
     heard();
     const p = e.payload ?? {};
@@ -172,7 +188,8 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
       const project = label('deictic.project');
       roots.set(p.thread, `"${first(p.text ?? '')}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`);
     }
-    if (e.type === 'task.created') event(`new task #${p.id}: ${roots.get(p.thread ?? -1) ?? ''}. Read it: ${ME} task ${p.id}`);
+    if (e.type === 'task.created' && !told.has(String(p.id)))
+      event(`new task #${p.id}: ${roots.get(p.thread ?? -1) ?? ''}. Read it: ${ME} task ${p.id}`);
     if (e.type === 'message.posted' && p.re !== null && p.re !== undefined) {
       if (me.profile !== null && p.by?.actor === me.actor) return;
       const by = e.message?.author?.handle ?? p.by?.actor ?? 'someone';
@@ -182,22 +199,38 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
       event(`task #${p.id} canceled: ${p.reason ?? ''}. Stop work on it, and put back what you changed for it.`);
   };
 
-  const over = (code: number | null) => {
-    say(`watch ended (vb tail exited ${code}): start it again`);
+  const over = (why: string) => {
+    say(`watch ended (${why}): start it again`);
     end(1);
   };
 
-  /** Follows the channel, from `cursor` on where there is one, and again when the board comes back after going away. */
+  /** Follows the channel from `cursor`, and again when the board comes back after going away. */
   const follow = (again: boolean) => {
     const started = Date.now();
-    const from = cursor === undefined ? [] : ['--after', cursor];
-    const [command, argv, options] = vbCommand(['tail', channel, ...labels, ...from, '--json']);
-    const child = spawn(command, argv, { env: options.env, shell: options.shell, stdio: ['ignore', 'pipe', 'inherit'] });
+    const [command, argv, options] = vbCommand(['tail', channel, ...labels, '--after', cursor, '--json']);
+    const child = spawn(command, argv, { env: options.env, shell: options.shell, stdio: ['ignore', 'pipe', 'pipe'] });
     tail = child;
     createInterface({ input: child.stdout }).on('line', heardOf);
+    // What it said as it ended goes in the watch's own line: a board started again refuses the old token, as expected,
+    // and the CLI's raw error isn't something for an agent to act on.
+    let said = '';
+    child.stderr.on('data', (chunk: Buffer) => (said += chunk.toString()));
+    // A dev server started again may start its board on another port: the tail would go on asking the old one for
+    // ever, so it's ended once the project's `.deictic/board.json` names another, and followed there.
+    const at = boardUrl();
+    let moved: string | undefined;
+    const elsewhere = setInterval(() => {
+      const now = boardUrl();
+      if (now === at || now === undefined) return;
+      moved = now;
+      child.kill();
+    }, 3000);
     child.on('exit', (code) => {
-      if (again && Date.now() - started < SOON) return over(code);
-      say(`the board went away (vb tail exited ${code}): waiting for it to come back`);
+      clearInterval(elsewhere);
+      const reason = reasonOf(said);
+      const why = moved === undefined ? `vb tail exited ${code}${reason === undefined ? '' : `: ${reason}`}` : `started again on ${moved}`;
+      if (again && moved === undefined && Date.now() - started < SOON) return over(why);
+      say(`the board went away (${why}): waiting for it to come back`);
       const until = Date.now() + BACK;
       const tried = () => {
         // Asked anew each time: a board started again may be at another URL, and the CLI gets itself a new token for it.
@@ -205,14 +238,9 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
           say(`the board is back on ${boardUrl() ?? "the team's board"}: watching ${channel} again`);
           // A board started anew (its folder cleaned) has no channel again.
           made();
-          // With nothing heard before it went, what's ready is all there is to go by.
-          if (cursor === undefined) {
-            const now = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
-            for (const l of now.split('\n').filter((l) => /^#\d+/.test(l) && !waiting.includes(l))) event(`ready: ${l}`);
-          }
           return follow(true);
         }
-        if (Date.now() > until) return over(code);
+        if (Date.now() > until) return over(why);
         setTimeout(tried, 2000);
       };
       setTimeout(tried, 2000);
