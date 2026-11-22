@@ -8,7 +8,8 @@ in page coordinates: CSS pixels from the document's top left), one at the start 
 
 A recording may cross pages: the person reloaded, or followed a link, and it went on. `page` is where it started, which
 is the page with the task's element; each page it went to is a `page` line in the timeline, and what follows happened
-there. A mic that was on makes a clip per page.
+there. A mic that was on makes a clip per page. A route change with no load (a router's) is a `page` line too, from a
+custom event tagged `deictic.page` (`href`).
 
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps
 them under `.deictic/recordings` and `.deictic/voice` too. Every script takes the task's ID.

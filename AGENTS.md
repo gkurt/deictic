@@ -202,7 +202,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `client.ts`: `record()` imports rrweb, records with the overlay blocked and masking as screenshots', sends the
   events each second, and keeps what the next page needs in session storage (`deictic:recording`: the ID, the start, the
   next part's place, the clips, the mic, the toolbar's marks and their page). So a load doesn't end it: `setup` on the
-  next page carries on under the same ID (rrweb's own `Meta` and snapshot per page; the last events go with `keepalive`
+  next page carries on under the same ID (rrweb's own `Meta` and snapshot per page, and for an address that changes with no load, a router's, a custom event,
+  `PAGE` in `marks.ts`, with the `href`; the last events go with `keepalive`
   on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
   `resume` gives the overlay. It
   shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;

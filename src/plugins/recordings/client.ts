@@ -21,7 +21,7 @@ import type { ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 import type { Take } from '#src/plugins/voice/index.ts';
 
 import type { Kept, Meta, Recorder, Recording, VoiceClip } from './index.ts';
-import { END, MARKS } from './marks.ts';
+import { END, MARKS, PAGE } from './marks.ts';
 import { dropOurs } from './ours.ts';
 
 type Edge = 'top' | 'bottom' | 'left' | 'right';
@@ -211,8 +211,19 @@ export default defineClientPlugin<never, never, Recorder>({
         () => rrweb.record.mirror.getId(host),
         () => rrweb.record.mirror.getId(document.documentElement),
       );
+      // The page's address changing with no load (a router's `pushState`, Back within the app, a hash), which rrweb
+      // doesn't record: a custom event, so the recording says where each stretch happened. Nothing tells of
+      // `pushState`, so it's read as each event comes, and as the clock ticks for a route that draws nothing.
+      let href = location.href;
+      const moved = () => {
+        if (location.href === href) return;
+        href = location.href;
+        rrweb.record.addCustomEvent(PAGE, { href });
+      };
       const stopRecording = rrweb.record({
         emit: (event) => {
+          // Before what the new route drew, which is what comes next.
+          moved();
           const kept = keep(event);
           if (kept !== undefined) unsent.push(kept);
         },
@@ -409,7 +420,10 @@ export default defineClientPlugin<never, never, Recorder>({
         bar.prepend(style);
         root.append(bar);
 
-        const tick = () => (time.textContent = clock(Date.now() - startedAt));
+        const tick = () => {
+          moved();
+          time.textContent = clock(Date.now() - startedAt);
+        };
         tick();
         const ticking = setInterval(tick, 250);
         let dock = storedDock();

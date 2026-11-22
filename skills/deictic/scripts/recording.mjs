@@ -124,6 +124,8 @@ for (const e of events) {
     }
     marks = now;
   }
+  // The address changed with no load: a route of the app's.
+  if (e.type === 5 && e.data.tag === 'deictic.page') push(t, 'page', `${e.data.payload.href} (a route change, no load)`);
   if (e.type === 5 && e.data.tag === 'deictic.end') push(t, 'end', 'recording stopped');
   if (e.type !== 3) continue;
   const d = e.data;
