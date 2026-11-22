@@ -1,38 +1,46 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `npx deictic clean` deletes what deictic kept\n\n- It says what it found under each `.deictic/` near here and how big, then asks. By default it deletes the shots, recordings and voice notes; name `history`, `board` (the local board's tasks) or `all` for the rest, which it refuses while the dev server's board is running. `transcribe` deletes the transcription model and its runtime, outside the project. With no terminal to ask on, it only lists them, and deletes with `--yes`.\n"
-    filename: deictic-clean.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### What a task's element rendered through is a label, `deictic.source`, not a `Source:` line in its text\n\n`deictic task` still prints it as `Source:`, from the element's own place out.\n"
+    filename: source-label.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic watch` starts on a fresh board, and the commands name the project's own runner\n\n- `deictic watch` makes its channel where the board has none yet, instead of failing until the first task is posted.\n- `deictic task` no longer prints `Result: null` and `Reason: null` for a task that isn't over.\n- The commands each command's output names use the project's runner (`bunx deictic`, `pnpm exec deictic`, `yarn deictic`), so an agent following them doesn't get npm's notices in every command's output; the skill says the same.\n"
-    filename: cli-gaps.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task goes in wherever the page's element isn't found in its file\n\nIt used to be refused, with \"the file changed since the page loaded\" even where it hadn't. A plugin's `read` and\n`apply` now get the `Source` or the `Refusal` saying why there's none, to throw where they need it: only text edits\nare refused without it.\n\n### An element whose column is off is found by its line\n\nWhere its line has only one of its tag. Otherwise the problem says what the line has, not that the file changed.\n"
+    filename: source-optional.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### The `deictic` command's help says every option\n\n- `deictic --help` and `deictic <command> --help` are generated from each command's arguments and options, so every option is listed with what it does and its default. A mistyped command gets a suggestion (`Did you mean task?`), and a missing argument or a value a command doesn't take is said with a pointer to `--help`.\n- `deictic help <command>` is the same as `deictic <command> --help`.\n- The command needs Node 22.12 or later.\n"
-    filename: cli-help.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task's text is only what was typed: the rest is its files and labels, numbered from 1\n\nOnly what the files don't say: `deictic.screenshot.N.position`, `.size` and `.note.M` for the Nth PNG attached,\n`deictic.note.M`, `deictic.recording.N.replay`, `deictic.pointed` and `deictic.dropped.N`. `deictic.position` and\n`deictic.size` are gone, and a URL too long for a label goes with its path only. `deictic task` prints them all.\n"
+    filename: attached-labels.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic watch` follows a restarted board wherever it comes back\n\n- A board started again on another port is followed there, instead of the watch going quiet while it asks the old one.\n- Every restart says the board went away and that it's back, with the reason in the watch's own line, not the board CLI's raw error.\n- After a restart the watch picks up from the last event it heard, and no longer lists the ready tasks again, which could repeat a task already done.\n"
-    filename: watch-restart.md
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic init` puts deictic first among the plugins\n\nLast, a plugin before it that changed a module had the page point at that plugin's code, not the file. Move it first\nin a config `init` set up before.\n"
+    filename: init-first.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task's text no longer says its screenshot has the element outlined, and the outline has no white under its dashes\n"
+    filename: outline-quiet.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task goes without an attachment that's no longer kept\n\nIt used to be refused whole. Now it says what it went without, and so does the panel.\n"
+    filename: dropped-attachments.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - deictic-clean.md
-      - cli-gaps.md
-      - cli-help.md
-      - watch-restart.md
+      - source-label.md
+      - source-optional.md
+      - attached-labels.md
+      - init-first.md
+      - outline-quiet.md
+      - dropped-attachments.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
-  - id: npm:example-next
+  - id: npm:example-rspack
     updated: false
   - id: npm:example-vite
     updated: false
-  - id: npm:example-rspack
-    updated: false
   - id: npm:example-bun
+    updated: false
+  - id: npm:example-next
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
-  - id: npm:example-next
-  - id: npm:example-vite
   - id: npm:example-rspack
+  - id: npm:example-vite
   - id: npm:example-bun
+  - id: npm:example-next

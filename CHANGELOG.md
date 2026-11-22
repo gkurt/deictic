@@ -1,3 +1,36 @@
+## deictic@0.6.0
+
+### What a task's element rendered through is a label, `deictic.source`, not a `Source:` line in its text
+
+`deictic task` still prints it as `Source:`, from the element's own place out.
+
+### A task goes in wherever the page's element isn't found in its file
+
+It used to be refused, with "the file changed since the page loaded" even where it hadn't. A plugin's `read` and
+`apply` now get the `Source` or the `Refusal` saying why there's none, to throw where they need it: only text edits
+are refused without it.
+
+### An element whose column is off is found by its line
+
+Where its line has only one of its tag. Otherwise the problem says what the line has, not that the file changed.
+
+### A task's text is only what was typed: the rest is its files and labels, numbered from 1
+
+Only what the files don't say: `deictic.screenshot.N.position`, `.size` and `.note.M` for the Nth PNG attached,
+`deictic.note.M`, `deictic.recording.N.replay`, `deictic.pointed` and `deictic.dropped.N`. `deictic.position` and
+`deictic.size` are gone, and a URL too long for a label goes with its path only. `deictic task` prints them all.
+
+### `deictic init` puts deictic first among the plugins
+
+Last, a plugin before it that changed a module had the page point at that plugin's code, not the file. Move it first
+in a config `init` set up before.
+
+### A task's text no longer says its screenshot has the element outlined, and the outline has no white under its dashes
+
+### A task goes without an attachment that's no longer kept
+
+It used to be refused whole. Now it says what it went without, and so does the panel.
+
 ## deictic@0.5.0
 
 ### `npx deictic clean` deletes what deictic kept
