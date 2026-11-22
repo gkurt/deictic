@@ -30,7 +30,7 @@ const plugins = [
   ['tailwind', 'class edits → file'],
 ];
 
-const PEERS = 'npm i -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core';
+const COMMAND = 'npx deictic init';
 
 function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -182,38 +182,31 @@ function Tokens({ line }: { line: Line }) {
   ));
 }
 
+/** What `init` does, each beside its own: it's the whole setup. */
+const INIT = [
+  'installs deictic and what its plugins use, with your package manager',
+  'adds it to your Vite, Next.js, Astro, webpack or Rspack config',
+  'offers the skill your agent works the tasks with',
+];
+
 function Setup() {
-  const [chosen, setChosen] = useState(0);
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm">
-      <div className="flex items-center gap-4 border-b border-line px-4 py-2.5 text-xs">
-        <span className="min-w-0 flex-1 truncate">{PEERS}</span>
-        <Copy text={PEERS} />
+      <div className="flex items-center gap-4 border-b border-line px-4 py-2.5">
+        <span className="min-w-0 flex-1 truncate">
+          <span className="text-muted">$ </span>
+          {COMMAND}
+        </span>
+        <Copy text={COMMAND} />
       </div>
-      <div role="tablist" className="flex overflow-x-auto overflow-y-hidden border-b border-line text-xs">
-        {code.setups.map(({ name }, i) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={i === chosen}
-            className={cn(
-              'cursor-pointer border-b-2 px-4 py-2.5 whitespace-nowrap',
-              i === chosen ? 'border-signal text-fg' : 'border-transparent text-muted hover:text-fg',
-            )}
-            onClick={() => setChosen(i)}
-          >
-            {name}
-          </button>
+      <ul className="space-y-1 p-4 text-xs text-muted">
+        {INIT.map((line) => (
+          <li key={line}>
+            <span className="text-signal-text">→ </span>
+            {line}
+          </li>
         ))}
-      </div>
-      <pre role="tabpanel" className="overflow-x-auto p-4 leading-6">
-        {code.setups[chosen]!.lines.map((line, i) => (
-          // The lines of one snippet never reorder.
-          // oxlint-disable-next-line react/no-array-index-key
-          <div key={i}>{line.length === 0 ? ' ' : <Tokens line={line} />}</div>
-        ))}
-      </pre>
+      </ul>
     </div>
   );
 }
@@ -233,8 +226,8 @@ export function Home() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-sm">
             <span className="flex items-center gap-4 rounded-md border border-line bg-surface px-3 py-2">
-              npm i -D deictic
-              <Copy text="npm i -D deictic" />
+              {COMMAND}
+              <Copy text={COMMAND} />
             </span>
             <a href={`${base}example/`} className="rounded-md bg-signal px-4 py-2 font-medium text-on-signal hover:brightness-110">
               playground →

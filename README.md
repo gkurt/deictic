@@ -46,41 +46,13 @@ In your project:
 npx deictic init
 ```
 
-It installs deictic and what its plugins use with your package manager, adds it to your bundler's config, and offers
-to add the agent skill. Or by hand, install it with what its plugins use:
-
-```bash
-npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core \
-  @rrweb/rrweb-plugin-console-record @rrweb/rrweb-plugin-network-record
-```
-
-Add it to your bundler:
-
-```ts
-// vite.config.ts
-import { recommended } from 'deictic/recommended';
-import { deictic } from 'deictic/vite';
-
-export default defineConfig({
-  plugins: [react(), deictic({ plugins: recommended() })],
-});
-```
-
-Next.js, webpack, Rspack, Astro and Bun are [in the API](API.md#bundlers). A plugin whose packages aren't installed
-says so as the dev server starts, with the command that installs them.
-
-Start your dev server and Alt-click something. Tasks go to a board the dev server starts on your machine, with
-nothing to set up: `http://127.0.0.1:4100/`.
-
-To have your agent work them, add the skill (if `init` didn't) and mention `/deictic`:
-
-```bash
-npx skills add gkurt/deictic
-```
+It installs deictic with your package manager, adds it to your bundler's config, and offers the agent skill. Then
+start your dev server and Alt-click something. Tasks go to a board the dev server starts on your machine:
+`http://127.0.0.1:4100/`. To have your agent work them, mention `/deictic`.
 
 ### Options
 
-Each plugin takes its options under its name, and `false` leaves one out:
+In the config `init` wrote, each plugin takes its options under its name, and `false` leaves one out:
 
 ```ts
 deictic({

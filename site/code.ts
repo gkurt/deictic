@@ -20,83 +20,6 @@ const SOURCE = `export function Plan() {
   );
 }`;
 
-/** Each integration's setup: its files, each in its own language, a blank line between them. */
-const SETUPS: [name: string, ...files: [Lang, string][]][] = [
-  [
-    'Vite',
-    [
-      'ts',
-      `// vite.config.ts
-import { recommended } from 'deictic/recommended';
-import { deictic } from 'deictic/vite';
-
-export default defineConfig({
-  plugins: [react(), deictic({ plugins: recommended() })],
-});`,
-    ],
-  ],
-  [
-    'Next.js',
-    [
-      'ts',
-      `// next.config.ts
-import { withDeictic } from 'deictic/next';
-import { recommended } from 'deictic/recommended';
-
-export default withDeictic(nextConfig, { plugins: recommended() });`,
-    ],
-  ],
-  [
-    'webpack · Rspack',
-    [
-      'ts',
-      `// webpack.config.ts, rspack.config.ts
-import { recommended } from 'deictic/recommended';
-import { DeicticPlugin } from 'deictic/webpack';
-
-export default {
-  mode: 'development',
-  plugins: [new DeicticPlugin({ plugins: recommended() })],
-};`,
-    ],
-  ],
-  [
-    'Bun',
-    [
-      'ts',
-      `// deictic.plugin.ts
-import { deictic } from 'deictic/bun';
-import { recommended } from 'deictic/recommended';
-export default deictic({ plugins: recommended() });`,
-    ],
-    [
-      'ts',
-      `// server.ts
-import tools from './deictic.plugin.ts';
-Bun.serve({ routes: { ...tools.routes, '/*': index }, development: true });`,
-    ],
-    [
-      'toml',
-      `# bunfig.toml
-[serve.static]
-plugins = ["./deictic.plugin.ts"]`,
-    ],
-  ],
-  [
-    'Astro',
-    [
-      'ts',
-      `// astro.config.ts
-import { deictic } from 'deictic/astro';
-import { recommended } from 'deictic/recommended';
-
-export default defineConfig({
-  integrations: [deictic({ plugins: recommended() })],
-});`,
-    ],
-  ],
-];
-
 const THEME: Theme = { name: 'site', appearance: 'light', style: {}, cssVariables: true };
 
 function highlight(code: string, lang: Lang): Line[] {
@@ -110,10 +33,6 @@ const ID = 'virtual:code';
 export function highlighted(): Plugin {
   const code: Code = {
     source: highlight(SOURCE, 'tsx'),
-    setups: SETUPS.map(([name, ...files]) => ({
-      name,
-      lines: files.flatMap(([lang, text], i) => [...(i === 0 ? [] : [[]]), ...highlight(text, lang)]),
-    })),
   };
   return {
     name: 'highlighted-code',

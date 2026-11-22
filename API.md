@@ -15,13 +15,10 @@ types are the full reference: every option is documented where it's declared.
 
 ## Bundlers
 
-`npx deictic init` (or `pnpm dlx`, `bunx`) sets a project up: it installs deictic and what the recommended plugins
-use with the project's package manager, as its own dev dependencies, adds deictic to the config of Vite, Next.js,
-Astro, webpack or Rspack where it can tell where (it says what to add where it can't, and for Bun), and offers the
-agent skill. `--dry-run` says what it would do, `--no-install` only says the command, `--skill` and `--no-skill`
-answer the skill's question.
-
-Every integration takes the same options and runs in the dev server only.
+`npx deictic init` sets a project up: it installs deictic and what its plugins use with the project's package manager,
+adds it to the bundler's config, and offers the agent skill (`--dry-run`, `--no-install`, `--skill`, `--no-skill`).
+This is what it adds, and what to add by hand where it can't (Bun, or a config it can't read). Every integration
+takes the same options and runs in the dev server only.
 
 ```ts
 // Vite, and anything on it (React Router, TanStack Start…): vite.config.ts
@@ -32,7 +29,7 @@ export default defineConfig({ plugins: [react(), deictic({ plugins: recommended(
 import { withDeictic } from 'deictic/next';
 export default withDeictic(nextConfig, { plugins: recommended() });
 
-// webpack 5, Rspack: add `launch-editor` to open files in your editor
+// webpack 5, Rspack (`launch-editor` opens files in your editor)
 import { DeicticPlugin } from 'deictic/webpack';
 export default { plugins: [new DeicticPlugin({ plugins: recommended() })] };
 
@@ -160,22 +157,21 @@ deictic ships a skill that watches the channel and works each task as it arrives
 `deictic recording` (a timeline), `deictic frame` (a screenshot at any moment), `deictic voice` and
 `deictic transcribe`, and `deictic vb`, the board's CLI on the dev server's board (`npx deictic --help` lists them).
 Its watch ends once the channel has been quiet for 20 minutes, and the agent then stops and says so, so none watches
-for ever:
-
-```bash
-npx skills add gkurt/deictic
-```
+for ever. `init` offers to add it; otherwise `npx skills add gkurt/deictic`.
 
 ## Screenshots, recordings and voice
 
-| Plugin                | Needs                                                          | Options                                           |
-| --------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
-| `deictic/screenshots` | `rrweb-snapshot` and `playwright-core`, or `modern-screenshot` | `renderer`, `keep` (100), `dir`, masking          |
-| `deictic/annotations` | nothing                                                        | `color`, `shortcut`                               |
-| `deictic/recordings`  | `rrweb`, `rrweb-player`                                        | `keep` (20), `dir`, `canvas`, masking             |
-| `deictic/voice`       | nothing                                                        | `keep` (50), `dir`                                |
-| `deictic/logs`        | `@rrweb/rrweb-plugin-console-record`                           | `levels`                                          |
-| `deictic/network`     | `@rrweb/rrweb-plugin-network-record`                           | `headers`, `body`, `mask`, `ignore`, `initiators` |
+| Plugin                | Options                                           |
+| --------------------- | ------------------------------------------------- |
+| `deictic/screenshots` | `renderer`, `keep` (100), `dir`, masking          |
+| `deictic/annotations` | `color`, `shortcut`                               |
+| `deictic/recordings`  | `keep` (20), `dir`, `canvas`, masking             |
+| `deictic/voice`       | `keep` (50), `dir`                                |
+| `deictic/logs`        | `levels`                                          |
+| `deictic/network`     | `headers`, `body`, `mask`, `ignore`, `initiators` |
+
+`init` installs what they use. Where something's missing (`modern-screenshot`, for `dom()` below), the dev server
+says so as it starts, with the command that installs it.
 
 Screenshots have two renderers:
 
