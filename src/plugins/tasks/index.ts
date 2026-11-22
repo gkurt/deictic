@@ -29,11 +29,8 @@ import { watchersOf } from './watchers.ts';
 
 export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
-/**
- * What the plugin uses of a board: `board()` from `@vercel/board` is one. `events` is for who ended a task, and
- * a board without it shows none.
- */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'> & Partial<Pick<Board, 'events'>>;
+/** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'>;
 
 export interface TasksOptions {
   /**
@@ -78,7 +75,7 @@ export interface Task {
   /** What was typed, whole: what an edit changes. */
   text: string;
   state: string;
-  /** Who holds its claim, or who completed or failed it, by name (`claude`), where the board says. */
+  /** Who holds its claim, by name (`claude`), while it's claimed. A board keeps no one for a task's end. */
   by?: string;
   /** Whether it can still be edited or deleted: no one has claimed it. */
   open: boolean;
@@ -298,27 +295,6 @@ export function tasks(options: TasksOptions = {}) {
     if (message.text !== from) throw new Refusal(`task ${id} has been edited since: change it on the board`);
     await team.edit(id, to, { revision: message.revision });
   };
-  /**
-   * Who completed or failed each task, by the actor's ID. A board's record of a task names who made it and who
-   * holds it, never who ended it: only its events do, so the channel's are followed, from its latest hundred.
-   */
-  const enders = new Map<string, string>();
-  let following = false;
-  const follow = (team: TaskBoard) => {
-    if (following || team.events === undefined) return;
-    following = true;
-    void (async () => {
-      try {
-        for await (const event of team.events!({ channel, last: 100 }))
-          if (event.type === 'task.completed' || event.type === 'task.failed') enders.set(String(event.payload.id), event.payload.by.actor);
-      } catch {
-        // A board that doesn't answer its events (or one started again, which refuses the old token): no names
-        // from here on, until the next read follows it anew.
-      } finally {
-        following = false;
-      }
-    })();
-  };
   const create = async (record: Omit<Added, 'id'>): Promise<Added> => {
     const { task } = await (
       await boardOf()
@@ -374,14 +350,11 @@ export function tasks(options: TasksOptions = {}) {
       project ??= nameOf(given.root);
       // Started with the dev server, not at the first task, so whoever works the tasks can watch from the start.
       // Not waited for: a failure is the first request's to tell.
-      void boardOf()
-        .then(follow)
-        .catch(() => {});
+      void boardOf().catch(() => {});
     },
     read: (source, target) =>
       asked(async () => {
         const team = await boardOf();
-        follow(team);
         const labelled = (label: Record<string, string>) => team.tasks.list({ channel, label, state: 'all' });
         // By place too: a task added before there was a `deictic.file` has none, and is still its element's.
         const [here, inFile, page, held] = await Promise.all([
@@ -397,10 +370,8 @@ export function tasks(options: TasksOptions = {}) {
         const tasks: Task[] = [];
         const elsewhere: (Task & { at: Place })[] = [];
         const about = [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks];
-        // Who has each, or ended it, and who holds any claim on the channel: asked of the board at once.
-        // An ender only for a task that's over: one failed and reopened is no one's again.
-        const actorOf = ({ id, task }: (typeof about)[number]['message']) =>
-          task?.claim?.actor ?? (task?.state === 'completed' || task?.state === 'failed' ? enders.get(id) : undefined);
+        // Who has each, and who holds any claim on the channel: asked of the board at once.
+        const actorOf = ({ task }: (typeof about)[number]['message']) => task?.claim?.actor;
         const claims = held.tasks.flatMap(({ message }) => message.task?.claim ?? []);
         const actors = await actorsOf(team, [...about.flatMap(({ message }) => actorOf(message) ?? []), ...claims.map((c) => c.actor)]);
         for (const { message } of about) {

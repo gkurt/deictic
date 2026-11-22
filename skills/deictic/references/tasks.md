@@ -102,8 +102,7 @@ vb tasks complete 68 "Bolded the card titles: src/pages/home.tsx:58 (font-semibo
 
 The result is what the person reads first: what changed, where, and anything you decided for them. A board's
 record of a task names who asked for it and, while it's claimed, who holds it, but not who completed it (that's
-only in its events), so `vb read` shows the person's name beside your result. `task.mjs` reads the events and
-says `Completed by claude`, and so does the Task tab, on the task's dot. Other endings:
+only in its events), so `vb read` shows the person's name beside your result. Other endings:
 
 - `vb tasks release 68`: you can't work it after all; it's ready again for someone else.
 - `vb tasks fail 68 "<why>"`: it can't be done as asked; say what would make it possible.

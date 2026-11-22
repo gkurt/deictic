@@ -157,24 +157,6 @@ export function vb(args, { json = false } = {}) {
   return json ? JSON.parse(run.stdout) : run.stdout;
 }
 
-/**
- * A thread's latest events, oldest first: what happened to a task, and who did it, which its record doesn't keep.
- * The CLI only follows events, so its tail is given two seconds to print what there is, and stopped.
- */
-export function eventsOf(id) {
-  const [command, argv, options] = vbCommand(['tail', '--re', String(id), '--last', '100', '--json']);
-  const run = spawnSync(command, argv, { ...options, encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] });
-  return String(run.stdout ?? '')
-    .split('\n')
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line)];
-      } catch {
-        return [];
-      }
-    });
-}
-
 /** Whether the board answers now, as whoever the CLI writes as: asked of one that may be starting again. */
 export function answers() {
   const [command, argv, options] = vbCommand(['whoami', '--json']);

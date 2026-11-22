@@ -117,9 +117,7 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 `local()` takes `port`, `dir` (its folder, from the root), `inspect: false` for none of the board's own pages, and
 `args`, more of `vb serve`'s.
 
-In the Task tab a task's dot says its state and who has it or closed it (`claimed by claude`, `completed by claude`),
-the second read off the board's events, as a task's record names only who asked. A custom `board` without `events`
-shows no name there.
+In the Task tab a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
 
 A task is the words typed and its attachments. The rest is labels: `deictic.project`, `deictic.at` (the element's
 `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your own beside them. After the
