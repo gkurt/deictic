@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 // A recording as a timeline: the page, each click and field typed in (with the element's place in the source),
 // scrolls, resizes, each change to the marks (what was drawn, where, and the notes' text), the voice clips,
-// and the end. Usage: recording.mjs <task | replay URL | recording ID | file> [--nth 2] [--json]
+// the page's console and its requests where the project records them, and the end.
+// Usage: recording.mjs <task | replay URL | recording ID | file> [--nth 2] [--json]
+// And to ask for a part of it, in any mix:
+//   --only console,request   these kinds of line (`console` is every level; also page, click, input, scroll, resize, marks, voice)
+//   --problems               errors, warnings and requests that failed
+//   --from 10 --to 15        a stretch, in seconds; --around 12 is the 3 seconds either side
+//   --grep text              lines with this in them, in any case
+//   --full                   all of each line: where it was logged from, a request's headers and bodies
 import { clock, fail, loadRecording, parseArgs } from './lib.mjs';
 
-const { options, rest } = parseArgs(process.argv.slice(2), ['json']);
+const { options, rest } = parseArgs(process.argv.slice(2), ['json', 'problems', 'full']);
 const { kept, id, replay, task } = await loadRecording(rest[0], Number(options.nth?.[0] ?? 1));
 const { events } = kept;
 if (!Array.isArray(events) || events.length === 0) fail(`Recording ${id} has no events.`);
@@ -138,7 +145,10 @@ for (const e of events) {
         return arg;
       }
     };
-    push(t, `console.${level}`, (payload ?? []).map(plain).join(' '), { trace: trace ?? [] });
+    push(t, `console.${level}`, (payload ?? []).map(plain).join(' '), {
+      trace: trace ?? [],
+      ...(['error', 'assert', 'warn'].includes(level) ? { problem: true } : {}),
+    });
   }
   // The page's requests (rrweb's network plugin), masked as they were kept: each as it ended. One the browser
   // reported of itself has no method; headers and bodies, where kept, are in `--json`.
@@ -148,6 +158,7 @@ for (const e of events) {
       const status = r.status ? r.status : 'no status (failed, blocked, or another origin’s)';
       push(t, 'request', `${r.method ?? r.initiatorType ?? ''} ${r.name} → ${status}${took}`.trim(), {
         request: r,
+        ...(r.status >= 400 ? { problem: true } : {}),
         ...(e.data.payload.isInitial ? { before: 'made as the page loaded, before this moment' } : {}),
       });
     }
@@ -193,6 +204,30 @@ flushTyping();
 for (const c of kept.voice ?? []) push(c.at, 'voice', `clip ${c.id}, ${clock(c.duration)} long, until ${clock(c.at + c.duration)}`);
 timeline.sort((a, b) => a.t - b.t);
 
+// The part asked for. Seconds, as the replay's `?t=` and `frame.mjs --at` take them.
+const seconds = (name) => {
+  const given = options[name]?.[0];
+  if (given === undefined) return undefined;
+  const value = Number(given);
+  if (!Number.isFinite(value)) fail(`--${name} takes seconds from the recording's start, as 12 or 4.5: not ${given}`);
+  return value * 1000;
+};
+const around = seconds('around');
+const from = seconds('from') ?? (around === undefined ? undefined : around - 3000);
+const to = seconds('to') ?? (around === undefined ? undefined : around + 3000);
+const only = (options.only ?? []).flatMap((list) => String(list).split(',')).filter(Boolean);
+const grep = options.grep?.[0]?.toLowerCase();
+// `console` is every level's lines, `click` a right or a double one too.
+const isKind = (kind, asked) => kind === asked || kind.startsWith(`${asked}.`) || kind.endsWith(`-${asked}`);
+const shown = timeline.filter(
+  (e) =>
+    (only.length === 0 || only.some((asked) => isKind(e.kind, asked))) &&
+    (!options.problems || e.problem === true) &&
+    (from === undefined || e.t >= from) &&
+    (to === undefined || e.t <= to) &&
+    (grep === undefined || `${e.kind} ${e.text}`.toLowerCase().includes(grep)),
+);
+
 const head = {
   id,
   page: kept.page,
@@ -204,16 +239,28 @@ const head = {
   task: task?.id,
 };
 if (options.json) {
-  console.log(JSON.stringify({ ...head, timeline }, null, 2));
+  console.log(JSON.stringify({ ...head, lines: timeline.length, timeline: shown }, null, 2));
 } else {
   console.log(`Recording ${id}${task ? ` on task #${task.id}` : ''}: ${clock(kept.duration)} of ${kept.page}`);
   console.log(`viewport ${kept.viewport.width}×${kept.viewport.height}, ${head.colorScheme}, started ${head.startedAt}`);
   if (replay) console.log(`replays at ${replay} (add ?t=<seconds> to open it paused there)`);
+  if (shown.length < timeline.length) console.log(`${shown.length} of its ${timeline.length} lines, as asked`);
   console.log();
-  for (const e of timeline) {
+  const under = (line) => console.log(`${' '.repeat(22)}${line}`);
+  for (const e of shown) {
     console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${e.text}`);
-    // Where a warning or an error came from: the rest have theirs in `--json`.
-    if (e.kind === 'console.warn' || e.kind === 'console.error' || e.kind === 'console.assert')
-      for (const line of e.trace.slice(0, 5)) console.log(`${' '.repeat(22)}at ${line}`);
+    // Where a warning or an error came from, its nearest few places: all of them, and every line's, with `--full`.
+    if (e.trace && (options.full || e.problem)) for (const line of options.full ? e.trace : e.trace.slice(0, 5)) under(`at ${line}`);
+    if (!options.full || !e.request) continue;
+    const r = e.request;
+    if (e.before) under(e.before);
+    for (const [title, held] of [
+      ['request headers', r.requestHeaders],
+      ['response headers', r.responseHeaders],
+    ])
+      for (const [name, value] of Object.entries(held ?? {})) under(`${title}  ${name}: ${value}`);
+    if (r.requestBody) under(`request body  ${r.requestBody}`);
+    if (r.responseBody) under(`response body  ${r.responseBody}`);
   }
+  if (shown.length === 0) console.log(timeline.length === 0 ? 'Nothing in it.' : 'No line of it is what was asked for.');
 }

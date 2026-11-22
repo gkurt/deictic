@@ -43,6 +43,18 @@ node <skill>/scripts/recording.mjs 68      # --nth 2 for a task's second recordi
 Clicks and typing name the element and the nearest source place deictic marked. Marks say what was drawn and where
 (a box or a pen stroke around something is pointing at it); the notes' text is quoted.
 
+Ask for a part of it, in any mix, where the whole is long:
+
+```bash
+node <skill>/scripts/recording.mjs 68 --problems                # errors, warnings and requests that failed
+node <skill>/scripts/recording.mjs 68 --around 12               # the 3 seconds either side; or --from 10 --to 15
+node <skill>/scripts/recording.mjs 68 --only console,request    # kinds of line: page, click, input, scroll, resize, marks, voice, console, request
+node <skill>/scripts/recording.mjs 68 --grep /api/plans --full  # lines with the text; --full: stacks, headers and bodies
+```
+
+To find what went wrong: `--problems` first, then `--around` its moment for the click or the request before it,
+then `frame.mjs --at` that moment for what the page looked like.
+
 ## Frames
 
 ```bash
