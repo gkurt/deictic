@@ -206,10 +206,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `PAGE` in `marks.ts`, with the `href`; the last events go with `keepalive`
   on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
   `resume` gives the overlay. It
-  keeps the console (`logs.ts`: `watchLogs` wraps `console.debug|log|info|warn|error` and hears the window's `error` and
-  `unhandledrejection`, from the start of `record` to its end and never otherwise, as a wrapped console names the wrapper
-  as each line's source in the browser's tools; a `LOG` custom event each, `Logged`; the `console: false` option, a
-  `clientOptions`, for none), and
+  takes rrweb's own plugins from the plugins that add to a recording (`use('logs')`, `use('network')`: each a `Recorded`,
+  whose `plugin({ sinceLoad })` answers a `RecordPlugin`; one that fails is warned of and left out), and
   shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;
   the marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each change.
 - `src/plugins/voice/`: no tab. `index.ts`, the server half: keeps the latest `keep` clips under
@@ -220,8 +218,17 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   recording's take ends there, and the next page's mic starts another. The recording toolbar's mic (its live waveform beside it while on) makes a clip of each
   stretch it's on, at its offset (`Kept.voice`); the replay plays them in step and starts paused, as a browser
   plays sound only after a click.
+- `src/plugins/logs/` and `src/plugins/network/`: what a recording has besides the page. No tab, no routes: each
+  page half answers a `Recorded`, rrweb's own plugin (`@rrweb/rrweb-plugin-console-record`,
+  `@rrweb/rrweb-plugin-network-record`, optional peers imported as a recording asks), so they listen only while one is
+  going. Never write our own capture of either. `logs({ levels })`: the console wrapped by rrweb from start to stop.
+  `network({ initiators, headers, body, mask, ignore })`: by default what `PerformanceObserver` reports (URL, status,
+  timing; nothing wrapped), `fetch` and XHR only; `headers` or `body` have rrweb wrap `fetch` and `XMLHttpRequest`.
+  `network/mask.ts` is the masking, rrweb's `transformRequestFn`: `maskRequest` blanks by name (`sensitive`) in a URL's
+  query and fragment, headers and JSON or form bodies, cuts bodies, and drops deictic's own requests (a recording
+  sends itself each second) and the `ignore`d. `test/network.test.ts` covers it. (`logs` is un-ignored in `.gitignore`.)
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
-  recordings and voice, in their tabs' order, each with its options under its name or left out with `false`. Server
+  recordings and voice, in their tabs' order, then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
   halves only, like every factory. The README, homepage and skill show it. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text (what was typed, or `See the recording` and the like where

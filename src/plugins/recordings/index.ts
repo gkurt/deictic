@@ -15,6 +15,8 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
+import type { record } from 'rrweb';
+
 import { definePlugin } from '#src/index.ts';
 import type { Masking, ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 import { keptIn } from '#src/tools/kept.ts';
@@ -52,6 +54,18 @@ export interface Recorder {
   recording(): boolean;
   /** The one going, as `record` answers it: also one a page before this started, carried on here. */
   going(): Promise<Recording | undefined> | undefined;
+}
+
+/** A plugin of rrweb's own, as its `record` takes them: what puts more than the page in a recording. */
+export type RecordPlugin = NonNullable<NonNullable<Parameters<typeof record>[0]>['plugins']>[number];
+
+/**
+ * What a plugin that adds to recordings answers in the page, under its name (`logs` and `network` do): the
+ * recorder asks each it knows for its rrweb plugin as a recording starts, so nothing listens before, or after it stops.
+ */
+export interface Recorded {
+  /** `sinceLoad`: the recording was going as this page loaded, so what the page did before now is its too. */
+  plugin(from: { sinceLoad: boolean }): Promise<RecordPlugin>;
 }
 
 /** The server's half, for other plugins' server halves. */
@@ -94,12 +108,6 @@ export interface RecordingsOptions extends Masking {
   keep?: number;
   /** Where they're kept, from the project's root: `.deictic/recordings` by default. */
   dir?: string;
-  /**
-   * Whether a recording has what the page logs while it goes, and the errors nothing caught, as custom events
-   * (`deictic.console`): it does by default. The console is wrapped for that only while one is going, and with
-   * `false` never.
-   */
-  console?: boolean;
 }
 
 const ID = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -183,7 +191,6 @@ export function recordings(options: RecordingsOptions = {}) {
         maskTextSelector: options.maskTextSelector,
         maskAllInputs: options.maskAllInputs ?? false,
       } satisfies ResolvedMasking,
-      console: options.console ?? true,
     },
     setup: ({ root }) => {
       dir = options.dir === undefined ? keptIn(root, 'recordings') : resolve(root, options.dir);

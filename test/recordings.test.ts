@@ -4,7 +4,6 @@ import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
 import { type Kept, recordings, replayPage } from '#src/plugins/recordings/index.ts';
-import { lineOf, type Logged, watchLogs } from '#src/plugins/recordings/logs.ts';
 import { dropOurs } from '#src/plugins/recordings/ours.ts';
 import { type Model, tasks } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
@@ -158,62 +157,8 @@ test('a task attaches the recording, saying how long it ran and where it replays
 
 test('masks as rrweb does, by its names and defaults, in the page', () => {
   expect(clientModule([recordings({ maskAllInputs: true })], '/')).toContain(
-    `{ plugin: p0, ...{"options":{"masking":{"blockClass":"rr-block","maskTextClass":"rr-mask","maskAllInputs":true},"console":true}} }`,
+    `{ plugin: p0, ...{"options":{"masking":{"blockClass":"rr-block","maskTextClass":"rr-mask","maskAllInputs":true}}} }`,
   );
-});
-
-test('hears the console only while asked to, and puts it back as it was', () => {
-  const before = { log: console.log, error: console.error };
-  const passed: unknown[][] = [];
-  console.log = (...args: unknown[]) => void passed.push(args);
-  console.error = () => {};
-  try {
-    const mine = console.log;
-    const heard: Logged[] = [];
-    const unwatch = watchLogs((line) => {
-      heard.push(line);
-      // What hears a line and logs one itself isn't heard again.
-      console.log('from the listener');
-    });
-    expect(console.log).not.toBe(mine);
-    const cycle: { self?: unknown } = {};
-    cycle.self = cycle;
-    console.log('saved', 3, { plan: 'pro' }, null, cycle);
-    const failure = new TypeError('no plan');
-    console.error('could not save:', failure);
-    expect(heard).toEqual([
-      { level: 'log', text: 'saved 3 {"plan":"pro"} null [object Object]' },
-      { level: 'error', text: 'could not save: TypeError: no plan', stack: failure.stack! },
-    ]);
-    // The console still says it all, the listener's own line too.
-    expect(passed).toEqual([['from the listener'], ['saved', 3, { plan: 'pro' }, null, cycle], ['from the listener']]);
-
-    unwatch();
-    expect(console.log).toBe(mine);
-    console.log('after');
-    expect(heard).toHaveLength(2);
-  } finally {
-    Object.assign(console, before);
-  }
-});
-
-test('a long line is cut, and a console wrapped again since is left wrapped, and deaf', () => {
-  const before = console.warn;
-  console.warn = () => {};
-  try {
-    expect(lineOf('warn', ['x'.repeat(5000)]).text).toHaveLength(1001);
-    const heard: Logged[] = [];
-    const unwatch = watchLogs((line) => heard.push(line));
-    const ours = console.warn;
-    const theirs = (...args: unknown[]) => ours(...args);
-    console.warn = theirs;
-    unwatch();
-    expect(console.warn).toBe(theirs);
-    console.warn('late');
-    expect(heard).toEqual([]);
-  } finally {
-    console.warn = before;
-  }
 });
 
 test('leaves deictic’s own UI out: what rrweb sees added under the overlay, and events on it', () => {

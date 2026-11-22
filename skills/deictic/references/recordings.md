@@ -10,10 +10,16 @@ A recording may cross pages: the person reloaded, or followed a link, and it wen
 is the page with the task's element; each page it went to is a `page` line in the timeline, and what follows happened
 there. A mic that was on makes a clip per page.
 
-What the page logged while recording is there too, as custom events tagged `deictic.console` (`level`, `text`, and
-for an error its `stack`), with the errors nothing caught (`Uncaught …`, `Unhandled rejection: …`): `console.<level>`
-lines in the timeline, at the moment they happened, so an error sits right after the click that caused it. Only from
-when the recording started; `recordings({ console: false })` leaves them out. A route change with no load (a router's) is a `page` line too, from a
+Where the project loads the `logs` and `network` plugins, the recording has rrweb's own plugin events too (type 6):
+
+- `rrweb/console@1`: what the page logged, and the errors nothing caught (`level`, `payload`, each argument as JSON,
+  and `trace`, where from). `console.<level>` lines in the timeline, at the moment they happened, so an error sits
+  right after the click that caused it, with where it came from under a warning or an error.
+- `rrweb/network@1`: the page's requests (`requests`, each with its `name`, the URL, `status`, `duration`, and where
+  the project asked for them `method`, headers and bodies). `request` lines in the timeline, as each ended. Secrets
+  were blanked to `***` before it was kept, so a `***` is not what the page sent. `--json` has the whole request.
+
+Both only from when the recording started. A route change with no load (a router's) is a `page` line too, from a
 custom event tagged `deictic.page` (`href`).
 
 A task attaches each recording as `recording-<id>.json` and its clips as `voice-<id>.webm`; the dev server keeps

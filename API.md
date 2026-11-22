@@ -77,8 +77,9 @@ deictic({
 | `plugins`  | The plugins to load. None by default.                                                          |
 | `shortcut` | `{ modifiers, button }`: held to outline, pressed to open. Alt and the left button by default. |
 
-`recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice. Each takes its
-options under its name, and `false` leaves it out. Other plugins, your own included, go beside it:
+`recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
+network, which put the page's console and its requests in a recording. Each takes its
+options under its name, and `false` leaves it out (`recommended({ logs: false, network: false })`). Other plugins, your own included, go beside it:
 `plugins: [...recommended(), notes()]`. Each plugin is also its own import (`deictic/tasks`, `deictic/screenshots`…),
 to pick them one by one.
 
@@ -150,12 +151,14 @@ npx skills add gkurt/deictic
 
 ## Screenshots, recordings and voice
 
-| Plugin                | Needs                                                          | Options                                  |
-| --------------------- | -------------------------------------------------------------- | ---------------------------------------- |
-| `deictic/screenshots` | `rrweb-snapshot` and `playwright-core`, or `modern-screenshot` | `renderer`, `keep` (100), `dir`, masking |
-| `deictic/annotations` | nothing                                                        | `color`, `shortcut`                      |
-| `deictic/recordings`  | `rrweb`, `rrweb-player`                                        | `keep` (20), `dir`, masking              |
-| `deictic/voice`       | nothing                                                        | `keep` (50), `dir`                       |
+| Plugin                | Needs                                                          | Options                                           |
+| --------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| `deictic/screenshots` | `rrweb-snapshot` and `playwright-core`, or `modern-screenshot` | `renderer`, `keep` (100), `dir`, masking          |
+| `deictic/annotations` | nothing                                                        | `color`, `shortcut`                               |
+| `deictic/recordings`  | `rrweb`, `rrweb-player`                                        | `keep` (20), `dir`, masking                       |
+| `deictic/voice`       | nothing                                                        | `keep` (50), `dir`                                |
+| `deictic/logs`        | `@rrweb/rrweb-plugin-console-record`                           | `levels`                                          |
+| `deictic/network`     | `@rrweb/rrweb-plugin-network-record`                           | `headers`, `body`, `mask`, `ignore`, `initiators` |
 
 Screenshots have two renderers:
 
@@ -173,9 +176,22 @@ Masking follows [rrweb](https://github.com/rrweb-io/rrweb)'s names and defaults:
 (`blockClass`, `blockSelector`), `rr-mask` masks its text (`maskTextClass`, `maskTextSelector`), and `maskAllInputs`
 masks every field. Passwords always are. Nothing of deictic's own UI is in a shot or a recording.
 
-A recording has what the page logged while it went, and the errors nothing caught, each at its moment. Masking doesn't
-reach what your code logs. The console is wrapped for it only while a recording is going, so the rest of the time the
-browser's tools name your own code as each line's source; `recordings: { console: false }` never wraps it.
+With logs and network, a recording has more than the page, each at its moment. Both are rrweb's own plugins, which
+listen only while a recording is going, and each is left out with `false`.
+
+- **`logs`** keeps what the page logged and the errors nothing caught. `levels: ['warn', 'error']` keeps less. rrweb
+  wraps the console as a recording starts and puts it back as it stops, so the rest of the time the browser's tools
+  name your own code as each line's source. Nothing masks what your code logs.
+- **`network`** keeps the page's `fetch` and XHR requests: the URL, the status and the timing, as the browser reports
+  them of itself, with nothing wrapped. `headers: true` and `body: true` add those and the method, for which rrweb
+  wraps `fetch` and `XMLHttpRequest` while a recording is going. `initiators` adds what the page loads (`'img'`,
+  `'script'`).
+
+Requests are masked before they're kept. A value is blanked to `***` where its name says it's a secret (`token`,
+`secret`, `password`, `auth`, `cookie`, `session`, `key`, `code` and the like), in a URL's query or fragment, a header,
+and a body's fields where the body is JSON or a form; `mask: ['email']` adds names. A password before a URL's host is
+dropped, a body is cut at 10,000 characters, and `ignore: ['/analytics']` leaves requests out whole. A secret under a
+name that says nothing isn't found, which is why headers and bodies are kept only when asked for.
 
 ## Tailwind
 

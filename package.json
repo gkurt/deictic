@@ -173,6 +173,34 @@
         "default": "./dist/voice/client.js"
       }
     },
+    "./logs": {
+      "deictic@dev": "./src/plugins/logs/index.ts",
+      "default": {
+        "types": "./dist/logs/index.d.ts",
+        "default": "./dist/logs/index.js"
+      }
+    },
+    "./logs/client": {
+      "deictic@dev": "./src/plugins/logs/client.ts",
+      "default": {
+        "types": "./dist/logs/client.d.ts",
+        "default": "./dist/logs/client.js"
+      }
+    },
+    "./network": {
+      "deictic@dev": "./src/plugins/network/index.ts",
+      "default": {
+        "types": "./dist/network/index.d.ts",
+        "default": "./dist/network/index.js"
+      }
+    },
+    "./network/client": {
+      "deictic@dev": "./src/plugins/network/client.ts",
+      "default": {
+        "types": "./dist/network/client.d.ts",
+        "default": "./dist/network/client.js"
+      }
+    },
     "./recommended": {
       "deictic@dev": "./src/plugins/recommended/index.ts",
       "default": {
@@ -234,6 +262,8 @@
   "devDependencies": {
     "@babel/core": "^8.1.3",
     "@babel/preset-react": "^8.0.1",
+    "@rrweb/rrweb-plugin-console-record": "2.2.2",
+    "@rrweb/rrweb-plugin-network-record": "2.2.2",
     "@rspack/core": "2.3.3",
     "@types/bun": "^1.4.5",
     "@vercel/board": "^0.53.0",
@@ -262,6 +292,8 @@
     "webpack": "5.113.0"
   },
   "peerDependencies": {
+    "@rrweb/rrweb-plugin-console-record": "^2.2.2",
+    "@rrweb/rrweb-plugin-network-record": "^2.2.2",
     "@rspack/core": ">=1",
     "@vercel/board": ">=0.53.0",
     "astro": ">=5",
@@ -276,6 +308,12 @@
     "webpack": ">=5"
   },
   "peerDependenciesMeta": {
+    "@rrweb/rrweb-plugin-console-record": {
+      "optional": true
+    },
+    "@rrweb/rrweb-plugin-network-record": {
+      "optional": true
+    },
     "@rspack/core": {
       "optional": true
     },

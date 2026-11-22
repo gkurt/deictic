@@ -126,10 +126,31 @@ for (const e of events) {
   }
   // The address changed with no load: a route of the app's.
   if (e.type === 5 && e.data.tag === 'deictic.page') push(t, 'page', `${e.data.payload.href} (a route change, no load)`);
-  // The page's console, and errors nothing caught: an error's stack goes under it.
-  if (e.type === 5 && e.data.tag === 'deictic.console') {
-    const { level, text, stack } = e.data.payload;
-    push(t, `console.${level}`, text, stack ? { stack } : {});
+  // The page's console, and errors nothing caught (rrweb's console plugin): each argument as JSON, a string in
+  // quotes, and where it was logged from, which goes under a warning or an error.
+  if (e.type === 6 && e.data.plugin === 'rrweb/console@1') {
+    const { level, payload, trace } = e.data.payload;
+    const plain = (arg) => {
+      try {
+        const value = JSON.parse(arg);
+        return typeof value === 'string' ? value : arg;
+      } catch {
+        return arg;
+      }
+    };
+    push(t, `console.${level}`, (payload ?? []).map(plain).join(' '), { trace: trace ?? [] });
+  }
+  // The page's requests (rrweb's network plugin), masked as they were kept: each as it ended. One the browser
+  // reported of itself has no method; headers and bodies, where kept, are in `--json`.
+  if (e.type === 6 && e.data.plugin === 'rrweb/network@1') {
+    for (const r of e.data.payload.requests ?? []) {
+      const took = Number.isFinite(r.duration) ? ` in ${Math.round(r.duration)} ms` : '';
+      const status = r.status ? r.status : 'no status (failed, blocked, or another origin’s)';
+      push(t, 'request', `${r.method ?? r.initiatorType ?? ''} ${r.name} → ${status}${took}`.trim(), {
+        request: r,
+        ...(e.data.payload.isInitial ? { before: 'made as the page loaded, before this moment' } : {}),
+      });
+    }
   }
   if (e.type === 5 && e.data.tag === 'deictic.end') push(t, 'end', 'recording stopped');
   if (e.type !== 3) continue;
@@ -191,8 +212,8 @@ if (options.json) {
   console.log();
   for (const e of timeline) {
     console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${e.text}`);
-    // The stack without its first line where that's the message again.
-    for (const line of (e.stack ?? '').split('\n').filter((l) => l.trim() !== '' && !e.text.includes(l.trim())))
-      console.log(`${' '.repeat(22)}${line.trim()}`);
+    // Where a warning or an error came from: the rest have theirs in `--json`.
+    if (e.kind === 'console.warn' || e.kind === 'console.error' || e.kind === 'console.assert')
+      for (const line of e.trace.slice(0, 5)) console.log(`${' '.repeat(22)}at ${line}`);
   }
 }

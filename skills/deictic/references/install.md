@@ -26,15 +26,17 @@ other options so they can add or drop some:
 
 > I'd set deictic up for tasks: Alt-click an element, describe the change, and attach a screenshot (which you can
 > draw on), a screen recording, or your voice; it goes to a Vercel Board for me to work. That's the tasks,
-> screenshots, annotations, recordings and voice plugins, plus `@vercel/board`, `rrweb`, `rrweb-player`, `rrweb-snapshot` and
-> `playwright-core` as dev dependencies. Also available: Tailwind (edit an element's classes in place, no task
+> screenshots, annotations, recordings and voice plugins (a recording keeps the page's console and its requests too,
+> secrets masked), plus `@vercel/board`, `rrweb`, `rrweb-player`, `rrweb-snapshot`, rrweb's console and network plugins
+> and `playwright-core` as dev dependencies. Also available: Tailwind (edit an element's classes in place, no task
 > needed), screenshots drawn in the page instead of a headless browser (`dom()`, for a page with no server to
 > render on), a channel or labels for the tasks, and a shortcut other than Alt. Go with the recommended setup?
 
 On yes, the recommended setup:
 
 ```bash
-npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core
+npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core \
+  @rrweb/rrweb-plugin-console-record @rrweb/rrweb-plugin-network-record
 ```
 
 ```ts
@@ -56,6 +58,8 @@ To fit what they choose instead: a plugin's options go under its name, `false` l
 | `annotations()` | Marks on the page, on shots (Annotate) and in recordings                                |                                                                       |
 | `recordings()`  | Record beside Attach: a screen recording attached to a task                             | `rrweb`, `rrweb-player` (its replay)                                  |
 | `voice()`       | The mic, in recordings and as voice notes in a task                                     |                                                                       |
+| `logs()`        | The console's lines and uncaught errors in a recording; `{ levels }`                    | `@rrweb/rrweb-plugin-console-record`                                  |
+| `network()`     | The page's requests in a recording, masked; `{ headers, body, mask, ignore }`           | `@rrweb/rrweb-plugin-network-record`                                  |
 | `tailwind()`    | Edit an element's classes in place; `{ css: 'src/index.css' }` names the theme's sheet  |                                                                       |
 
 `deictic({ shortcut })` changes Alt-click, or `false` for none. The plugins' order is the tabs' order: keep theirs.

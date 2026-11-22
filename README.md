@@ -43,7 +43,8 @@ The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a tea
 Install it with what its plugins use:
 
 ```bash
-npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core
+npm install -D deictic @vercel/board rrweb rrweb-player rrweb-snapshot playwright-core \
+  @rrweb/rrweb-plugin-console-record @rrweb/rrweb-plugin-network-record
 ```
 
 Add it to your bundler:

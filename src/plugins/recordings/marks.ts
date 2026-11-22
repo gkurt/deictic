@@ -10,9 +10,6 @@ export const MARKS = 'deictic.annotations';
  */
 export const PAGE = 'deictic.page';
 
-/** The custom event for a line of the page's console, or an error nothing caught: a `Logged` (`level`, `text`, `stack`). */
-export const LOG = 'deictic.console';
-
 /**
  * The custom event a recording ends with: rrweb's timeline lasts as long as its events, so without it a
  * recording of a still page (a voice-over, say) would replay as a moment, and its voice never play.
