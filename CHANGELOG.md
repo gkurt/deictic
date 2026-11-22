@@ -1,3 +1,27 @@
+## deictic@0.5.0
+
+### `npx deictic clean` deletes what deictic kept
+
+- It says what it found under each `.deictic/` near here and how big, then asks. By default it deletes the shots, recordings and voice notes; name `history`, `board` (the local board's tasks) or `all` for the rest, which it refuses while the dev server's board is running. `transcribe` deletes the transcription model and its runtime, outside the project. With no terminal to ask on, it only lists them, and deletes with `--yes`.
+
+### `deictic watch` starts on a fresh board, and the commands name the project's own runner
+
+- `deictic watch` makes its channel where the board has none yet, instead of failing until the first task is posted.
+- `deictic task` no longer prints `Result: null` and `Reason: null` for a task that isn't over.
+- The commands each command's output names use the project's runner (`bunx deictic`, `pnpm exec deictic`, `yarn deictic`), so an agent following them doesn't get npm's notices in every command's output; the skill says the same.
+
+### The `deictic` command's help says every option
+
+- `deictic --help` and `deictic <command> --help` are generated from each command's arguments and options, so every option is listed with what it does and its default. A mistyped command gets a suggestion (`Did you mean task?`), and a missing argument or a value a command doesn't take is said with a pointer to `--help`.
+- `deictic help <command>` is the same as `deictic <command> --help`.
+- The command needs Node 22.12 or later.
+
+### `deictic watch` follows a restarted board wherever it comes back
+
+- A board started again on another port is followed there, instead of the watch going quiet while it asks the old one.
+- Every restart says the board went away and that it's back, with the reason in the watch's own line, not the board CLI's raw error.
+- After a restart the watch picks up from the last event it heard, and no longer lists the ready tasks again, which could repeat a task already done.
+
 ## deictic@0.4.0
 
 ### The skill's scripts are the `deictic` command's
