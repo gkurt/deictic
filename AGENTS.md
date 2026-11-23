@@ -147,7 +147,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   which the overlay calls), the pointer is on it, something keeps it (`keep()`: a recording, a take, a shot being
   made) or a tool has the page (`hold(left)`, one at a time: the next holder's `hold` calls the last one's `left`),
   and goes `LINGER` after. Plugins `add(group)` their controls from `setup` (`{ last: true }` for tasks', after the
-  others'). Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
+  others'; `{ section }` puts groups of one section side by side, with no `.sep` between them, where its first went:
+  screenshots', recordings' and voice's are `capture`). Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
   page, while the keys are held or a tool holds: a control's `aria-keyshortcuts` is its key, which clicks it (a key
   alone, whatever is held while pointing; never one typed in a field of ours, or of the page's while only pointing),
   and Esc gives the page back. Not while a `data-deictic-modal` is in the root: the keys are the modal's. So a tool never listens for keys itself. `pick()` answers the next press on the page
@@ -379,7 +380,9 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `sessionStorage` (`deictic:tasks:drafts`). It reads `thread/<id>` again every `AGAIN`, and marks the task seen as it
   does. `open(tasks)` is a pin's: the task, or a list to pick from for several.
   `composer.ts` is the composer both share (`composerIn(context, options)`, answering a `Composer`): the chips, the
-  textarea (as tall as what's typed, to `GROWN`; Enter sends, Shift+Enter is a new line, not while an IME composes),
+  textarea (as tall as what's typed, to `GROWN`; Enter sends, Shift+Enter is a new line, not while an IME composes; a
+  picture pasted or dropped in is made a PNG, `pngOf`, kept with `screenshots.upload` and put in the tray as drawn on with
+  no marks, so its lightbox offers Draw on it; any other file is said, not attached),
   and `.attach`, icon buttons made with `toolButton`, as below. Its options say what differs: `about` (the elements
   attached to begin with, and their chips, picker and HTML snapshot: a task's), `shoot` (a shot as it's sent while
   nothing else is attached), `at`, `here`, `over`, `record` (what Record does), `submit` (answers whether it was taken,

@@ -232,6 +232,8 @@ The Task tab is for a new task. The ones there are, are in the drawer. In the ta
 - **Voice** records a note, here.
 - What the tool panel's tools made since the last task is attached too: a shot, a recording, a voice note. A chip
   opens it, and its × leaves it out.
+- A picture pasted in (`Ctrl+V`, `⌘V`) or dropped on the composer is attached as a screenshot, to draw on from its
+  chip. A reply's composer takes them too.
 - A task that's added is in the drawer at once. Undo takes it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
   now is taken up. It knows of an agent watching with the skill from the project's folder, and of one holding a
@@ -397,7 +399,8 @@ export default defineClientPlugin<Model, Op>({
 - A panel's `apply(op, on)` sends an op on another element than the popup's, where the op is about that one: tasks
   sends a task on the first element attached.
 - `context.tools` is the tool panel, for a page half's `setup`: `add(group)` puts a group of controls in it (buttons
-  with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears), `hold(left)` takes the page for a
+  with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears; groups given one `section` sit
+  together, as the screenshots', recordings' and voice's do in `capture`), `hold(left)` takes the page for a
   tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the
   next point pressed on the page, as a `Spot` (the element and the point in it).
 - `context.drawer` is the drawer, for a page half's `setup`: `add(section)` puts a section in it, which hides

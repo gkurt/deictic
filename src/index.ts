@@ -172,11 +172,13 @@ export interface Spot {
  */
 export interface ToolPanel {
   /**
-   * Adds a plugin's controls, as one group, in the order plugins are loaded; `last` puts it after the others'. Each
-   * control is a button named by its `title`; its `aria-keyshortcuts` (`B`, `Control+Z`) is the key the panel
-   * hears for it, alone or with the keys held to point, and what its tooltip shows.
+   * Adds a plugin's controls, as one group, in the order plugins are loaded; `last` puts it after the others'. Groups
+   * of one `section` sit together, with no line between them, where its first group went: the screenshots',
+   * recordings' and voice's are `capture`. Each control is a button named by its `title`; its `aria-keyshortcuts`
+   * (`B`, `Control+Z`) is the key the panel hears for it, alone or with the keys held to point, and what its tooltip
+   * shows.
    */
-  add: (group: HTMLElement, options?: { last?: boolean }) => void;
+  add: (group: HTMLElement, options?: { last?: boolean; section?: string }) => void;
   /**
    * Takes the page for a tool that works on it (drawing, picking a point): the tool that had it lets go first, and
    * the panel stays shown. `left` is called when another takes it, or Esc or the pointer tool gives the page back.

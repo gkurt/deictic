@@ -117,6 +117,8 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
   bar.append(grip, pointer);
   // After every plugin's own, whichever adds first: what takes the rest (a task).
   const last: HTMLElement[] = [];
+  // Each section's last group, by name: the next of it goes after that one, with no line between them.
+  const sections = new Map<string, HTMLElement>();
   root.append(bar);
 
   let dock = storedDock();
@@ -214,6 +216,12 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
 
   return {
     add: (group, options) => {
+      const joined = options?.section === undefined ? undefined : sections.get(options.section);
+      if (options?.section !== undefined) sections.set(options.section, group);
+      if (joined !== undefined) {
+        joined.after(group);
+        return;
+      }
       const sep = Object.assign(document.createElement('span'), { className: 'sep' });
       if (options?.last === true) {
         last.push(sep, group);

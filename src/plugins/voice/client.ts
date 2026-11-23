@@ -153,7 +153,8 @@ export default defineClientPlugin<never, never, Voice>({
     mic.classList.add('mic');
     mic.setAttribute('aria-pressed', 'false');
     group.append(Object.assign(document.createElement('style'), { textContent: STYLE }), mic, time, wave);
-    tools.add(group);
+    // Beside the other tools that capture the page: a shot, a recording, the mic.
+    tools.add(group, { section: 'capture' });
     // In the drawer until a task takes them: each plays in the lightbox.
     drawer.add(
       trayed({ tray }, 'voice', 'Voice notes', (item, i, all) => {

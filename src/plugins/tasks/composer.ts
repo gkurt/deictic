@@ -12,6 +12,8 @@
  * A task's elements are chips too: the one the popup is on to begin with, and any other the element button's next
  * press on the page picks. A reply has none.
  *
+ * A picture pasted in, or dropped on it, is a screenshot of its own, in the tray, to draw on as one drawn here is.
+ *
  * What they make, and what the tool panel's tools made since (the tray), is this one's to attach. Each is a chip,
  * which opens it; removing one takes it out of the tray. Once it's sent, they're gone from the tray, and the page's
  * marks with them.
@@ -33,7 +35,7 @@ import type { Marks, Op } from './index.ts';
 export const COMPOSER_STYLE = `
 /* One box for what's attached, the words and the buttons, lit as a field is while it's typed in. */
 .composer { border: 1px solid var(--deictic-line); border-radius: 12px; background: rgb(0 0 0 / 0.35); }
-.composer:focus-within { border-color: var(--deictic-accent); box-shadow: 0 0 0 1px var(--deictic-accent); }
+.composer:focus-within, .composer.dropping { border-color: var(--deictic-accent); box-shadow: 0 0 0 1px var(--deictic-accent); }
 .composer textarea { display: block; box-sizing: border-box; width: 100%; min-height: 0; padding: 10px 12px 4px; border: 0; resize: none; background: none; font: 13px/1.45 system-ui, sans-serif; }
 .composer textarea:focus { outline: none; }
 .composer .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 8px 8px 0; font-size: 12px; }
@@ -264,6 +266,28 @@ async function outlined(png: string, size: Shot['size'], boxes: Shot['box'][], s
   );
 }
 
+/** A picture as a PNG, and its size: the screenshots plugin keeps PNGs, and a pasted one may be a JPEG or a GIF. */
+async function pngOf(picture: Blob): Promise<{ png: Blob; width: number; height: number }> {
+  const url = URL.createObjectURL(picture);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const { naturalWidth: width, naturalHeight: height } = image;
+    if (picture.type === 'image/png') return { png: picture, width, height };
+    const canvas = element('canvas', { width, height });
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) throw new Error("tasks: this browser won't draw to a canvas");
+    ctx.drawImage(image, 0, 0);
+    const png = await new Promise<Blob>((done, fail) =>
+      canvas.toBlob((blob) => (blob === null ? fail(new Error('tasks: the picture drew nothing')) : done(blob)), 'image/png'),
+    );
+    return { png, width, height };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function composerIn(context: ClientContext, options: ComposerOptions): Composer {
   const shots = context.use('screenshots');
   const notes = context.use('annotations');
@@ -368,7 +392,15 @@ export function composerIn(context: ClientContext, options: ComposerOptions): Co
         kind: 'image' as const,
         url: s.url,
         title: numbered('Screenshot', i, pictures.length),
-        ...(s.drawn === undefined ? {} : { actions: [{ label: 'Change marks', title: 'Draw on it again', run: () => void draw(s) }] }),
+        ...(s.drawn === undefined
+          ? {}
+          : {
+              actions: [
+                s.drawn.marks.length === 0
+                  ? { label: 'Draw on it', title: 'Draw boxes, arrows and notes on it', run: () => void draw(s) }
+                  : { label: 'Change marks', title: 'Draw on it again', run: () => void draw(s) },
+              ],
+            }),
       })),
       ...recordings.map((r, i) => ({
         kind: 'page' as const,
@@ -526,6 +558,56 @@ export function composerIn(context: ClientContext, options: ComposerOptions): Co
       text.focus();
     }
   };
+
+  /**
+   * Pictures pasted in or dropped on it: each kept as a shot of its own (a PNG, as the screenshots plugin keeps them)
+   * and put in the tray, so it's a chip as any other is, to draw on. Anything else is said, not attached.
+   */
+  const paste = async (files: File[]) => {
+    const pictures = files.filter((file) => file.type.startsWith('image/'));
+    const others = files.length - pictures.length;
+    problem.textContent = '';
+    if (pictures.length > 0 && shots === undefined)
+      problem.textContent = 'Attaching a picture needs the screenshots plugin: add it to deictic';
+    else if (others > 0)
+      problem.textContent = `Only pictures can be attached here: ${others === 1 ? 'that file was' : `${others} files were`} left out`;
+    if (shots === undefined || pictures.length === 0) return;
+    doing.textContent = 'Attaching…';
+    try {
+      for (const picture of pictures) {
+        const { png, width, height } = await pngOf(picture);
+        const size = { width, height };
+        const kept = await shots.upload(png, { box: { x: 0, y: 0, ...size }, size });
+        // Drawn on with no marks yet: its lightbox offers to draw on it, as one drawn here does.
+        const pictured: Pictured = { ...kept, drawn: { shot: kept, marks: [], about: '' } };
+        tray.add('screenshots', kept.id, pictured);
+      }
+    } catch (e) {
+      problem.textContent = messageOf(e);
+    } finally {
+      doing.textContent = '';
+    }
+  };
+  box.addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData?.files ?? [])];
+    if (files.length === 0) return;
+    // A picture isn't text: nothing goes in the field for it.
+    e.preventDefault();
+    void paste(files);
+  });
+  box.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    box.classList.add('dropping');
+  });
+  box.addEventListener('dragleave', () => box.classList.remove('dropping'));
+  box.addEventListener('drop', (e) => {
+    box.classList.remove('dropping');
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length === 0) return;
+    e.preventDefault();
+    void paste(files);
+  });
 
   // The mic, here: its button starts a take, and stops it, and it's a chip.
   let ticking: ReturnType<typeof setInterval> | undefined;

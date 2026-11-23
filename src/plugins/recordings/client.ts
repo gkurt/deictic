@@ -98,7 +98,8 @@ export default defineClientPlugin<never, never, Recorder>({
       });
     });
     group.append(Object.assign(document.createElement('style'), { textContent: STYLE }), start, going);
-    tools.add(group);
+    // Beside the other tools that capture the page: a shot, a recording, the mic.
+    tools.add(group, { section: 'capture' });
     // In the drawer until a task takes them: each plays back in the lightbox.
     drawer.add(
       trayed({ tray }, 'recordings', 'Recordings', (item, i, all) => {

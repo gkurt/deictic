@@ -128,7 +128,8 @@ export function screenshotsClient(capture: PageCapture) {
           });
       });
       group.append(shoot);
-      tools.add(group);
+      // Beside the other tools that capture the page: a shot, a recording, the mic.
+      tools.add(group, { section: 'capture' });
       // In the drawer until a task takes them: each opens among the others.
       drawer.add(
         trayed({ tray }, 'screenshots', 'Screenshots', (item, i, all) => {
