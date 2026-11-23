@@ -1,46 +1,54 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### What a task's element rendered through is a label, `deictic.source`, not a `Source:` line in its text\n\n`deictic task` still prints it as `Source:`, from the element's own place out.\n"
-    filename: source-label.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task's elements are attached, and there can be several\n\nThe element the popup is on is a chip in the Task tab's composer, with what else is attached. The crosshair button\nattaches another: the next press on the page picks it. A task about several is listed and pinned at its first, names\nthe rest as `deictic.also.N` (`src/Nav.tsx:4:7 <a>`, each one's HTML in `element.N.html`), and has them all outlined\nin its screenshot. With every element taken out, the task is about the page, and has no `deictic.at`. `deictic task`\nsays both.\n\n### An element is named by its component\n\nThe caption while pointing, the popup's bar and a pin's card say the component whose JSX has the element, with React\nin development: `<Plan> <li>`, or `<Badge>` alone for the only element a component writes. Without, it's the tag, as\nbefore.\n\n### A panel can apply on another element: `apply(op, on)`\n\nFor an op that's about another element than the popup's. The model answered is then that element's.\n"
+    filename: task-elements.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task goes in wherever the page's element isn't found in its file\n\nIt used to be refused, with \"the file changed since the page loaded\" even where it hadn't. A plugin's `read` and\n`apply` now get the `Source` or the `Refusal` saying why there's none, to throw where they need it: only text edits\nare refused without it.\n\n### An element whose column is off is found by its line\n\nWhere its line has only one of its tag. Otherwise the problem says what the line has, not that the file changed.\n"
-    filename: source-optional.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### Paste a picture into the composer\n\nA picture pasted into the Task tab's composer or a reply's, or dropped on it, is attached as a screenshot, which its\nchip's lightbox offers to draw on.\n\n### The tool panel keeps the capture tools together\n\nScreenshot, Record, the mic and Task sit side by side at the end of the tool panel, after the drawing tools. A plugin\nputs its group in a section with `tools.add(group, { section })`: groups of one section sit together, with no line\nbetween them, after the groups of none, and `last` puts one at its section's end. The gap after Record is gone, and\nwhile a recording goes its controls are the only ones in that section.\n\n### Attachments keep one size\n\nEvery attachment chip, in a composer and in the drawer, is one height, and a picture's thumbnail one size whatever\nits shape: nothing moves as one is attached or as its picture loads.\n"
+    filename: paste-pictures.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task's text is only what was typed: the rest is its files and labels, numbered from 1\n\nOnly what the files don't say: `deictic.screenshot.N.position`, `.size` and `.note.M` for the Nth PNG attached,\n`deictic.note.M`, `deictic.recording.N.replay`, `deictic.pointed` and `deictic.dropped.N`. `deictic.position` and\n`deictic.size` are gone, and a URL too long for a label goes with its path only. `deictic task` prints them all.\n"
-    filename: attached-labels.md
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### The agent skill is one short file\n\n`skills/deictic/` is a single `SKILL.md`, the loop and nothing else: no `references/`, and no rules on committing or\non what a task may ask, which are the person's. What the references explained, the commands now say as they run:\n`deictic task` says how to read a task's source chain, the markup pointed at, and a task about the page as a whole,\nand `deictic voice` says how to line speech up with the recording's frames.\n\n### Shorter command output, for an agent's context\n\n`deictic watch` says a ready task as it says a new one (its words, place, page and project), not with every label.\n`deictic task` says how to download what's attached once (`--out <dir>`), not a command per file, and a task's voice\nclips' commands once; its paths are from where it runs. `deictic recording` writes the page's own URLs as paths (a file\nVite serves from outside its root as the file's path, without a cache-busting query) and the marks all cleared as\n`− all N marks`; `--json` keeps every URL whole. `deictic voice` gives each clip's path from where it runs.\n"
+    filename: one-skill-file.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic init` puts deictic first among the plugins\n\nLast, a plugin before it that changed a module had the page point at that plugin's code, not the file. Move it first\nin a config `init` set up before.\n"
-    filename: init-first.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### The overlay is a spotlight\n\nThe page dims around the element you point at, which stays lit with guides from its edges across the window. The\npopup opens beside it, tied to it by a line, and the page gets its light back once the pointer is out on it. The\noutline and the popup under it are gone.\n\nIt shows the tasks on the page: while the keys are held, each element with a task still to do has a pin on its\ncorner, and with the Task tab open a pin reads its tasks under the pointer and opens them with a click. The tab's own\ntasks are cards, read whole, with the window's height to scroll in.\n\n### A plugin can draw on the page while it's pointed on: `pointing(context)`\n\nIt answers what takes it away again.\n\n### `context.open` leaves a popup that holds something unsaved\n\nIts button shakes, as it does for a press on the page, and `open` answers false.\n"
+    filename: spotlight.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task's text no longer says its screenshot has the element outlined, and the outline has no white under its dashes\n"
-    filename: outline-quiet.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### Annotation tools have keys, and no hints\n\nEach drawing tool has a key, and its tooltip is its name and the key, as a keycap. The line of advice under the\ntools is gone. Esc in a note being typed drops the note, and no longer closes what's around it.\n\n### A control's keys show in its tooltip: `aria-keyshortcuts`\n\nA plugin sets `aria-keyshortcuts` (`Control+Z`) on a control, and the overlay's tooltip draws each key as a keycap\nafter the control's `title`.\n"
+    filename: annotation-keys.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task goes without an attachment that's no longer kept\n\nIt used to be refused whole. Now it says what it went without, and so does the panel.\n"
-    filename: dropped-attachments.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### The drawer\n\nWhile the shortcut's keys are held, a drawer on the window's side has what there is for the page: every task of the\nchannel still to do, the latest finished folded under them, and the screenshots, recordings and voice notes no task has\ntaken yet. It stays while the pointer is on it, and goes at once when the last thing in it is deleted.\n\nA task opens in the drawer, from its row or from its pin on the page: its state, its words, what it has attached,\nand its thread. A screenshot, a recording, a voice note or an element's HTML opens in the lightbox. The composer under\nthe thread replies on the board, so an agent that asked is answered from the page, and a reply attaches what a task\ndoes: a screenshot, a drawing, a recording, a voice note. `deictic task` lists a reply's attachments under it. A task\nno one has claimed can be edited and deleted there. The pointer on a task's row lights its element on the page.\n\nThe drawer folds away to a pill that counts what's in it, or what's unread. Finished tasks can be archived, one or\nall: they're out of the drawer until something happens to one.\n\n### Unread tasks\n\nA task an agent answered, blocked, completed or failed since you last opened it has a dot, in the drawer and on\nits pin, and the replies that are new are outlined in its thread. It's kept in the browser.\n\n### Enter sends\n\nIn the Task tab's composer, and in a reply's, Enter sends and Shift+Enter starts a new line. Enter saves a task's\nedited words too.\n\n### The Task tab is for a new task\n\nIt no longer lists the element's tasks or the file's: they're in the drawer. The tasks plugin's `apply` only adds\na task (the `Change` type, with its `edit` and `remove`, is gone, and so is the model's `elsewhere`), and its `page`\nroute answers `{ channel, link, tasks }`, every task with how its thread stands. `thread/<id>` (with each message's\n`files`), `file/<task>/<file>`, `reply/<id>` (with attachments, an `Answer`), `edit/<id>` and `remove/<id>` are new, and a `standalone` module answers them where it keeps tasks.\n\n### A plugin can add to the drawer: `context.drawer`\n\n`add(section)` puts a section in it, `show(view)` opens an item in the sections' place, and `keep()` keeps the drawer\nup. A section with nothing hides itself, and says how many things it has in `data-count` (and unread in `data-unread`)\nfor the folded drawer's pill. `context.light(element)` lights an element on the page as pointing does.\n"
+    filename: drawer.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### The tool panel\n\nWhile the shortcut's keys are held, a bar of tools shows at the bottom of the window: drawing on the page, a\nscreenshot, a recording, the mic, and a task about a point. It goes a moment after the keys are let go, unless it's\nin use (a tool has the page, a recording or the mic is on, the pointer is on it), and its grip drags it to any edge.\n\nEach tool has a key, which works while the keys are held or a tool has the page: `V` or `Esc` the pointer, `M` box,\n`A` arrow, `B` pen, `N` note, `Ctrl+Z` (`⌘Z`) and `Shift+Backspace` for the marks, `S` screenshot, `R` record and\nstop, `Shift+R` discard, `K` the mic, `T` task.\n\nWhat the tools make waits for the next task: the Task tab lists each shot, recording and voice note as a chip, and\nthe task takes them, and what's drawn on the page, as it's added.\n\n### A task can be about a point\n\nThe Task tool's next press on the page opens the Task tab on that point, wherever it is: in the marked element under\nit, or beside the nearest one. The task is pinned there, its screenshot has the point circled, and it says the spot\nas `deictic.point` (`x,y` from the element's top left), which `deictic task` prints.\n\n### The popup is Task and Tailwind, and the Task tab's field is a composer\n\nThe Annotate tab is gone: marks are drawn on the page with the tool panel's tools. The recording's own toolbar is\nthe tool panel, too.\n\nThe Task tab's field has what's attached over the words, a chip each, and its buttons under them, as icons:\nscreenshot and HTML snapshot, on or off, then draw (a screenshot to draw on, as Annotate was), record and voice, and\nan arrow that adds the task.\n\nA task's pin is pressed while the keys are held, too: it opens that element's tasks.\n\n- `annotations({ shortcut })` is gone, as it has no tab to open. Its page API has `draw()`, which starts drawing on\n  the page as the tool panel's tools do, and no `tools()`.\n- A screenshot taken from the tool panel has no `box` in a task, so no `deictic.screenshot.N.position` and `.size`.\n- `page: true` on a plugin's page half is gone.\n\n### A plugin can add tools, and what they make: `context.tools`, `context.tray`\n\n`tools.add(group)` puts a group of controls in the tool panel, each button's key in `aria-keyshortcuts`, which the\npanel hears. `hold(left)` takes the page for a tool until the panel gives it back, `keep()` keeps the panel up, and\n`pick()` answers the next point pressed on the page. `tray` is what the tools made that no task has taken.\n`context.open(plugin, element, at)` opens the popup on a point of an element, which the panel gets as `context.at`.\n"
+    filename: tool-panel.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### The `deictic:task` event says where each attached shot is, so a page can show it\n"
+    filename: task-event-shots.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - source-label.md
-      - source-optional.md
-      - attached-labels.md
-      - init-first.md
-      - outline-quiet.md
-      - dropped-attachments.md
+      - task-elements.md
+      - paste-pictures.md
+      - one-skill-file.md
+      - spotlight.md
+      - annotation-keys.md
+      - drawer.md
+      - tool-panel.md
+      - task-event-shots.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
   - id: npm:example-rspack
     updated: false
-  - id: npm:example-vite
-    updated: false
   - id: npm:example-bun
     updated: false
   - id: npm:example-next
+    updated: false
+  - id: npm:example-vite
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
   - id: npm:example-rspack
-  - id: npm:example-vite
   - id: npm:example-bun
   - id: npm:example-next
+  - id: npm:example-vite
