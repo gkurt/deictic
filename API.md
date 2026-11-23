@@ -93,9 +93,27 @@ across the window. Its caption says what it is: with React in development, the c
 pointer has been out on it a moment. Nothing of it takes the pointer from the page.
 
 The tasks are on the page, too. While the keys are held, and while the Task tab is open, every element with a task
-still to do has a pin on its corner: how many, in the colour of the furthest along. A pin under the pointer reads its
-tasks, and a click opens them. The tab has the window's height: each task is a card that says its state and reads
-whole, and they scroll over the field.
+still to do has a pin on its corner: how many, in the colour of the furthest along, with a dot where one has
+something unread. A pin under the pointer reads its tasks, and a click opens them in the drop zone.
+
+### The drop zone
+
+While the keys are held, a drawer shows on the window's right (its left, with the tool panel docked on the right):
+what there is for the page. It goes a moment after the keys are let go, unless the pointer is on it or a task is open
+in it.
+
+- **Tasks**: every task of the channel still to do, oldest first, each with its state, who holds it, the element
+  it's about and how many replies it has; those lately completed or failed are folded under them. A task of another
+  page says which.
+- A task opens in the drawer: its state, its words, what it came to, and its thread. **Edit** changes the words and
+  **Delete** cancels it, twice pressed, for a task no one has claimed. The field under the thread replies on the
+  board, `Ctrl+Enter` (`⌘Enter`) or the arrow, so an agent that asked is answered from the page. The element is
+  outlined while the task is open, and a press on its name scrolls to it. `Esc`, or the arrow back, is the list again.
+- **Unread**: a task an agent answered, blocked, completed or failed since you last opened it has a dot, in the
+  list and on its pin, and the heading counts them; in the thread the replies that are new are outlined. It's kept
+  in the browser, and a browser's first look counts everything as read.
+- **Screenshots, recordings, voice notes**: what the tools made that no task has taken yet, a row each: it opens,
+  and its × drops it.
 
 ### The tool panel
 
@@ -116,8 +134,8 @@ keys work while the shortcut's are held, and while a tool has the page:
 
 A recording, the mic and a drawing tool keep the panel up: stop them (`R`, `K`, `Esc`) and it goes with the keys.
 What the tools make (shots, recordings, voice notes) waits for the next task, whichever element it's about: the Task
-tool counts them, and the Task tab lists each as a chip, to open or to leave out. Marks stay on the page until a task
-takes them.
+tool counts them, and the Task tab lists each as a chip, to open or to leave out, and the drop zone has them meanwhile. Marks stay on the
+page until a task takes them.
 
 A task about a point is pinned on that point, not on an element's corner, and a shot taken as it goes has the point
 circled. It still names an element, the marked one under the point or the nearest to it, for its file and line.
@@ -166,7 +184,7 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 `local()` takes `port`, `dir` (its folder, from the root), `inspect: false` for none of the board's own pages, and
 `args`, more of `vb serve`'s.
 
-In the Task tab a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
+In the drop zone a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
 
 A task's text is the words typed, and nothing else. The rest is its attachments and labels: `deictic.project`,
 `deictic.at` (the element's `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your
@@ -185,16 +203,15 @@ Untick **Attach HTML snapshot** for a task without it; `html: false` takes the b
 button has the element outlined in it, or the point circled; one you drew on is as you drew it, and one taken from
 the tool panel is the window as it was.
 
-The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
-that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening
-tag's first line is still the same and the file has it once.
+A task stays with its element as lines above it change, while the opening tag's first line is still the same and
+the file has it once.
 
-In the Task tab:
+The Task tab is for a new task. The ones there are, are in the drop zone. In the tab:
 
 - The field is a composer: what's attached is over the words, a chip each, and the buttons that attach are under
   them, each an icon named by its tooltip. `Ctrl+Enter` (`⌘Enter`), or the arrow, adds the task.
 - The element is attached to begin with, a chip like the rest. **Element** (the crosshair) attaches another: the
-  next press on the page picks it. A task about several is listed and pinned at its first, and names the others;
+  next press on the page picks it. A task about several is pinned at its first, and names the others;
   each is outlined in its screenshot. Take every element out, and the task is about the page.
 - **Screenshot** is on or off: on, a shot of the page goes with the task as it's added, the element outlined in it.
   It's on to begin with, and goes off once something else is attached, until you turn it on again.
@@ -209,8 +226,7 @@ In the Task tab:
 - **Voice** records a note, here.
 - What the tool panel's tools made since the last task is attached too: a shot, a recording, a voice note. A chip
   opens it, and its × leaves it out.
-- The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed
-  can be edited or deleted. Undo takes any of it back.
+- A task that's added is in the drop zone at once. Undo takes it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
   now is taken up. It knows of an agent watching with the skill from the project's folder, and of one holding a
   claim on a task of the channel's; with a board that isn't this machine's own it says nothing where it knows of
@@ -311,7 +327,8 @@ export default (async (request) => Response.json({ model: null })) satisfies Sta
 
 What a plugin's routes would keep, the module keeps, and answers with the `url` it's at: screenshots' `add`; voice's
 `add` and then `more/<id>`, a take as it's spoken (the `url` with `?last`); recordings' `begin`, `part/<id>?seq=<n>`
-and `end/<id>` (the `url`) or `discard/<id>`. A recording's is a replay page for the build to publish:
+and `end/<id>` (the `url`) or `discard/<id>`; tasks' `page` (`{ channel, tasks }`, what the drop zone lists) and
+`thread/<id>`, `reply/<id>`, `edit/<id>` and `remove/<id>`, what it does to one. A recording's is a replay page for the build to publish:
 `replayPage({ player, source })`, from `deictic/recordings`, is its HTML.
 
 ## Events
@@ -376,6 +393,9 @@ export default defineClientPlugin<Model, Op>({
   with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears), `hold(left)` takes the page for a
   tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the
   next point pressed on the page, as a `Spot` (the element and the point in it).
+- `context.zone` is the drop zone, for a page half's `setup`: `add(section)` puts a section in it, which hides
+  itself (`hidden`) while it has nothing, `show(view, { title, closed })` opens one of its items in the sections'
+  place and answers what closes it, and `keep()` keeps the drawer up while something goes on.
 - `context.tray` is what the tools made that no task has taken: `add(plugin, id, value)`, `list(plugin?)`,
   `remove(plugin, id?)` and `subscribe`. It's kept for the tab, over page loads. A plugin of yours can add to it, or
   take from it as tasks does.

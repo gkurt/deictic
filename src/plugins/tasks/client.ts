@@ -1,8 +1,7 @@
 /**
- * The tasks panel: the tasks already about this element and their state, and a field to add one. Each
- * task's ID opens it on the board, where the board has a page; one no one has claimed yet can be edited
- * in place (its words) or deleted (canceled on the board), both changes the popup's undo takes back.
- * Beside the channel it says who watches it (`Model.watching`), or that no agent does.
+ * The Task tab: a field to add a task about the element with. The tasks there already are the drop zone's to list
+ * and open (`zone.ts`), and the pins' to show on the page. Beside the channel it says who watches it
+ * (`Model.watching`), or that no agent does.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
  * the source can't tell: the chain of source it rendered through, its HTML (a file attached), and where the
  * annotations plugin is loaded, what's marked on the page.
@@ -40,18 +39,12 @@ import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
-import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
+import type { Marks, Model, Op, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
+import { storeOf } from './store.ts';
+import { zoneOf } from './zone.ts';
 
 const STYLE = `
-/*
- * The panel has the window's height, so the tasks aren't a few lines of a list: each is a card that says its state
- * and reads whole, and they scroll over the field, which stays where it is.
- */
-.body:has(> .thread) { display: flex; flex-direction: column; }
-.thread { flex: 0 1 auto; min-height: 0; margin: -12px -12px 0; padding: 12px 12px 0; overflow-y: auto; scrollbar-width: thin; }
-/* Never squeezed out by the field: a window too low for both scrolls the panel. */
-.thread:has(> .tasks li, .more[open] li) { min-height: 84px; }
 .compose { flex: none; }
 /* One box for what's attached, the words and the buttons, lit as a field is while it's typed in. */
 .composer { border: 1px solid var(--deictic-line); border-radius: 12px; background: rgb(0 0 0 / 0.35); }
@@ -71,55 +64,6 @@ const STYLE = `
 .composer .attach button.send { border-radius: 50%; color: var(--deictic-on-accent); }
 .composer .attach button.send:hover:not(:disabled) { color: var(--deictic-on-accent); background: var(--deictic-accent); filter: brightness(1.1); }
 .composer [hidden] { display: none; }
-/* The column is no wider than the panel: an \`auto\` one grows to a long word, which then never wraps. */
-.tasks { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-.tasks:empty { margin: 0; }
-.tasks li {
-  display: grid;
-  grid-template: 'state says place acts id' auto 'text text text text text' auto / auto minmax(0, 1fr) auto auto auto;
-  gap: 6px 8px;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 0.04);
-}
-.tasks li:hover, .tasks li:focus-within { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
-/* The state is a dot and its name: a ring while no one has it, filled once someone does or it's over. */
-.tasks .state { grid-area: state; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
-.tasks .state.waiting { border-style: dotted; }
-.tasks .state.claimed { border-color: #60a5fa; background: #60a5fa; }
-.tasks .state.blocked { border-color: #fbbf24; background: #fbbf24; }
-.tasks .state.completed { border-color: #4ade80; background: #4ade80; }
-.tasks .state.failed { border-color: var(--deictic-problem); background: var(--deictic-problem); }
-.tasks .says { grid-area: says; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--deictic-muted); }
-.tasks .says.claimed { color: #60a5fa; }
-.tasks .says.blocked { color: #fbbf24; }
-.tasks .says.completed { color: #4ade80; }
-.tasks .says.failed { color: var(--deictic-problem); }
-.tasks a { color: inherit; text-decoration: none; }
-.tasks a:hover { text-decoration: underline; }
-.tasks li > a, .tasks li > code { grid-area: id; color: var(--deictic-muted); }
-.tasks .place { grid-area: place; padding: 0; border: 0; font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
-.tasks button.place:hover { color: var(--deictic-fg); text-decoration: underline; }
-.tasks .title { grid-area: text; padding: 0; border: 0; border-radius: 0; text-align: left; font-size: 13px; line-height: 1.45; }
-/* A few lines of it, as it was typed, and all of it once clicked. */
-.tasks .title span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
-.tasks li.whole .title span { display: block; }
-/* In the card's first line: there all along, and plain once the card is pointed at or focused in. */
-.tasks .acts { grid-area: acts; display: flex; opacity: 0; }
-.tasks li:hover .acts, .tasks li:focus-within .acts { opacity: 1; }
-.tasks .act { display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
-.tasks .act:hover { color: var(--deictic-fg); }
-.tasks .act svg { width: 12px; height: 12px; }
-.more { margin: 0 0 10px; }
-.more[hidden] { display: none; }
-.more summary { cursor: pointer; font-size: 12px; color: var(--deictic-muted); }
-.more summary:hover { color: var(--deictic-fg); }
-.more .tasks { margin: 8px 0 0; }
-.tasks li.editing { grid-template: none / minmax(0, 1fr); }
-.tasks li.editing .row { margin-top: 0; }
-.tasks li.editing .actions { display: flex; gap: 6px; }
 textarea { min-height: 76px; resize: vertical; font: 13px/1.45 system-ui, sans-serif; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; align-items: center; }
 /* Cut short before it pushes Add out: a channel's name and its watchers' may be long. */
@@ -142,9 +86,6 @@ textarea { min-height: 76px; resize: vertical; font: 13px/1.45 system-ui, sans-s
 /* An element the task is about: named as the caption names it, in the overlay's own green. */
 .chip.about .open { padding: 4px 4px 4px 8px; font: 12px ui-monospace, monospace; color: var(--deictic-accent); }
 .chip.about .open span { color: var(--deictic-muted); }
-/* On the page, around each attached element but the popup's own, which has the light. */
-.task-about { position: fixed; z-index: 2147483646; box-sizing: border-box; pointer-events: none; border: 1.5px dashed var(--deictic-accent); border-radius: 6px; }
-.task-about[hidden] { display: none; }
 .shot-problem { margin-top: 4px; font-size: 12px; color: var(--deictic-problem); }
 .shot-problem:empty { display: none; }
 .shot-note { margin-top: 4px; font-size: 12px; color: var(--deictic-muted); }
@@ -171,12 +112,6 @@ const TOOL_STYLE = `
 /** A note with a plus: a task to add. */
 const TASK = '<path d="M4 5h16v11H9l-5 4zM12 8v5M9.5 10.5h5"/>';
 
-const ICON = (path: string) =>
-  `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`;
-const EDIT = ICON('M4 20h4L19 9l-4-4L4 16z');
-const DELETE = ICON('M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13');
-/** The states of a task that's over, as a board names them: nothing more happens to it. */
-const OVER = new Set(['completed', 'failed']);
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
 /** The composer's buttons, each its strokes on a 24-pixel grid. */
 const CAMERA = '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
@@ -398,13 +333,15 @@ function announce(model: Model, op: Op, target: Target, shots: string[]): void {
   window.dispatchEvent(new CustomEvent(TASK_ADDED, { detail }));
 }
 
-export default defineClientPlugin<Model, Change>({
+export default defineClientPlugin<Model, Op>({
   name: 'tasks',
   label: 'Task',
   // Its tool in the tool panel, after the others': what takes what they made. Picked, the next press on the page
   // opens the tab on that spot.
   setup: (context) => {
     const { tools, tray } = context;
+    // The tasks there already, in the drop zone.
+    zoneOf(context);
     const group = element('div', { className: 'tool-group task-tool' });
     let picking = false;
     const button = toolButton(TASK, 'Task', 'T', () => {
@@ -437,29 +374,15 @@ export default defineClientPlugin<Model, Change>({
   pointing: (context) => pinsIn(context).glance(),
   mount: (panel, context) => {
     const style = element('style', { textContent: STYLE });
-    const list = element('ul', { className: 'tasks' });
     const text = element('textarea', { placeholder: 'What should change here?', rows: 2 });
     const hint = element('span', { className: 'hint' });
     const row = element('div', { className: 'row' });
     row.append(hint);
-    // The file's other tasks, folded away: the panel is about this element. It stays as it's left while the panel is up.
-    const fold = element('details', { className: 'more' });
-    const count = element('summary');
-    const others = element('ul', { className: 'tasks' });
-    fold.append(count, others);
-    // The element's tasks that are over, folded away too: what's still to do is what's read first.
-    const closed = element('details', { className: 'more' });
-    const closedCount = element('summary');
-    const ended = element('ul', { className: 'tasks' });
-    closed.append(closedCount, ended);
-    // What's there, and what's being added: apart, as the one scrolls over the other.
-    const thread = element('div', { className: 'thread' });
-    thread.append(list, closed, fold);
     const compose = element('div', { className: 'compose' });
-    panel.append(style, thread, compose);
-    // The page's other tasks, pinned where they are: not for a popup a page shows in place, which is in a root of
-    // its own.
-    const around = panel.getRootNode() === context.root ? pinsIn(context).around(context.element) : undefined;
+    panel.append(style, compose);
+    // The page's tasks, pinned where they are, while the tab is open too: not for a popup a page shows in place,
+    // which is in a root of its own.
+    const unpin = panel.getRootNode() === context.root ? pinsIn(context).glance() : undefined;
 
     const shots = context.use('screenshots');
     const notes = context.use('annotations');
@@ -792,180 +715,27 @@ export default defineClientPlugin<Model, Change>({
       mark();
     };
 
-    // The task whose words are open to change, by ID, and the tasks as last read.
-    let editing: string | undefined;
-    // The tasks shown whole, by ID: kept over a change, which draws the list again.
-    const whole = new Set<string>();
-    // The Save of a listed task whose words were changed and not kept yet.
-    let edited: HTMLElement | undefined;
-    /** Tells the popup what leaving now would lose: a listed task's changed words, a new one's, or a take. What's attached is the tray's, and stays. */
-    const mark = () => context.unsaved(edited ?? (text.value.trim() === '' && take === undefined ? undefined : add));
-    let shown = context.model;
-    /** Asks for a change to a listed task and shows the tasks as they are after; the panel's status says why not. */
-    const change = async (op: Change) => {
-      try {
-        editing = undefined;
-        render(await context.apply(op));
-        around?.refresh();
-      } catch {
-        render(shown);
-      }
-    };
-    /** A task's words in a field of their own: Save or Ctrl+Enter keeps them, Cancel or Esc leaves them. */
-    const editor = (t: Task) => {
-      // Marked a modal while it's open, so Esc is its and not the popup's.
-      const item = element('li', { className: 'editing' });
-      item.dataset['deicticModal'] = '';
-      const field = element('textarea', { value: t.text });
-      const save = element('button', { type: 'button', className: 'primary', textContent: 'Save' });
-      const leave = element('button', { type: 'button', textContent: 'Cancel' });
-      const buttons = element('div', { className: 'row' });
-      const right = element('span', { className: 'actions' });
-      right.append(leave, save);
-      buttons.append(element('code', { textContent: `#${t.id}` }), right);
-      item.append(field, buttons);
-      const done = () => {
-        editing = undefined;
-        render(shown);
-      };
-      const keep = () => {
-        if (field.value.trim() === '') return;
-        if (field.value.trim() === t.text) return done();
-        save.disabled = true;
-        void change({ edit: t.id, text: field.value });
-      };
-      field.addEventListener('input', () => {
-        save.disabled = field.value.trim() === '';
-        edited = field.value.trim() === t.text ? undefined : save;
-        mark();
-      });
-      field.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          done();
-        }
-        if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
-        e.preventDefault();
-        keep();
-      });
-      save.addEventListener('click', keep);
-      leave.addEventListener('click', done);
-      queueMicrotask(() => field.focus());
-      return item;
-    };
-    const render = (model: Model) => {
-      shown = model;
-      // A task being changed is drawn again with its words as they were.
-      edited = undefined;
-      const { channel, link, tasks, elsewhere, watching } = model;
+    /** Tells the popup what leaving now would lose: the words of a new task, or a take. What's attached is the tray's, and stays. */
+    const mark = () => context.unsaved(text.value.trim() === '' && take === undefined ? undefined : add);
+    /** Where a task goes, and whether it's taken up: the channel, and who watches it, or that no one does, where that's known. */
+    const render = ({ channel, link, watching }: Model) => {
       const name =
         link === undefined
           ? element('span')
           : element('a', { href: link, target: '_blank', rel: 'noreferrer', title: 'Open the channel on the board' });
       name.textContent = `#${channel}`;
       hint.replaceChildren('to ', name);
-      // Whether a task added now is taken up: who watches the channel, or that no one does, where that's known.
-      if (watching !== undefined) {
-        const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(watching);
-        const on = watching.length > 0;
-        const who = element('span', {
-          className: on ? 'watch on' : 'watch',
-          textContent: on ? `${names} watching` : 'no agent watching',
-          title: on
-            ? `${names} ${watching.length === 1 ? 'is' : 'are'} watching #${channel}, and take${watching.length === 1 ? 's' : ''} each task as it's added`
-            : `A task waits on the board until an agent watches #${channel}: ask yours to watch deictic's tasks`,
-        });
-        hint.append(' · ', who);
-      }
-      /** A task's card: its state, its ID, a link where it has a page, its words, and where it's from when that's said. */
-      const rowOf = (t: Task, from?: HTMLElement) => {
-        const item = element('li');
-        const says = t.by === undefined ? t.state : `${t.state} by ${t.by}`;
-        // The dot is the words beside it again, in a colour: nothing to read out.
-        const state = element('span', { className: `state ${t.state}`, ariaHidden: 'true' });
-        const said = element('span', { className: `says ${t.state}`, textContent: says });
-        const id = element('code', { textContent: `#${t.id}` });
-        const title = element('button', { type: 'button', className: 'title' });
-        // In a box of its own: a button's doesn't cut its lines short.
-        title.append(element('span', { textContent: t.text }));
-        // In place, not by drawing the list again: that would take a task's words being changed with it.
-        const show = () => {
-          const all = whole.has(t.id);
-          item.classList.toggle('whole', all);
-          title.title = all ? 'Show less of it' : 'Show all of it';
-          title.ariaExpanded = String(all);
-        };
-        title.addEventListener('click', () => {
-          if (!whole.delete(t.id)) whole.add(t.id);
-          show();
-        });
-        show();
-        const to =
-          t.link === undefined
-            ? id
-            : element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
-        if (to !== id) to.append(id);
-        item.append(state, said, to, title, ...(from === undefined ? [] : [from]));
-        return item;
-      };
-      const { file } = context.target.loc;
-      fold.hidden = elsewhere.length === 0;
-      count.textContent = `${elsewhere.length} elsewhere in ${file.split('/').at(-1)}`;
-      others.replaceChildren(
-        ...elsewhere.map((t) => {
-          if (t.at === undefined) return rowOf(t);
-          const { line, column, tag } = t.at;
-          const name = `<${tag}> :${line}`;
-          // Only an element the page shows now has a popup to open: its place is from the task, which may be old.
-          const there = document.querySelector(`[data-deictic="${CSS.escape(`${file}:${line}:${column}`)}"]`);
-          if (there === null)
-            return rowOf(t, element('span', { className: 'place', textContent: name, title: `Line ${line}, not on this page now` }));
-
-          const go = element('button', { type: 'button', className: 'place', textContent: name, title: `Open the tasks of line ${line}` });
-          go.addEventListener('click', () => void context.open('tasks', there));
-          return rowOf(t, go);
-        }),
-      );
-      const over = tasks.filter((t) => OVER.has(t.state));
-      closed.hidden = over.length === 0;
-      closedCount.textContent = `${over.length} closed`;
-      ended.replaceChildren(...over.map((t) => rowOf(t)));
-      const live = tasks.filter((t) => !OVER.has(t.state));
-      // The latest is the last, which a list longer than its room would keep out of sight: as it opens, and after one is added.
-      const grew = live.length > list.childElementCount;
-      list.replaceChildren(
-        ...live.map((t) => {
-          if (t.id === editing && t.open) return editor(t);
-          const item = rowOf(
-            t,
-            t.at === undefined
-              ? undefined
-              : element('span', {
-                  className: 'place',
-                  textContent: `was :${t.at.line}`,
-                  title: `Added when this was on line ${t.at.line}: it has moved since`,
-                }),
-          );
-          if (!t.open) return item;
-          const edit = element('button', { type: 'button', className: 'act', innerHTML: EDIT, title: 'Edit the task' });
-          edit.addEventListener('click', () => {
-            editing = t.id;
-            render(shown);
-          });
-          const remove = element('button', { type: 'button', className: 'act', innerHTML: DELETE, title: 'Delete the task' });
-          remove.addEventListener('click', () => {
-            remove.disabled = true;
-            void change({ remove: t.id });
-          });
-          const acts = element('span', { className: 'acts' });
-          acts.append(edit, remove);
-          item.append(acts);
-          return item;
-        }),
-      );
-      if (grew) thread.scrollTop = thread.scrollHeight;
-      able();
-      mark();
+      if (watching === undefined) return;
+      const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(watching);
+      const on = watching.length > 0;
+      const who = element('span', {
+        className: on ? 'watch on' : 'watch',
+        textContent: on ? `${names} watching` : 'no agent watching',
+        title: on
+          ? `${names} ${watching.length === 1 ? 'is' : 'are'} watching #${channel}, and take${watching.length === 1 ? 's' : ''} each task as it's added`
+          : `A task waits on the board until an agent watches #${channel}: ask yours to watch deictic's tasks`,
+      });
+      hint.append(' · ', who);
     };
 
     /**
@@ -1092,9 +862,8 @@ export default defineClientPlugin<Model, Change>({
         // this tab's to list.
         const on = first?.target ?? context.target;
         const model = await context.apply(op, on);
-        const mine = first !== undefined && atOf(on) === atOf(context.target);
-        if (mine) render(model);
-        around?.refresh();
+        // In the drop zone and on its pin at once: the tab lists none.
+        storeOf(context).load(true);
         announce(
           model,
           op,
@@ -1102,9 +871,10 @@ export default defineClientPlugin<Model, Change>({
           (screenshots ?? []).map((taken) => taken.url),
         );
         const added = model.tasks.at(-1)?.id;
-        if (first === undefined) note.textContent = 'Added, about the page: no element was attached, so no element lists it';
-        else if (!mine)
-          note.textContent = `Added${added === undefined ? '' : ` #${added}`} on <${on.tag}> ${on.loc.file.split('/').at(-1)}:${on.loc.line}`;
+        note.textContent =
+          first === undefined
+            ? 'Added, about the page: it is in the drop zone'
+            : `Added${added === undefined ? '' : ` #${added}`}: it is in the drop zone`;
         text.value = '';
         grow();
         // The task has them now: what was made for it, and what was drawn on the page for it.
@@ -1153,7 +923,7 @@ export default defineClientPlugin<Model, Change>({
     grow();
     text.focus();
     return () => {
-      around?.release();
+      unpin?.();
       for (const stop of unsubscribe) stop?.();
       aborts.abort();
       cancelAnimationFrame(following);

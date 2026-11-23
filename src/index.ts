@@ -193,6 +193,25 @@ export interface ToolPanel {
 }
 
 /** Something a plugin made on the page that nothing has taken yet: a shot, a recording, a voice clip. */
+/**
+ * The drop zone: a drawer on the window's side where what the plugins have for the page lands, a section each. It
+ * shows while a shortcut's keys are held and a section has something, and stays while it's in use.
+ */
+export interface DropZone {
+  /**
+   * Adds a section, in the order added, or before the others with `first`. A section that has nothing to show sets
+   * its own `hidden`: the zone stays away while every one is.
+   */
+  add: (section: HTMLElement, options?: { first?: boolean }) => void;
+  /**
+   * Opens one item in the zone, in the sections' place, under `title` and a way back. The zone stays while it's
+   * open. `closed` is called when it's left, by the way back, Esc, or another item opening. Answers what closes it.
+   */
+  show: (view: HTMLElement, options?: { title?: string; closed?: () => void }) => () => void;
+  /** Keeps the zone up while something goes on in it; answers what lets it go. */
+  keep: () => () => void;
+}
+
 export interface TrayItem {
   /** The plugin that made it. */
   plugin: string;
@@ -239,6 +258,8 @@ export interface ClientContext {
   tools: ToolPanel;
   /** What was made from the tool panel and not taken yet. */
   tray: Tray;
+  /** The drop zone, to add this plugin's section to. */
+  zone: DropZone;
   /**
    * Shows `items` in the lightbox over everything, at `at` (the first by default), stepping between them with
    * ← and →. With `from`, it grows out of that element (the chip clicked) and shrinks back into it on close.

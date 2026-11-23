@@ -29,7 +29,7 @@ import { watchersOf } from './watchers.ts';
 export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'discovery' | 'upload' | 'edit' | 'actors'>;
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'threads' | 'reply' | 'discovery' | 'upload' | 'edit' | 'actors'>;
 
 export interface TasksOptions {
   /**
@@ -85,8 +85,7 @@ export interface Task {
   /** The spot in the element it's about, where it's about one: CSS pixels from the element's top left. */
   point?: Point;
   /**
-   * Where it was added, where that isn't the element's place: for one of `tasks`, where the element was before
-   * it moved; for one of `elsewhere`, the element it's about.
+   * Where it was added, where that isn't the element's place: where the element was before it moved.
    */
   at?: Place;
 }
@@ -98,10 +97,40 @@ export interface Place {
   tag: string;
 }
 
-/** A task that's still to do, with the place it's about, as its mark has it: what the page pins to the element there. */
-export interface Placed extends Task {
-  /** `file:line:column`, as the element's mark. */
-  place: string;
+/** A task as the drop zone lists it: with its place, where it has one, and how its thread stands. */
+export interface Listed extends Task {
+  /** `file:line:column`, as the element's mark: none for a task about the page. */
+  place?: string;
+  /** The tag there, as the task saw it. */
+  tag?: string;
+  /** The page it was added on, as its path: `/pricing`. */
+  page?: string;
+  /** How many replies its thread has, and the newest's ID: what the page tells the unread by. */
+  replies: number;
+  last?: string;
+  /** What the board says of where it stands: why it's blocked, what it came to, why it failed. */
+  said?: string;
+}
+
+/** A task with a place, as its mark has it: what the page pins to the element there. */
+export type Placed = Listed & { place: string };
+
+/** A message in a task's thread, oldest first. */
+export interface Reply {
+  id: string;
+  /** Who wrote it, by name. */
+  by: string;
+  /** `person`, or what else wrote it: an agent's `profile`, a deployment, a workflow. */
+  kind: string;
+  text: string;
+  /** When, as an ISO date. */
+  at: string;
+}
+
+/** A task with its thread, as the drop zone opens it. */
+export interface Thread {
+  task: Listed;
+  replies: Reply[];
 }
 
 export interface Model {
@@ -110,8 +139,6 @@ export interface Model {
   link?: string;
   /** Tasks about this element, oldest first, canceled ones left out: also those added before it moved. */
   tasks: Task[];
-  /** Tasks about the file's other elements, by line, canceled ones left out: each with its `at`. */
-  elsewhere: Task[];
   /**
    * Who watches the channel, by name (`claude`): the agents whose watch (`deictic watch`) is running in
    * this project, as a board can't say, and those holding a claim on one of the channel's tasks, which it can.
@@ -120,12 +147,6 @@ export interface Model {
    */
   watching?: string[];
 }
-
-/**
- * What the Task tab asks for: a new task (an `Op`), other words for one it lists (`edit` is its ID), or
- * that one deleted (`remove` is its ID), which cancels it on the board.
- */
-export type Change = Op | { edit: string; text: string } | { remove: string };
 
 /** A new task: what the page knows and the source doesn't. */
 export interface Op {
@@ -220,7 +241,7 @@ export interface Added {
   attachments?: string[];
 }
 
-/** A task's words changed: its message's whole text before and after. */
+/** A task's words changed in the tab, as an earlier version let it: its message's whole text before and after. */
 export interface Edited {
   kind: 'edited';
   id: string;
@@ -229,18 +250,25 @@ export interface Edited {
 }
 
 /**
- * A task deleted in the panel: canceled on the board, for good, as a board has it. So it's kept whole, and
- * an undo adds it again, as a new task whose ID the record then has.
+ * A task deleted in the tab, as an earlier version let it: canceled on the board, for good, as a board has it. So
+ * it's kept whole, and an undo adds it again, as a new task whose ID the record then has.
  */
 export interface Removed extends Added {
   kind: 'removed';
 }
 
-/** What the history keeps of a change: a task added has no `kind`, as it had none before there were others. */
+/**
+ * What the history keeps of a change: a task added has no `kind`, as it had none before there were others. The others
+ * are no longer made (a task is changed in the drop zone, by the plugin's routes), and still undone where a history has them.
+ */
 export type Kept = Added | Edited | Removed;
 
 /** A task as a board lists it: its root message. */
 type Message = Awaited<ReturnType<TaskBoard['thread']>>['message'];
+/** A task's thread at a glance, as a board lists tasks. */
+type Summary = Awaited<ReturnType<TaskBoard['tasks']['list']>>['tasks'][number];
+/** How many of the tasks lately over the drop zone lists: what an agent said as it ended one is there to read. */
+const OVER = 10;
 
 /** How many tasks a page is asked about at most: past that it has more pins than anyone reads. */
 const PINNED = 500;
@@ -306,9 +334,11 @@ export function tasks(options: TasksOptions = {}) {
    * One of this channel's tasks about an element, while it's still open: the page names it by ID, so
    * nothing else on the board is its to change, nor a task someone has taken up.
    */
+  /** One of deictic's: it has a place, or the page it's about where no element was attached. */
+  const ours = (message: Message) => message.labels[AT] !== undefined || message.labels['deictic.page'] !== undefined;
   const openTask = async (team: TaskBoard, id: string, verb: string) => {
     const { message } = await team.thread(id);
-    if (message.channel !== channel || message.labels[AT] === undefined)
+    if (message.channel !== channel || !ours(message))
       throw new Refusal(`#${id} isn't a task of deictic's in #${channel}: reload the page for the ones that are`);
 
     const { task } = message;
@@ -367,28 +397,81 @@ export function tasks(options: TasksOptions = {}) {
       ...(point === undefined ? {} : { point }),
     };
   };
-  /** The channel's tasks still to do, each with its place: a page of the board's at a time, and no more than `PINNED`. */
-  const placed = async (): Promise<Placed[]> => {
+  const listedOf = (
+    { message, replies, last }: Summary,
+    actors: Awaited<ReturnType<typeof actorsOf>>,
+    page: string | undefined,
+  ): Listed => {
+    const { task, labels } = message;
+    const said = task?.blocked?.reason ?? task?.result ?? task?.reason ?? undefined;
+    return {
+      ...taskOf(message, actors, page),
+      ...(labels[AT] === undefined ? {} : { place: labels[AT] }),
+      ...(labels['deictic.tag'] === undefined ? {} : { tag: labels['deictic.tag'] }),
+      ...(labels['deictic.page'] === undefined ? {} : { page: labels['deictic.page'] }),
+      replies,
+      ...(last === null ? {} : { last: last.id }),
+      ...(said === undefined || said === '' ? {} : { said: clip(said, 2000) }),
+    };
+  };
+  /**
+   * The channel's tasks, for the page: those still to do, oldest first, a page of the board's at a time and no more
+   * than `PINNED`, then the `OVER` that last ended, the latest first.
+   */
+  const listed = async (): Promise<Listed[]> => {
     const team = await boardOf();
-    const open: Message[] = [];
+    const open: Summary[] = [];
     for (let after: string | undefined; open.length < PINNED;) {
       const { tasks, cursor } = await team.tasks.list({ channel, ...(after === undefined ? {} : { after }) });
-      open.push(...tasks.map(({ message }) => message));
+      open.push(...tasks);
       if (tasks.length === 0 || cursor === after) break;
       after = cursor;
     }
-    const about = open.filter((message) => message.labels[AT] !== undefined);
+    // By their latest activity, which is how a board answers threads: the newest of each end, then of both.
+    const ended = await Promise.all(
+      ['completed', 'failed'].map((state) => team.threads({ channel, label: { 'board.task': state }, limit: OVER })),
+    );
+    const when = ({ message, last }: Summary) => (last ?? message).createdAt;
+    const over = ended
+      .flatMap(({ threads }) => threads)
+      .sort((a, b) => when(b).localeCompare(when(a)))
+      .slice(0, OVER);
+    const about = [...open, ...over].filter(({ message }) => ours(message));
     const [actors, page] = await Promise.all([
       actorsOf(
         team,
-        about.flatMap((message) => message.task?.claim?.actor ?? []),
+        about.flatMap(({ message }) => message.task?.claim?.actor ?? []),
       ),
       linkOf(),
     ]);
-    return about.map((message) => ({ ...taskOf(message, actors, page), place: message.labels[AT]! }));
+    return about.map((summary) => listedOf(summary, actors, page));
+  };
+  const replyOf = (message: Message): Reply => ({
+    id: message.id,
+    by: message.author?.name ?? message.by.actor,
+    kind: message.author?.kind ?? 'unknown',
+    text: message.text,
+    at: message.createdAt,
+  });
+  /** A task of ours with its thread, the newest replies a board answers at once. */
+  const threadOf = async (id: string): Promise<Thread> => {
+    const team = await boardOf();
+    const { message, replies } = await team.thread(id);
+    if (message.channel !== channel || !ours(message))
+      throw new Refusal(`#${id} isn't a task of deictic's in #${channel}: reload the page for the ones that are`);
+    const said = replies.filter((reply) => !reply.deleted);
+    const [actors, page] = await Promise.all([actorsOf(team, message.task?.claim ? [message.task.claim.actor] : []), linkOf()]);
+    return { task: listedOf({ message, replies: said.length, last: said.at(-1) ?? null }, actors, page), replies: said.map(replyOf) };
+  };
+  /** The task a route's request names, as its last segment, and what it sent. */
+  const named = async (req: Request) => {
+    const id = decodeURIComponent(new URL(req.url).pathname.split('/').at(-1) ?? '');
+    const body: unknown = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const { text } = (typeof body === 'object' && body !== null ? body : {}) as { text?: unknown };
+    return { id, text: typeof text === 'string' ? text : '' };
   };
 
-  // Kept from `setup`, to `use` another plugin when an op asks for it.
+  // Kept from `setup`, to `use` another plugin when an op asks for it.  // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
   let project = options.project;
   /**
@@ -440,7 +523,7 @@ export function tasks(options: TasksOptions = {}) {
     return Promise.all(files.map(async (file) => (await team.upload(file)).id));
   };
 
-  return definePlugin<Model, Change, Kept>({
+  return definePlugin<Model, Op, Kept>({
     name: 'tasks',
     client: 'deictic/tasks/client',
     packages: ['@vercel/board'],
@@ -456,8 +539,41 @@ export function tasks(options: TasksOptions = {}) {
       void boardOf().catch(() => {});
     },
     routes: {
-      // Every task of the channel's still to do that has a place, for the page to pin where its elements are.
-      page: async () => Response.json({ tasks: await asked(placed) }),
+      // The channel's tasks, for the page: the drop zone lists them, and those with a place are pinned where their
+      // elements are.
+      page: async () => {
+        const [tasks, link] = await Promise.all([asked(listed), linkOf()]);
+        return Response.json({ channel, ...(link === undefined ? {} : { link }), tasks });
+      },
+      // A task and its thread, `thread/<id>`: what the drop zone opens.
+      thread: async (req) => Response.json(await asked(async () => threadOf((await named(req)).id))),
+      // What the drop zone does to a task: a reply in its thread, other words for it, or its end, which cancels it
+      // on the board. Each answers the thread as it is after.
+      reply: (req) =>
+        asked(async () => {
+          const { id, text } = await named(req);
+          if (text.trim() === '') throw new Refusal('say something first');
+          await threadOf(id);
+          await (await boardOf()).reply(id, clip(text.trim(), 10_000));
+          return Response.json(await threadOf(id));
+        }),
+      edit: (req) =>
+        asked(async () => {
+          const { id, text } = await named(req);
+          // A task's words are never changed to none.
+          if (text.trim() === '') throw new Refusal('say what should change first');
+          const before = (await openTask(await boardOf(), id, 'edit')).text;
+          // What follows the words in a task added before they were labels (what's attached, what was pointed at) stays.
+          const rest = before.includes(REST) ? before.slice(before.indexOf(REST)) : '';
+          await rewrite(id, before, clip(text.trim(), 10_000 - rest.length) + rest);
+          return Response.json(await threadOf(id));
+        }),
+      remove: (req) =>
+        asked(async () => {
+          const { id } = await named(req);
+          await cancel(id, 'deleted in deictic');
+          return Response.json({});
+        }),
     },
     read: (source, target) =>
       asked(async () => {
@@ -474,7 +590,6 @@ export function tasks(options: TasksOptions = {}) {
         // Nothing to tell a moved task by where the file has no such element.
         const line = source instanceof Refusal ? undefined : onceIn(source);
         const tasks: Task[] = [];
-        const elsewhere: (Task & { at: Place })[] = [];
         const about = [...here.tasks.filter((t) => !listed.has(t.message.id)), ...inFile.tasks];
         // Who has each, and who holds any claim on the channel: asked of the board at once.
         const actorOf = ({ task }: (typeof about)[number]['message']) => task?.claim?.actor;
@@ -486,7 +601,6 @@ export function tasks(options: TasksOptions = {}) {
           const at = placeIn(message.labels);
           if (at === undefined || message.labels[AT] === atOf(target)) tasks.push(task);
           else if (line !== undefined && at.tag === target.tag && message.labels['deictic.line'] === line) tasks.push({ ...task, at });
-          else elsewhere.push({ ...task, at });
         }
         // An agent at work on a task is here too, though its watch may be over until the task is (`deictic watch --once`).
         const working = agentsOf(actors, claims);
@@ -498,33 +612,11 @@ export function tasks(options: TasksOptions = {}) {
           ...(page === undefined ? {} : { link: page }),
           ...(watching.length > 0 || ours ? { watching } : {}),
           tasks,
-          // The board's order (oldest first) among those of one place.
-          elsewhere: elsewhere.sort((a, b) => (a.at.line === b.at.line ? a.at.column - b.at.column : a.at.line - b.at.line)),
         };
       }),
     apply: (source, target, op) => {
-      if ('remove' in op) {
-        return asked(async () => {
-          const message = await cancel(op.remove, 'deleted in deictic');
-          // The board's own labels (`board.task`) are its to set on the task an undo adds.
-          const labels = Object.fromEntries(Object.entries(message.labels).filter(([key]) => !key.startsWith('board.')));
-          const attachments = message.attachments.map((a) => a.id);
-          const kept = { channel, id: op.remove, text: message.text, labels, ...(attachments.length === 0 ? {} : { attachments }) };
-          return { done: { kind: 'removed' as const, ...kept } };
-        });
-      }
-      // A new task may go without words where something attached says it; a task's words are never changed to none.
-      if (op.text.trim() === '' && ('edit' in op || shown(op) === undefined)) throw new Refusal('say what should change first');
-      if ('edit' in op) {
-        return asked(async () => {
-          const before = (await openTask(await boardOf(), op.edit, 'edit')).text;
-          // What follows the words in a task added before they were labels (what's attached, what was pointed at) stays.
-          const rest = before.includes(REST) ? before.slice(before.indexOf(REST)) : '';
-          const after = clip(op.text.trim(), 10_000 - rest.length) + rest;
-          await rewrite(op.edit, before, after);
-          return { done: { kind: 'edited' as const, id: op.edit, before, after } };
-        });
-      }
+      // A task may go without words where something attached says it.
+      if (op.text.trim() === '' && shown(op) === undefined) throw new Refusal('say what should change first');
       const { op: kept, files, dropped } = keptOf(op);
       const verb = dropped.length === 1 ? "isn't" : "aren't";
       if (wordsOf(kept) === '') throw new Refusal(`${listOf(dropped)} ${verb} kept any more: attach again, or say what should change`);
@@ -566,12 +658,7 @@ export function tasks(options: TasksOptions = {}) {
         await cancel(record.id, 'deleted in deictic');
         return record;
       }),
-    describe: (op, before) => {
-      const named = (id: string) => `task "${clip(before.tasks.find((t) => t.id === id)?.title ?? `#${id}`, 60)}"`;
-      if ('remove' in op) return `delete ${named(op.remove)}`;
-      if ('edit' in op) return `edit ${named(op.edit)}`;
-      return `task "${clip(wordsOf(op).split('\n', 1)[0]!, 60)}"`;
-    },
+    describe: (op) => `task "${clip(wordsOf(op).split('\n', 1)[0]!, 60)}"`,
   });
 }
 

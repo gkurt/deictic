@@ -90,6 +90,8 @@ function draggable(bar: HTMLElement, grip: HTMLElement, docked: (dock: Dock) => 
 export interface Tools extends ToolPanel {
   /** Whether a shortcut's keys are held: the panel shows while they are. */
   point: (on: boolean) => void;
+  /** The edge of the window it's docked to. */
+  edge: () => Edge;
 }
 
 export interface ToolsOptions {
@@ -257,5 +259,6 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
       pointing = on;
       show();
     },
+    edge: () => dock.edge,
   };
 }

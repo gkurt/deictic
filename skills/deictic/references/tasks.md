@@ -23,7 +23,8 @@ command to read each, and whether the line still reads as the task saw it.
 - **The page** (`deictic.url`) is theirs: their host, account and data. Reach the same screen in the app as the
   project says to run it, by its path. Never ask for or use their session. Say in the result what you couldn't see.
 - **Still unsure**: `vb reply 68 "<what you understood, and the question>"`, then `vb tasks block 68 "<why>"` while
-  they answer.
+  they answer. They read it on the page, where the task is marked unread, and answer in its thread: the watch says
+  `reply on`.
 
 Other endings: `vb tasks release 68` (someone else can take it), `vb tasks fail 68 "<why, and what would make it
 possible>"`.

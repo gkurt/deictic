@@ -1,8 +1,9 @@
 /**
  * The page's tasks, each pinned where its element is: what's shown of them on the page itself, beside the Task
  * tab's list of one element's. A pin is the element's outline, faint, and a badge on its corner with how many
- * tasks are still to do there, in the colour of the furthest along. They show while a shortcut's keys are held and
- * while the Task tab is open: a pin under the pointer reads its tasks, and a click opens them.
+ * tasks are still to do there, in the colour of the furthest along, and a dot where one has something unread. They
+ * show while a shortcut's keys are held and while the Task tab is open: a pin under the pointer reads its tasks, and
+ * a click opens them in the drop zone.
  *
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
@@ -11,6 +12,8 @@ import { div, place, reduced } from '#src/client/dom.ts';
 import type { ClientContext, Point } from '#src/index.ts';
 
 import type { Placed } from './index.ts';
+import { OVER, storeOf } from './store.ts';
+import { zoneOf } from './zone.ts';
 
 const STYLE = `
 /* No box of its own, which its pins would stack in: each is under the popup, and the one pointed at over it, with its card. */
@@ -42,6 +45,8 @@ const STYLE = `
   cursor: pointer;
 }
 .pin-badge:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* Something unread there: a dot on the badge's corner. */
+.pin.unread .pin-badge::after { content: ''; position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border: 2px solid #09090b; border-radius: 50%; background: #fff; }
 .pin-card {
   position: absolute;
   left: 0;
@@ -87,8 +92,6 @@ const STYLE = `
 }
 `;
 
-/** How long the tasks read last are shown as they are, in ms: the keys are held again and again, and each is no reason to ask the board. */
-const FRESH = 4000;
 /** How long the pins outlast what showed them, in ms: the popup opens a moment after the pointing that led to it ends. */
 const LINGER = 200;
 /** A badge's size, and how far out of the element's corner it sits, in pixels. */
@@ -101,13 +104,8 @@ const NAMED = 4;
 const ALONG = ['blocked', 'claimed', 'ready', 'waiting'];
 
 export interface Pins {
-  /** While pointing: every place's, to read under the pointer and open with a click. Answers what takes them away. */
+  /** Shows them: every place's, to read under the pointer and open with a click. Answers what takes them away. */
   glance: () => () => void;
-  /**
-   * While the Task tab is open on `element`: every other place's, as while pointing.
-   * `refresh` reads the tasks again, after a change made here.
-   */
-  around: (element: Element) => { refresh: () => void; release: () => void };
 }
 
 interface Pin {
@@ -119,6 +117,8 @@ interface Pin {
   badge: HTMLButtonElement;
   count: HTMLElement;
   card: HTMLElement;
+  /** The tasks its badge counts, as last drawn: what a click opens. */
+  tasks: Placed[];
 }
 
 const made = new WeakMap<ShadowRoot, Pins>();
@@ -128,15 +128,11 @@ export function pinsIn(context: ClientContext): Pins {
   const kept = made.get(context.root);
   if (kept !== undefined) return kept;
 
+  const store = storeOf(context);
   let glances = 0;
-  // The element the Task tab is open on, whose tasks the tab lists: it has no pin.
-  let open: Element | undefined;
   let layer: HTMLElement | undefined;
   let frame = 0;
   let leaving: ReturnType<typeof setTimeout> | undefined;
-  let tasks: Placed[] = [];
-  let read = 0;
-  let asked = 0;
   const pins = new Map<string, Pin>();
   let frames = 0;
 
@@ -151,15 +147,17 @@ export function pinsIn(context: ClientContext): Pins {
     box.append(badge);
     // One after another, as they come: where motion is reduced there's no animation to delay.
     if (!reduced()) box.style.animationDelay = `${Math.min(pins.size, 12) * 30}ms`;
-    const pin: Pin = { place: at, ...(spot === undefined ? {} : { at: spot }), el, box, badge, count, card };
-    badge.addEventListener('click', () => void context.open('tasks', pin.el, pin.at));
+    const pin: Pin = { place: at, ...(spot === undefined ? {} : { at: spot }), el, box, badge, count, card, tasks: [] };
+    // In the drop zone, where a task is read and changed: the popup is for a new one.
+    badge.addEventListener('click', () => zoneOf(context).open(pin.tasks));
     return pin;
   };
 
   /** A pin as its tasks are now: how many, the colour of the furthest along, and its card. */
   const fill = (pin: Pin, list: Placed[]) => {
     const state = ALONG.find((s) => list.some((t) => t.state === s)) ?? 'ready';
-    pin.box.className = `pin ${state}${pin.at === undefined ? '' : ' spot'}`;
+    pin.tasks = list;
+    pin.box.className = `pin ${state}${pin.at === undefined ? '' : ' spot'}${list.some(store.unread) ? ' unread' : ''}`;
     pin.count.textContent = String(list.length);
     const [, file = '', line = ''] = /^(.*):(\d+):\d+$/.exec(pin.place) ?? [];
     const tag = tell(named(pin.el));
@@ -178,14 +176,14 @@ export function pinsIn(context: ClientContext): Pins {
     pin.card.replaceChildren(where, ...rows, ...more);
   };
 
-  /** The pins as the tasks read last have them: one per place with an element on the page, but the open one's. */
+  /** The pins as the tasks read last have them: one per place with an element on the page, for those still to do. */
   const draw = () => {
     if (layer === undefined) return;
-    const mine = open?.getAttribute('data-deictic');
+    const tasks = store.tasks().filter((t): t is Placed => t.place !== undefined && !OVER.has(t.state));
     // One for an element's tasks, and one of its own for each spot a task is about.
     const keyOf = (t: Placed) => (t.point === undefined ? t.place : `${t.place}@${t.point.x},${t.point.y}`);
     const byPlace = new Map<string, Placed[]>();
-    for (const t of tasks) if (t.place !== mine) byPlace.set(keyOf(t), [...(byPlace.get(keyOf(t)) ?? []), t]);
+    for (const t of tasks) byPlace.set(keyOf(t), [...(byPlace.get(keyOf(t)) ?? []), t]);
     for (const [at, pin] of pins) {
       if (byPlace.has(at)) continue;
       pin.box.remove();
@@ -235,26 +233,11 @@ export function pinsIn(context: ClientContext): Pins {
     }
   };
 
-  /** The tasks read again, unless they were a moment ago, and drawn; as they were, where the board can't be asked. */
-  const load = (again = false) => {
-    draw();
-    if (!again && Date.now() - read < FRESH) return;
-    const ask = ++asked;
-    read = Date.now();
-    void context
-      .request('page')
-      .then(async (res) => {
-        if (!res.ok || ask !== asked) return;
-        ({ tasks } = (await res.json()) as { tasks: Placed[] });
-        draw();
-      })
-      // No pins, then: the tab says why the board can't be reached, where it's opened.
-      .catch(() => {});
-  };
+  store.subscribe(draw);
 
-  const sync = (again = false) => {
+  const sync = () => {
     clearTimeout(leaving);
-    if (glances === 0 && open === undefined) {
+    if (glances === 0) {
       leaving = setTimeout(() => {
         cancelAnimationFrame(frame);
         layer?.remove();
@@ -266,13 +249,15 @@ export function pinsIn(context: ClientContext): Pins {
     if (layer === undefined) {
       layer = div('pins');
       layer.append(Object.assign(document.createElement('style'), { textContent: STYLE }));
-      context.root.append(layer);
       frame = requestAnimationFrame(function each() {
         frame = requestAnimationFrame(each);
         follow();
       });
     }
-    load(again);
+    // After a popup that opened since: at the same height, the later is the upper, and a pin's card is over it.
+    context.root.append(layer);
+    draw();
+    store.load();
   };
 
   const shown: Pins = {
@@ -282,21 +267,6 @@ export function pinsIn(context: ClientContext): Pins {
       return () => {
         glances--;
         sync();
-      };
-    },
-    around: (element) => {
-      open = element;
-      sync();
-      // After the popup, which opened since: at the same height, the later is the upper, and a pin's card is over it.
-      if (layer !== undefined) context.root.append(layer);
-      return {
-        refresh: () => sync(true),
-        release: () => {
-          // Another tab's since, where the popup went on to another element: that one's to let go.
-          if (open !== element) return;
-          open = undefined;
-          sync();
-        },
       };
     },
   };

@@ -10,7 +10,7 @@
  */
 import type { Standalone, Target } from 'deictic';
 import type { Model as Classes, Op as ClassOp } from 'deictic/tailwind';
-import type { Change, Model as Tasks, Task } from 'deictic/tasks';
+import type { Listed, Model as Tasks, Op as TaskOp, Reply, Task, Thread } from 'deictic/tasks';
 
 interface Body {
   plugin: string;
@@ -26,8 +26,10 @@ interface Step {
 }
 
 const PREFIX = '__deictic/';
-/** Each element's tasks, by its place (`file:line:column`). */
+/** Each element's tasks, by its place (`file:line:column`): the page's, with no element attached, under none. */
 const tasks = new Map<string, Task[]>();
+/** Each task's thread, by its ID: what was answered here, as there's no agent to answer. */
+const threads = new Map<string, Reply[]>();
 /** Each plugin's changes on each element, as the dev server's history keeps them by scope. */
 const history = new Map<string, { done: Step[]; undone: Step[] }>();
 /** The recordings made here, for the replay page to ask for. */
@@ -45,50 +47,62 @@ function stepsOf(plugin: string, place: string) {
   return steps;
 }
 
-/** A place's file, and its line and column. */
-const PLACE = /^(.*):(\d+):(\d+)$/;
+const readTasks = (place: string): Tasks => ({ channel: 'deictic', tasks: tasks.get(place) ?? [] });
 
-function readTasks(place: string): Tasks {
-  const file = PLACE.exec(place)?.[1];
-  // The file's other elements' tasks, each with its place: the tag is the page's to say, with no source to read.
-  const elsewhere = [...tasks].flatMap(([other, list]) => {
-    const [, its, line, column] = PLACE.exec(other) ?? [];
-    if (other === place || its !== file) return [];
-    const at = { line: Number(line), column: Number(column), tag: elementsAt(other)[0]?.localName ?? '' };
-    return list.map((task) => ({ ...task, at }));
-  });
-  return { channel: 'deictic', tasks: tasks.get(place) ?? [], elsewhere: elsewhere.sort((a, b) => a.at.line - b.at.line) };
-}
-
-function changeTasks(place: string, change: Change): Step {
+function changeTasks(at: string, change: TaskOp): Step {
+  // With no element attached it's the page's, whatever element it was sent on.
+  const place = change.detached === true ? '' : at;
   const before = tasks.get(place) ?? [];
-  const titleOf = (text: string) => text.split('\n')[0] ?? '';
-  const put = (list: Task[]) => () => void tasks.set(place, list);
-  const step = (what: string, after: Task[]): Step => ({ label: what, undo: put(before), redo: put(after) });
-  if ('edit' in change) {
-    const { edit, text } = change;
-    return step(
-      `edit ${edit}`,
-      before.map((task) => (task.id === edit ? { ...task, text, title: titleOf(text) } : task)),
-    );
-  }
-  if ('remove' in change) {
-    const { remove } = change;
-    return step(
-      `delete ${remove}`,
-      before.filter((task) => task.id !== remove),
-    );
-  }
   const { point } = change;
   const task: Task = {
     id: `demo-${++added}`,
-    title: titleOf(change.text),
+    title: change.text.split('\n')[0] ?? '',
     text: change.text,
     state: 'ready',
     open: true,
     ...(point === undefined ? {} : { point }),
   };
-  return step(`add "${task.title}"`, [...before, task]);
+  const put = (list: Task[]) => () => void tasks.set(place, list);
+  return { label: `add "${task.title}"`, undo: put(before), redo: put([...before, task]) };
+}
+
+/** The tasks as the drop zone lists them: each with its place, where it has one, and how its thread stands. */
+const listed = (): Listed[] =>
+  [...tasks].flatMap(([place, list]) =>
+    list.map((task) => {
+      const replies = threads.get(task.id) ?? [];
+      const tag = elementsAt(place)[0]?.localName;
+      const last = replies.at(-1)?.id;
+      return {
+        ...task,
+        ...(place === '' ? {} : { place }),
+        ...(tag === undefined ? {} : { tag }),
+        replies: replies.length,
+        ...(last === undefined ? {} : { last }),
+      };
+    }),
+  );
+
+/** What the drop zone does to a task, by the tasks plugin's routes: read its thread, answer in it, change its words, delete it. */
+async function task(request: Request, asked: string, id: string): Promise<Response> {
+  const found = () => listed().find((each) => each.id === id);
+  if (found() === undefined) return refuse(`#${id} isn't a task of this page's any more: it was deleted`, 422);
+  const { text = '' } = request.method === 'POST' ? ((await request.json()) as { text?: string }) : {};
+  const change = (to: (task: Task) => Task[]) => {
+    const changed = (list: Task[]) => list.flatMap((each) => (each.id === id ? to(each) : [each]));
+    for (const [place, list] of tasks) tasks.set(place, changed(list));
+  };
+  if (asked === 'reply') {
+    const before = threads.get(id) ?? [];
+    threads.set(id, [...before, { id: `${id}-${before.length + 1}`, by: 'you', kind: 'person', text, at: new Date().toISOString() }]);
+  }
+  if (asked === 'edit') change((each) => [{ ...each, text, title: text.split('\n')[0] ?? '' }]);
+  if (asked === 'remove') {
+    change(() => []);
+    return Response.json({});
+  }
+  const thread: Thread = { task: found()!, replies: threads.get(id) ?? [] };
+  return Response.json(thread);
 }
 
 /** Every element rendered from a place: a list's rows share one. */
@@ -216,9 +230,9 @@ const standalone: Standalone = async (request) => {
   const route = url.pathname.slice(url.pathname.indexOf(PREFIX) + PREFIX.length);
   // A plugin's own route: `plugins/<name>/<route>`, and what it's about after that.
   const [, of, asked, id] = /^plugins\/(\w+)\/(\w+)(?:\/([\w-]+))?$/.exec(route) ?? [];
-  // The tasks plugin's `page`: every task kept here with its place, for the pins.
-  if (of === 'tasks' && asked === 'page')
-    return Response.json({ tasks: [...tasks].flatMap(([place, list]) => list.map((task) => ({ ...task, place }))) });
+  // The tasks plugin's `page`: every task kept here, for the drop zone and the pins.
+  if (of === 'tasks' && asked === 'page') return Response.json({ channel: 'deictic', tasks: listed() });
+  if (of === 'tasks' && id !== undefined && ['thread', 'reply', 'edit', 'remove'].includes(asked ?? '')) return task(request, asked!, id);
   if (of === 'screenshots' && asked === 'add') return keepShot(request);
   if (of === 'voice' && asked === 'add') return keepClip(request);
   if (of === 'voice' && asked === 'more') return keepClip(request, id);

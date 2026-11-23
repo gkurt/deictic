@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
-import { type Model, type Placed, tasks, type TasksOptions } from '#src/plugins/tasks/index.ts';
+import { type Listed, type Model, tasks, type TasksOptions, type Thread } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
 import { project } from './fixture.ts';
@@ -49,7 +49,6 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model).toEqual({
     channel: 'add',
     tasks: [],
-    elsewhere: [],
   });
 
   const { json } = await post<{ model: Model; change: { label: string; files: string[] } }>('apply', { plugin: 'tasks', target, op });
@@ -188,7 +187,7 @@ test('says the source it rendered through, and attaches its HTML as it rendered'
   expect((await team.thread(plain.json.model.tasks[1]!.id)).message.text).toBe(op.text);
 });
 
-test("lists the file's other tasks apart, and keeps an element's own as it moves", async () => {
+test("lists an element's own tasks, not its file's others, and keeps them as it moves", async () => {
   const page = (above: string) =>
     `${above}export const App = () => (\n  <main>\n    <h1 className="text-4xl">Pricing</h1>\n    <li>One</li>\n    <li>One</li>\n  </main>\n);\n`;
   const { p, post } = setup(
@@ -209,41 +208,70 @@ test("lists the file's other tasks apart, and keeps an element's own as it moves
     ['An old one', undefined],
     ['The headline', undefined],
   ]);
-  expect(before.elsewhere).toEqual([expect.objectContaining({ title: 'The first row', at: { line: 4, column: 5, tag: 'li' } })]);
-  expect((await read('h1', 'src/Other.tsx')).elsewhere).toEqual([]);
+  // The file's other elements' tasks aren't this one's: the drop zone lists them all.
+  expect((await read('h1', 'src/Other.tsx')).tasks).toEqual([]);
 
   // Lines above change, and the page is loaded again: the headline's task is still its own, by its tag and line.
   p.write('src/App.tsx', page('// Prices\n\n'));
   const after = await read('h1');
   expect(after.tasks).toEqual([expect.objectContaining({ title: 'The headline', open: true, at: { line: 3, column: 5, tag: 'h1' } })]);
   // A row's line is there twice, so its task can't be told to be either's; the old one, with no file, is found at its place only.
-  expect(after.elsewhere.map((t) => t.title)).toEqual(['The first row']);
   expect((await read('li')).tasks).toEqual([]);
 });
 
-test('answers the page every task still to do with its place, for its pins', async () => {
+test('answers the page its tasks: those still to do with their places, then those lately over', async () => {
   const { p, post, get } = setup(
     'pins',
     {},
     { 'src/App.tsx': 'export const App = () => (\n  <main>\n    <h1 className="text-4xl">Pricing</h1>\n    <li>One</li>\n  </main>\n);\n' },
   );
-  const add = async (tag: string, text: string) =>
+  const add = async (tag: string, text: string, more = {}) =>
     (
-      await post<{ model: Model }>('apply', { plugin: 'tasks', target: p.target('src/App.tsx', tag), op: { ...op, text } })
+      await post<{ model: Model }>('apply', { plugin: 'tasks', target: p.target('src/App.tsx', tag), op: { ...op, text, ...more } })
     ).json.model.tasks.at(-1)!.id;
-  const placed = async () => (await get<{ tasks: Placed[] }>('plugins/tasks/page')).tasks;
+  const listed = async () => (await get<{ channel: string; tasks: Listed[] }>('plugins/tasks/page')).tasks;
   await add('h1', 'The headline');
   const row = await add('li', 'The first row');
-  // Neither is a pin: one that's over, and one of the channel's that's about no element.
-  await (await team.tasks.claim(await add('li', 'Done already'))).complete('done');
+  const done = await add('li', 'Done already');
+  await (await team.tasks.claim(done)).complete('It was already');
+  // One about the page has no place, and is listed all the same; one that isn't deictic's is not.
+  await post('apply', {
+    plugin: 'tasks',
+    target: p.target('src/App.tsx', 'h1'),
+    op: { ...op, text: 'The page is slow', count: 0, detached: true },
+  });
   await team.tasks.create('pins', 'Not about an element');
 
-  expect((await placed()).map((t) => [t.title, t.place, t.state])).toEqual([
+  expect((await listed()).map((t) => [t.title, t.place, t.state])).toEqual([
     ['The headline', 'src/App.tsx:3:5', 'ready'],
     ['The first row', 'src/App.tsx:4:5', 'ready'],
+    ['The page is slow', undefined, 'ready'],
+    ['Done already', 'src/App.tsx:4:5', 'completed'],
   ]);
+  // What it came to is said, and its thread's newest reply named, for the page to tell what's unread.
+  expect((await listed()).at(-1)).toMatchObject({ id: done, tag: 'li', said: 'It was already', open: false });
   await team.as('codex').tasks.claim(row);
-  expect((await placed())[1]).toMatchObject({ id: row, state: 'claimed', by: 'codex', open: false });
+  const reply = await team.as('codex').reply(row, 'On it');
+  expect((await listed())[1]).toMatchObject({ id: row, state: 'claimed', by: 'codex', open: false, replies: 1, last: reply.id });
+});
+
+test("reads a task's thread, and answers in it", async () => {
+  const { post, get, target } = setup('thread');
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
+  const { id } = json.model.tasks[0]!;
+  await team.as('codex').reply(id, 'Which headline, the first?');
+
+  const before = await get<Thread>(`plugins/tasks/thread/${id}`);
+  expect(before.task).toMatchObject({ id, place: 'src/App.tsx:1:26', tag: 'h1', replies: 1 });
+  expect(before.replies).toEqual([
+    { id: expect.any(String), by: 'codex', kind: expect.any(String), text: 'Which headline, the first?', at: expect.any(String) },
+  ]);
+
+  const after = await post<Thread>(`plugins/tasks/reply/${id}`, { text: ' The first.\n' });
+  expect(after.json.replies.map((r) => r.text)).toEqual(['Which headline, the first?', 'The first.']);
+  expect(after.json.task).toMatchObject({ replies: 2, last: after.json.replies[1]!.id });
+  expect((await team.thread(id)).replies.map((r) => r.text)).toEqual(['Which headline, the first?', 'The first.']);
+  expect((await post(`plugins/tasks/reply/${id}`, { text: ' ' })).json.problem).toBe('say something first');
 });
 
 test('undo cancels the task and redo adds it again, as a new one', async () => {
@@ -275,7 +303,7 @@ test('refuses to undo a task someone has claimed', async () => {
   expect(undo.json.problem).toMatch(/^task \d+ is claimed by .+ now: cancel it on the board if you still mean to$/);
 });
 
-test("edits a task's words, keeping what follows them, and undo puts them back", async () => {
+test("edits a task's words from the drop zone, keeping what follows them", async () => {
   const { post, target } = setup('edit');
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;
@@ -283,45 +311,20 @@ test("edits a task's words, keeping what follows them, and undo puts them back",
   await team.edit(id, `${op.text}\n---\nPointed at, inside it: \`span.icon\``);
   const before = (await team.thread(id)).message.text;
 
-  const edited = await post<{ model: Model; change: { label: string } }>('apply', {
-    plugin: 'tasks',
-    target,
-    op: { edit: id, text: 'Keep the headline on one line' },
-  });
-  expect(edited.json.change.label).toBe('tasks src/App.tsx:1: edit task "The headline wraps on phones"');
-  expect(edited.json.model.tasks[0]).toMatchObject({ id, title: 'Keep the headline on one line', text: 'Keep the headline on one line' });
+  const edited = await post<Thread>(`plugins/tasks/edit/${id}`, { text: 'Keep the headline on one line' });
+  expect(edited.json.task).toMatchObject({ id, title: 'Keep the headline on one line', text: 'Keep the headline on one line' });
   expect((await team.thread(id)).message.text).toBe(`Keep the headline on one line${before.slice(op.text.length)}`);
-
-  await post('undo');
-  expect((await team.thread(id)).message.text).toBe(before);
-  await post('redo');
-  expect((await team.thread(id)).message.text).toStartWith('Keep the headline on one line\n---\n');
-
-  // Edited on the board since: an undo would write over that, so it's refused.
-  await team.edit(id, 'Changed on the board');
-  expect((await post('undo')).json.problem).toBe(`task ${id} has been edited since: change it on the board`);
-  expect((await post('apply', { plugin: 'tasks', target, op: { edit: id, text: ' ' } })).json.problem).toBe('say what should change first');
+  expect((await post(`plugins/tasks/edit/${id}`, { text: ' ' })).json.problem).toBe('say what should change first');
 });
 
-test('deletes a task by canceling it, and undo adds it again, as a new one', async () => {
+test('deletes a task from the drop zone by canceling it', async () => {
   const { post, target } = setup('remove');
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;
 
-  const removed = await post<{ model: Model; change: { label: string } }>('apply', { plugin: 'tasks', target, op: { remove: id } });
-  expect(removed.json.change.label).toBe('tasks src/App.tsx:1: delete task "The headline wraps on phones"');
-  expect(removed.json.model.tasks).toEqual([]);
+  expect((await post(`plugins/tasks/remove/${id}`)).status).toBe(200);
   expect((await team.thread(id)).message.task?.state).toBe('canceled');
-
-  // A board cancels for good, so what comes back is the same task under a new ID, which a redo cancels.
-  await post('undo');
-  const [again] = (await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks;
-  expect(again).toMatchObject({ title: 'The headline wraps on phones', open: true });
-  expect(again!.id).not.toBe(id);
-  const { message } = await team.thread(again!.id);
-  expect(message.labels).toMatchObject({ team: 'web', 'deictic.at': 'src/App.tsx:1:26', 'board.task': 'ready' });
-  await post('redo');
-  expect((await team.thread(again!.id)).message.task?.state).toBe('canceled');
+  expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks).toEqual([]);
 });
 
 test("changes only an open task of the channel's own", async () => {
@@ -329,20 +332,18 @@ test("changes only an open task of the channel's own", async () => {
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;
   const other = (await team.tasks.create('elsewhere', 'Not one of ours')).task.id;
-  for (const change of [{ remove: other }, { edit: other, text: 'x' }]) {
-    expect((await post('apply', { plugin: 'tasks', target, op: change })).json.problem).toBe(
+  for (const route of ['remove', 'edit', 'reply', 'thread']) {
+    expect((await post(`plugins/tasks/${route}/${other}`, { text: 'x' })).json.problem).toBe(
       `#${other} isn't a task of deictic's in #own: reload the page for the ones that are`,
     );
   }
 
   await team.tasks.claim(id);
   expect((await post<{ model: Model }>('read', { plugin: 'tasks', target })).json.model.tasks[0]).toMatchObject({ open: false });
-  expect((await post('apply', { plugin: 'tasks', target, op: { remove: id } })).json.problem).toMatch(
-    / is claimed by .+ now: cancel it on the board/,
-  );
-  expect((await post('apply', { plugin: 'tasks', target, op: { edit: id, text: 'x' } })).json.problem).toMatch(
-    / now: edit it on the board/,
-  );
+  expect((await post(`plugins/tasks/remove/${id}`)).json.problem).toMatch(/ is claimed by .+ now: cancel it on the board/);
+  expect((await post(`plugins/tasks/edit/${id}`, { text: 'x' })).json.problem).toMatch(/ now: edit it on the board/);
+  // Answering one someone has is what a thread is for.
+  expect((await post<Thread>(`plugins/tasks/reply/${id}`, { text: 'One more thing' })).json.replies).toHaveLength(1);
 });
 
 test('refuses an empty task, and says how to reach a board when there is none', async () => {
@@ -367,6 +368,8 @@ test("links the channel to a local board's page, to the page `link` names, or no
   const at = (url: string) => ({
     tasks: team.tasks,
     thread: team.thread,
+    threads: team.threads,
+    reply: (...said: Parameters<typeof team.reply>) => team.reply(...said),
     edit: team.edit,
     actors: team.actors,
     upload: (input: Parameters<typeof team.upload>[0]) => team.upload(input),

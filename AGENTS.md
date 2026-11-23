@@ -34,7 +34,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes,
   `open(plugin, element, at?)` to open the popup at a tab (on a `Point` of the element, with `at`, which the panel
-  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
+  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`), `zone` (the drop zone, a `DropZone`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
   answered), `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
@@ -153,6 +153,15 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   one, and the point from its top left), over a `.tool-surface` that takes the press, the page lit as for pointing.
 - `src/client/tray.ts`: `tray()`, `context.tray`: what the tools made that no task has taken (`add(plugin, id,
 value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so it's the tab's over page loads.
+- `src/client/zone.ts`: `dropZone(root, { crowded })`, the drop zone (`.zone`), `context.zone`: a drawer on the
+  window's right (its left while `crowded`, the tool panel docked right) of what the plugins have for the page, a
+  section each (`add(section, { first })`; a section with nothing sets its own `hidden`, and the zone with none shown
+  stays away). It shows while a shortcut's keys are held (`point`, which the overlay calls), the pointer or the focus
+  is in it, something keeps it (`keep()`) or an item is open, and goes `LINGER` after. `show(view, { title, closed })`
+  opens an item in the sections' place, under a head with a way back, and answers what closes it; Esc is the item's
+  while the focus is in the zone or no popup is open (never a `data-deictic-modal`'s). `trayed(context, plugin, title,
+row)` is a section of a plugin's tray items, a row each that opens it and a × that removes it: screenshots',
+  recordings' and voice's sections are that, each opening the lightbox. `playMark()` is a row's play icon.
 - `src/client/lighting.ts`: what's drawn on the page itself, `spotlight(root)`, a `Lighting`: `point` (what's under
   the pointer while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel, at?)`
   (the popup's element, for as long as it's open, or with `at` a circle of `SPOT` around that point of it: `spotOf`). It dims the page around the element with one shadow (`.veil`, under
@@ -325,32 +334,43 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   this one, or its name alone where it has none; otherwise `file:line`s read off the marks around it, the nearest of each file
   in turn: where a shared component is used; no tags, as it's source, not the DOM). The element's HTML is attached as `element.html`
   (`Op.html`, masked by `screenshots.masked` where that's loaded; sent while the panel's Attach HTML snapshot box is ticked,
-  as it is by default, and the `html: false` option, a `clientOptions`, takes the box away), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`, the
-  rest of its file's by `deictic.file` as `elsewhere` (each with its `at`: line, column, tag; folded away in the panel, its place a button
-  that opens that element's tasks where the page has it), a task whose place moved still the element's own where its tag and `deictic.line`
+  as it is by default, and the `html: false` option, a `clientOptions`, takes the box away), for an agent to read only when it needs more. `read` lists the element's tasks by `deictic.at`,
+  a task whose place moved still the element's own where its tag and `deictic.line`
   are the element's and the file has that line once (its `at` is where it was), and the channel's page
   (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`), each task with its own
   (`?thread=<id>` there, or `link(channel, id)`), its whole typed text and whether it's `open`. Undo cancels the task
-  unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` takes a `Change`: a new task (`Op`),
-  `{ edit: id, text }` (the words before the `---`, with the message's revision, undone by writing the old text back
-  unless it was edited since) or `{ remove: id }` (canceled, which a board never reopens, so the record keeps the task
-  whole and undo adds it again under a new ID). Both only for an open task of the channel's with `deictic.at`.
+  unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` only adds a task (`Op`); the history's
+  older records of an edit or a removal are still undone and redone.
+  The routes are the drop zone's: `page` answers the channel's tasks as `Listed` (a `Task` with its `place`, `tag` and
+  `page` where it has them, its `replies` count, its newest reply's ID as `last`, and what it came to as `said`): those
+  still to do, oldest first, then the `OVER` (10) lately completed or failed; `thread/<id>` a `Thread` (the task and its
+  `Reply`s: who, `kind`, text, when); `reply/<id>`, `edit/<id>` (the words before the `---`) and `remove/<id>` (canceled)
+  take `{ text }` and answer the thread after. All only for a task of the channel's that's deictic's (`ours`: it has
+  `deictic.at` or `deictic.page`), and the last two only while it's open.
+  `store.ts` is those tasks on the page (`storeOf(context)`, one per overlay root): `load()` reads `page`, not again
+  within `FRESH`, and `subscribe` tells of each read. What's unread is its: `deictic:tasks:seen` in `localStorage`, each
+  task's mark as last opened (its newest reply's ID, and its state once blocked, completed or failed); `unread(task)` is
+  a mark that differs, `seen(task)` writes it, and a browser's first read marks every task seen.
+  `zone.ts` is the tasks' section in the drop zone (`zoneOf(context)`, added first): a row per task (state dot, title,
+  state and who has it, what it's about as `tell(named())` or `<tag> on /page`, replies, an unread mark), those over
+  folded in a `details`. A row opens the task in the zone (`context.zone.show`): `.stands` (state, the board's link,
+  Edit and a Delete pressed twice within `SURE`, for an open one), `.where` (the element, outlined on the page as
+  `.task-about` while it's open, scrolled to by a press), the words (a field while edited), what it came to, the thread
+  (`.task-thread`; replies after the one last read are `.new`, never one written here) and a reply field. It reads
+  `thread/<id>` again every `AGAIN`, and marks the task seen as it does. `open(tasks)` is a pin's: the task, or a list
+  to pick from for several.
   `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
-  root): the `page` route answers every task still to do with its `place` (`Placed`), and each place with an element
-  on the page gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along), followed
-  each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`), and `around(element)`
-  while the Task tab is open over the page, without that element's: either way a badge under the pointer shows a card of
-  its tasks and a click opens them (`context.open`, which a draft refuses). A pin has no layer to stack in: each is
-  fixed under the popup, and the one pointed at over it. The tab's own tasks are cards (`.tasks li`:
-  the state as a dot and in words, the text whole to four lines and all of it once clicked) in `.thread`, which scrolls
-  over `.compose`, the field and what's attached.
-  `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
-  `data-deictic-modal` so Esc is its) and Delete, in its card's first line, plain while the card is pointed at or focused in. The thread
-  scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
+  root), from the store: each place with an element
+  on the page and a task still to do gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along, a dot where one is unread), followed
+  each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`)
+  and while the Task tab is open over the page: a badge under the pointer shows a card of
+  its tasks and a click opens them in the drop zone (`zoneOf(context).open`). A pin has no layer to stack in: each is
+  fixed under the popup, and the one pointed at over it.
+  `client.ts` is the Task tab, a composer and nothing else: the tasks there are, are the drop zone's. Under the field,
+  the channel and who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
-  each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none); completed and failed tasks are folded under "N closed". A row starts with its
-  state as a dot (a ring while no one has it, filled once claimed, blocked or over; and the state in words beside it, with who holds it while it's claimed, `claimed by claude`: `Task.by`), and its words are a
-  button that shows the task's whole text in place. With
+  each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none).
+  A task that's added reloads the store, and the tab says it's in the drop zone. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
@@ -362,9 +382,9 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   target, the element where this page has it, and what the page said of it, `Seen`): the popup's own to begin with,
   and each the Element button picks (`tools.pick()`, only a press on a marked element), outlined on the page while
   attached (`.task-about`, followed each frame). The first is the task's place: the op is sent on it
-  (`apply(op, on)`; where that isn't the popup's element the tab doesn't list the task, and says so under the field),
+  (`apply(op, on)`),
   the rest go as `Op.also` (place, tag, HTML: labels `deictic.also.N`, files `element.N.html` from 2), and with none
-  the op is `detached`: the page's labels alone, no `deictic.at`, so nothing lists or pins it. What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
+  the op is `detached`: the page's labels alone, no `deictic.at`, so no pin has it, and the drop zone lists it as about the page. What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
   (removable, which takes it out of the tray), and every chip opens one lightbox of all that's attached, at itself:
   a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
   (`subscribe`), so a shot taken while it's open is a chip at once, and a task that's added empties it and clears
@@ -389,8 +409,7 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   count of what's in the tray) picks a spot (`tools.pick()`) and opens the tab on it: `context.at`, sent as
   `Op.point`, and kept over `away` (`Away.at`).
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
-  `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached, and each shot's URL as sent),
-  which the playground lists as a board, its shots shown.
+  `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached, and each shot's URL as sent).
   `Op.voice` attaches each voice note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
   `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
   project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
@@ -448,7 +467,7 @@ repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
-works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, the tasks' `page` route answered for the pins, a recording's parts and the voice clips in
+works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, the tasks' `page`, `thread`, `reply`, `edit` and `remove` routes answered for the drop zone and the pins, a recording's parts and the voice clips in
 IndexedDB for a day, so a recording carries on to the site's next page, class edits
 on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
 publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a

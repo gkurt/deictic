@@ -245,6 +245,46 @@ export const STYLE = `
   background: var(--deictic-accent);
 }
 .tool-panel button.problem { color: var(--deictic-problem); }
+/*
+ * The drop zone (zone.ts): a drawer on the window's side, as tall as what's in it, there while it's of use. Its
+ * sections are the plugins', each with its own styles; these are what they share.
+ */
+.zone {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: var(--deictic-fg);
+  background: linear-gradient(rgb(39 39 42 / 0.92), rgb(24 24 27 / 0.96));
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0s 0.15s;
+}
+.zone.left { right: auto; left: 12px; }
+.zone.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
+.zone [hidden] { display: none; }
+.zone-sections, .zone-view { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 12px; overflow-y: auto; scrollbar-width: thin; }
+.zone-view { gap: 10px; }
+.zone-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--deictic-muted); }
+.zone-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.zone-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 8px; background: rgb(255 255 255 / 0.04); }
+.zone-row:hover { border-color: rgb(255 255 255 / 0.16); }
+.zone-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; border: 0; text-align: left; font-size: 12px; }
+.zone-open img { display: block; height: 32px; border-radius: 4px; }
+.zone-open svg { flex: none; width: 12px; height: 12px; }
+.zone-head { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 -4px; }
+.zone-title { font-weight: 600; }
 /* What a tool that picks a point takes the pointer with, over the page and under the popup. */
 .tool-surface { position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair; }
 .lightbox {
