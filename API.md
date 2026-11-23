@@ -160,7 +160,9 @@ tag's first line is still the same and the file has it once.
 
 In the Task tab:
 
-- **Attach** adds a screenshot of the page, and **Annotate** opens it to draw boxes, arrows and notes on.
+- **Attach** adds a screenshot of the page, and **Annotate** opens it to draw boxes, arrows and notes on. Each
+  tool has a key, which its tooltip shows: `B` box, `A` arrow, `P` pen, `N` note, `Ctrl+Z` (`⌘Z`) to take the last
+  mark back and `Shift+Backspace` to clear them.
 - **Attach HTML snapshot** adds the element as the page has it, as a file.
 - **Record** records the page as you use it, drawing as you go, with the mic on if you like. A reload, or a link to
   another page of your site, leaves it going: stop it there, and the Task tab comes back with it, about the element

@@ -4,8 +4,20 @@
  * and looks like nothing else here. Plugins only set `title`, as they would anywhere; the first hover moves
  * it to `data-tip`, so the browser's own stays away, and gives a textless control the title as its name.
  * The box is fixed in the root, so no panel's scrolling clips it.
+ *
+ * A control's keys (`aria-keyshortcuts`, as `Control+Z`) are in its tip too, each a keycap after the words, and a
+ * tip of their own for a control whose text already names it.
  */
 const DELAY = 300;
+const KEYS = 'aria-keyshortcuts';
+/** A key as its cap reads, where that isn't its name. */
+const CAPS: Record<string, string> = { Control: 'Ctrl', Meta: '⌘', Escape: 'Esc', Backspace: '⌫', Enter: '↵' };
+
+/** The first of a control's shortcuts, a cap for each key held together. */
+function capsOf(el: Element): HTMLElement[] {
+  const [first = ''] = (el.getAttribute(KEYS) ?? '').split(' ');
+  return first === '' ? [] : first.split('+').map((key) => Object.assign(document.createElement('kbd'), { textContent: CAPS[key] ?? key }));
+}
 
 export function tooltips(root: ShadowRoot): void {
   const tip = document.createElement('div');
@@ -21,9 +33,10 @@ export function tooltips(root: ShadowRoot): void {
     tip.classList.remove('shown');
   };
   const show = (el: Element) => {
-    const text = el.getAttribute('data-tip');
-    if (text === null || text === '' || !el.isConnected) return hide();
-    tip.textContent = text;
+    const text = el.getAttribute('data-tip') ?? '';
+    const caps = capsOf(el);
+    if ((text === '' && caps.length === 0) || !el.isConnected) return hide();
+    tip.replaceChildren(text, ...caps);
     // Last in the root, over a modal or toolbar added since at the same z-index.
     if (tip !== root.lastElementChild) root.append(tip);
     tip.classList.add('shown');
@@ -50,7 +63,7 @@ export function tooltips(root: ShadowRoot): void {
         if (!node.hasAttribute('aria-label') && (node.textContent ?? '').trim().length <= 1) node.setAttribute('aria-label', title);
         else node.setAttribute('aria-description', title);
       }
-      if (node.hasAttribute('data-tip')) return node;
+      if (node.hasAttribute('data-tip') || node.hasAttribute(KEYS)) return node;
     }
     return undefined;
   };

@@ -10,7 +10,7 @@
  */
 import { defineClientPlugin } from '#src/index.ts';
 
-import { button, drawing, measurer, TOOLS_STYLE } from './draw.ts';
+import { button, drawing, measurer, MOD, TOOLS_STYLE } from './draw.ts';
 import type { Annotation, AnnotationEvent, Annotations, Area, MarkSet, Picture, Point, Shape } from './index.ts';
 import { type Measure, toSvg } from './svg.ts';
 
@@ -41,10 +41,12 @@ function fixed(z: number): HTMLDivElement {
 }
 
 const EDITOR_STYLE = `
+.annotations-editor:focus { outline: none; }
 .annotations-editor { position: fixed; inset: 0; z-index: ${TOP}; box-sizing: border-box; padding: 16px; display: flex;
   flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgb(0 0 0 / 0.75);
   font: 13px/1.4 system-ui, sans-serif; color: var(--deictic-fg); }
-.annotations-editor .bar { box-sizing: border-box; width: min(100%, 720px); padding: 6px 8px; border: 1px solid var(--deictic-line);
+/* A block, whatever the popup's own \`.bar\` is: its tools take its width, and Cancel and Save its end. */
+.annotations-editor .bar { display: block; box-sizing: border-box; width: min(100%, 720px); padding: 6px 8px; border: 1px solid var(--deictic-line);
   border-radius: 8px; background: var(--deictic-bg); }
 .annotations-editor .stage { position: relative; line-height: 0; box-shadow: 0 12px 32px rgb(0 0 0 / 0.5); touch-action: none; }
 .annotations-editor img { display: block; max-width: calc(100vw - 32px); max-height: calc(100vh - 120px); user-select: none; }
@@ -96,7 +98,7 @@ function edit(
       svg?.setAttribute('width', '100%');
       svg?.setAttribute('height', '100%');
     };
-    const { tools, hint } = drawing({
+    const { tools, stop } = drawing({
       surface: stage,
       at: (e) => {
         const r = stage.getBoundingClientRect();
@@ -116,26 +118,37 @@ function edit(
         show();
       },
     });
+    // The focus is the editor's while it's open: a field under it (the task's words) would take what's typed.
+    const focused = root.activeElement;
+    backdrop.tabIndex = -1;
     const end = (result: Annotation[] | undefined) => {
       backdrop.remove();
+      if (focused instanceof HTMLElement) focused.focus();
+      stop();
       window.removeEventListener('keydown', onKey, true);
       signal?.removeEventListener('abort', cancel);
       resolve(result);
     };
     const cancel = () => end(undefined);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      // A note being typed has Esc and Enter for itself.
+      if (e.composedPath()[0] instanceof HTMLInputElement) return;
+      const saves = e.key === 'Enter' && (e.ctrlKey || e.metaKey);
+      if (e.key !== 'Escape' && !saves) return;
+      e.preventDefault();
       e.stopPropagation();
-      cancel();
+      if (saves) end(marks);
+      else cancel();
     };
-    const save = button('Save', 'Keep these marks', () => end(marks));
+    const save = button('Save', `${MOD}+Enter`, () => end(marks));
     save.classList.add('primary');
-    const back = button('Cancel', 'Leave it as it was (Esc)', cancel);
+    const back = button('Cancel', 'Escape', cancel);
     back.classList.add('end');
     tools.append(back, save);
-    bar.append(tools, hint);
+    bar.append(tools);
     backdrop.append(style, bar, stage);
     root.append(backdrop);
+    backdrop.focus();
     window.addEventListener('keydown', onKey, true);
     signal?.addEventListener('abort', cancel);
     show();
@@ -217,7 +230,7 @@ function onPage(root: ShadowRoot, marks: MarkSet, color: string, usable: boolean
   const preview = fixed(0);
   surface.append(preview);
   root.append(surface);
-  const { tools, hint } = drawing({
+  const { tools, stop } = drawing({
     surface,
     at: (e) => ({ x: e.clientX + scrollX, y: e.clientY + scrollY }),
     preview: (shape) => {
@@ -231,7 +244,11 @@ function onPage(root: ShadowRoot, marks: MarkSet, color: string, usable: boolean
     clear: () => marks.clear(),
     ...(usable ? { drawing: (on: boolean) => (surface.style.pointerEvents = on ? 'auto' : 'none') } : {}),
   });
-  return { tools, hint, surface };
+  const close = () => {
+    stop();
+    surface.remove();
+  };
+  return { tools, close };
 }
 
 /** The picture with the marks drawn over it, as a PNG at the picture's own resolution. */
@@ -269,14 +286,14 @@ export default defineClientPlugin<null, never, Annotations>({
       tools: () => {
         // Its own marks, kept by nothing: they show while it's open, and go with it.
         const own = marksOnPage(root, color, measure);
-        const { tools, surface } = onPage(root, own.marks, color, true);
+        const { tools, close } = onPage(root, own.marks, color, true);
         const element = document.createElement('div');
         element.append(Object.assign(document.createElement('style'), { textContent: TOOLS_STYLE }), tools);
         return {
           element,
           marks: own.marks,
           close: () => {
-            surface.remove();
+            close();
             own.remove();
           },
         };
@@ -292,11 +309,11 @@ export default defineClientPlugin<null, never, Annotations>({
     const style = document.createElement('style');
     style.textContent = TOOLS_STYLE;
     // Over the page while annotate mode is open: it takes the pointer, so drawing never clicks the page.
-    const { tools, hint, surface } = onPage(root, marks, color, false);
-    const done = button('Done', 'Leave annotate mode (Esc)', close);
+    const { tools, close: leave } = onPage(root, marks, color, false);
+    const done = button('Done', 'Escape', close);
     done.classList.add('primary', 'end');
     tools.append(done);
-    panel.append(style, tools, hint);
-    return () => surface.remove();
+    panel.append(style, tools);
+    return leave;
   },
 });

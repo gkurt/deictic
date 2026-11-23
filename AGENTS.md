@@ -152,7 +152,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/client/tooltip.ts`: `tooltips(root)`, the one tooltip for a shadow root of ours (the overlay's, and
   `popupIn`'s): any `title` in it moves to `data-tip` on first hover (the browser's own never shows), naming a
   textless control (`aria-label`) or describing one with text (`aria-description`). Fixed in the root, centred
-  under the control, kept on screen. Set `title`, never draw a tooltip of a panel's own.
+  under the control, kept on screen. Set `title`, never draw a tooltip of a panel's own. A control's keys
+  (`aria-keyshortcuts`, `Control+Z`) are in its tip as keycaps after the words, and a tip of their own for a control
+  whose text already names it: set that for a shortcut, never write it into the title.
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
   first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
   Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), and opens the popup on
@@ -226,7 +228,13 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   same toolbar over a picture, in a modal over everything; marks in the picture's CSS pixels) `flatten` (its
   PNG with them drawn in) and `tools()` (the toolbar for another plugin's UI, with a pointer tool that leaves
   the page usable, drawing its own `marks`, kept by nothing and gone on `close`); `mount` is annotate mode, a toolbar and a surface over the page that takes the pointer.
-  `draw.ts` is the toolbar and gestures both share, each saying where an event is in its marks' coordinates. Screenshots' renderers draw `svg(area)`
+  `draw.ts` is the toolbar, its keys and the gestures both share, each saying where an event is in its marks' coordinates.
+  The toolbar has no words: each tool is an icon named by its tooltip, with its key (V pointer, B box, A arrow, P pen,
+  N note, Ctrl or ⌘ Z undo, Shift+Backspace clear, with a modifier as nothing brings the marks back; Esc is Done and
+  Cancel, Ctrl or ⌘ Enter the editor's Save). The keys are heard on `window` before the page, for as long as there's
+  drawing: all the while under a surface that takes the pointer, and in a recording's toolbar only once a drawing tool is
+  picked, where V and Esc give the page back. A note being typed has its keys to itself (Enter places it, Esc doesn't),
+  and the editor takes the focus while it's open, so nothing is typed into the field under it. Screenshots' renderers draw `svg(area)`
   over a shot (`overlay` in a `PageCapture`), and a task names the count and notes.
 - `src/plugins/recordings/`: no tab. `index.ts`, the server half: keeps the latest `keep` recordings (JSON:
   `Kept`, rrweb's events with page, viewport and duration) under `.deictic/recordings`, answers

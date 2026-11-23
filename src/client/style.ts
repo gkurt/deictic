@@ -297,6 +297,23 @@ export const STYLE = `
   transition: opacity 0.12s;
 }
 .tip.shown { visibility: visible; opacity: 1; }
+/* A control's keys, after its name: caps, as on a keyboard. */
+.tip kbd {
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 18px;
+  margin-left: 3px;
+  padding: 0 4px;
+  border: 1px solid var(--deictic-line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: 11px/15px ui-monospace, monospace;
+  text-align: center;
+  color: var(--deictic-fg);
+  background: rgb(255 255 255 / 0.08);
+}
+.tip kbd:first-of-type { margin-left: 6px; }
+.tip kbd:first-child { margin-left: 0; }
 button {
   font: inherit;
   color: inherit;
