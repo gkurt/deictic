@@ -100,15 +100,21 @@ something unread. A pin under the pointer reads its tasks, and a click opens the
 
 While the keys are held, the drawer shows on the window's right (its left, with the tool panel docked on the right):
 what there is for the page. It goes a moment after the keys are let go, unless the pointer is on it or a task is open
-in it.
+in it. The button in its corner folds it away to a pill that counts what's in it (what's unread, in green, where
+there's some); press the pill to open it again. It stays folded until then, or until a task opens in it.
 
 - **Tasks**: every task of the channel still to do, oldest first, each with its state, who holds it, the element
-  it's about and how many replies it has; those lately completed or failed are folded under them. A task of another
-  page says which.
-- A task opens in the drawer: its state, its words, what it came to, and its thread. **Edit** changes the words and
-  **Delete** cancels it, twice pressed, for a task no one has claimed. The field under the thread replies on the
-  board, `Ctrl+Enter` (`⌘Enter`) or the arrow, so an agent that asked is answered from the page. The element is
-  outlined while the task is open, and a press on its name scrolls to it. `Esc`, or the arrow back, is the list again.
+  it's about and how many replies it has; the latest finished (completed or failed) are folded under them. A task of
+  another page says which. The pointer on a task lights its element on the page.
+- A task opens in the drawer: its state, its words, what it has attached, what it came to, and its thread, each
+  reply with what it attached. A file opens in the lightbox: a screenshot, a recording's replay, a voice note, an
+  element's HTML as text. **Edit** changes the words and **Delete** cancels it, twice pressed, for a task no one has
+  claimed. The composer under the thread replies on the board, so an agent that asked is answered from the page: it's
+  the Task tab's, with a screenshot, a drawing, a recording, a voice note and what the tool panel made to attach.
+  The element is outlined while the task is open, and a press on its name scrolls to it. `Esc`, or the arrow back, is
+  the list again. What's typed in a reply waits there while you look elsewhere.
+- **Archive** puts a finished task away, and **Archive all**, under the finished ones, all of them: out of the drawer
+  until something happens to one (a reply). It's kept in the browser.
 - **Unread**: a task an agent answered, blocked, completed or failed since you last opened it has a dot, in the
   list and on its pin, and the heading counts them; in the thread the replies that are new are outlined. It's kept
   in the browser, and a browser's first look counts everything as read.
@@ -209,7 +215,7 @@ the file has it once.
 The Task tab is for a new task. The ones there are, are in the drawer. In the tab:
 
 - The field is a composer: what's attached is over the words, a chip each, and the buttons that attach are under
-  them, each an icon named by its tooltip. `Ctrl+Enter` (`⌘Enter`), or the arrow, adds the task.
+  them, each an icon named by its tooltip. `Enter`, or the arrow, adds the task; `Shift+Enter` is a new line.
 - The element is attached to begin with, a chip like the rest. **Element** (the crosshair) attaches another: the
   next press on the page picks it. A task about several is pinned at its first, and names the others;
   each is outlined in its screenshot. Take every element out, and the task is about the page.
@@ -328,7 +334,8 @@ export default (async (request) => Response.json({ model: null })) satisfies Sta
 What a plugin's routes would keep, the module keeps, and answers with the `url` it's at: screenshots' `add`; voice's
 `add` and then `more/<id>`, a take as it's spoken (the `url` with `?last`); recordings' `begin`, `part/<id>?seq=<n>`
 and `end/<id>` (the `url`) or `discard/<id>`; tasks' `page` (`{ channel, tasks }`, what the drawer lists) and
-`thread/<id>`, `reply/<id>`, `edit/<id>` and `remove/<id>`, what it does to one. A recording's is a replay page for the build to publish:
+`thread/<id>`, `reply/<id>`, `edit/<id>` and `remove/<id>`, what it does to one (a thread's files with the `url` each
+is at). A recording's is a replay page for the build to publish:
 `replayPage({ player, source })`, from `deictic/recordings`, is its HTML.
 
 ## Events
@@ -395,7 +402,10 @@ export default defineClientPlugin<Model, Op>({
   next point pressed on the page, as a `Spot` (the element and the point in it).
 - `context.drawer` is the drawer, for a page half's `setup`: `add(section)` puts a section in it, which hides
   itself (`hidden`) while it has nothing, `show(view, { title, closed })` opens one of its items in the sections'
-  place and answers what closes it, and `keep()` keeps the drawer up while something goes on.
+  place and answers what closes it, and `keep()` keeps the drawer up while something goes on. A section says how many
+  things it lists in `data-count`, and how many are unread in `data-unread`, for the pill the drawer folds to.
+- `context.light(element)` lights an element on the page as pointing at it does, for something of yours that stands
+  for it; `context.light()` puts the light back.
 - `context.tray` is what the tools made that no task has taken: `add(plugin, id, value)`, `list(plugin?)`,
   `remove(plugin, id?)` and `subscribe`. It's kept for the tab, over page loads. A plugin of yours can add to it, or
   take from it as tasks does.

@@ -40,8 +40,11 @@ export function openLightbox(
   head.append(title, count, actions, close);
   const body = div('lb-body');
   stage.append(head, body);
-  const prev = button('‹', 'Previous (←)', 'lb-prev');
-  const next = button('›', 'Next (→)', 'lb-next');
+  // Drawn, not glyphs: a font's ‹ and › sit off the middle of a round button, each font its own way.
+  const prev = button('', 'Previous (←)', 'lb-prev');
+  prev.innerHTML = chevron('M15 6l-6 6 6 6');
+  const next = button('', 'Next (→)', 'lb-next');
+  next.innerHTML = chevron('M9 6l6 6-6 6');
   box.append(backdrop, stage, ...(items.length > 1 ? [prev, next] : []));
   root.append(box);
 
@@ -239,6 +242,9 @@ function player(url: string, autoplay: boolean): { element: HTMLElement; leave: 
     },
   };
 }
+
+const chevron = (d: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 
 function button(text: string, title: string, className: string): HTMLButtonElement {
   const el = document.createElement('button');

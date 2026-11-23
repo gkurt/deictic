@@ -6,6 +6,9 @@
  *
  * An item opens in the drawer itself (`show`): its view takes the sections' place, with a way back. Esc is the view's
  * while the focus is in the drawer, or no popup is open to have it first.
+ *
+ * It folds away to a pill, by the button in its corner, and stays so (`localStorage`) until the pill is pressed or an
+ * item opens in it. The pill counts what the sections have (`data-count`), or what's unread there (`data-unread`).
  */
 import type { ClientContext, Drawer, TrayItem } from '#src/index.ts';
 
@@ -13,6 +16,12 @@ import { div } from './dom.ts';
 
 /** How long the drawer outlasts the keys, in milliseconds: time to get the pointer to it. */
 const LINGER = 600;
+/** Where whether it's folded is kept. */
+const FOLDED = 'deictic:drawer';
+const FOLD =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg>';
+const TRAY =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13l2.5-8h11l2.5 8v6H4zM4 13h5l1 2h4l1-2h5"/></svg>';
 const BACK =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
 
@@ -40,8 +49,55 @@ export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawe
   const sections = div('drawer-sections');
   const viewing = div('drawer-view');
   viewing.hidden = true;
-  drawer.append(sections, viewing);
+  const fold = Object.assign(document.createElement('button'), {
+    type: 'button',
+    className: 'icon drawer-fold',
+    title: 'Fold the drawer away',
+    innerHTML: FOLD,
+  });
+  const pill = Object.assign(document.createElement('button'), {
+    type: 'button',
+    className: 'drawer-pill',
+    title: 'Open the drawer',
+    innerHTML: TRAY,
+  });
+  const count = document.createElement('span');
+  pill.append(count);
+  drawer.append(fold, pill, sections, viewing);
   root.append(drawer);
+
+  let folded = false;
+  try {
+    folded = localStorage.getItem(FOLDED) === 'folded';
+  } catch {
+    // Storage can be off: open, then.
+  }
+  const foldTo = (on: boolean) => {
+    folded = on;
+    drawer.classList.toggle('folded', on);
+    try {
+      localStorage.setItem(FOLDED, on ? 'folded' : 'open');
+    } catch {
+      // Not kept past the page, then.
+    }
+  };
+  drawer.classList.toggle('folded', folded);
+  fold.addEventListener('click', () => foldTo(true));
+  pill.addEventListener('click', () => foldTo(false));
+  /** What the pill says: how much the sections shown have, or how much of it is unread, in the overlay's green. */
+  const counted = () => {
+    const shown = [...sections.children].filter((section) => !section.hasAttribute('hidden')) as HTMLElement[];
+    // A section that says nothing, or something that isn't a number, counts none.
+    const sum = (key: 'count' | 'unread') =>
+      shown.reduce((n, section) => {
+        const said = Number(section.dataset[key] ?? 0);
+        return n + (Number.isFinite(said) ? said : 0);
+      }, 0);
+    const unread = sum('unread');
+    count.textContent = String(unread > 0 ? unread : sum('count'));
+    pill.classList.toggle('news', unread > 0);
+    pill.title = unread > 0 ? `Open the drawer: ${unread} unread` : 'Open the drawer';
+  };
 
   let pointing = false;
   let over = false;
@@ -75,7 +131,10 @@ export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawe
   });
   drawer.addEventListener('focusout', () => queueMicrotask(show));
   // A section fills as its plugin reads what it has: the drawer is there once one does.
-  new MutationObserver(show).observe(sections, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  new MutationObserver(() => {
+    counted();
+    show();
+  }).observe(sections, { subtree: true, attributes: true, attributeFilter: ['hidden', 'data-count', 'data-unread'] });
 
   const close = () => {
     const closed = leave;
@@ -105,6 +164,7 @@ export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawe
       section.classList.add('drawer-section');
       if (options?.first === true) sections.prepend(section);
       else sections.append(section);
+      counted();
       show();
     },
     show: (view, { title = '', closed = () => {} } = {}) => {
@@ -123,6 +183,8 @@ export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawe
       sections.hidden = true;
       viewing.hidden = false;
       leave = closed;
+      // Something asked to be seen: folded away, it couldn't be.
+      if (folded) foldTo(false);
       show();
       return () => {
         if (leave === closed) close();
@@ -163,6 +225,7 @@ export function trayed(
   const draw = () => {
     const items = tray.list(plugin);
     section.hidden = items.length === 0;
+    section.dataset.count = String(items.length);
     list.replaceChildren(
       ...items.map((item, i) => {
         const { label, open } = row(item, i, items);

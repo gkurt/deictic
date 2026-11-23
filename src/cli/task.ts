@@ -62,10 +62,17 @@ export function run(id: string, values: { out?: string }): void {
   }
 
   if (at !== undefined) placeOf(at, label('deictic.line'));
-  attachments(root, values.out === undefined ? undefined : resolve(values.out));
+  const out = values.out === undefined ? undefined : resolve(values.out);
+  if (root.attachments.length > 0) console.log('\nAttached:');
+  attachments(root, out, '  ', String(root.id));
 
   if (replies.length > 0) console.log('\nReplies:');
-  for (const r of replies) console.log(`  ${r.author?.handle ?? r.by.actor}: ${r.text}`);
+  for (const r of replies) {
+    console.log(`  ${r.author?.handle ?? r.by.actor}: ${r.text}`);
+    // A reply may attach what a task does: shots, a recording, a voice note.
+    for (const line of drawn(r)) console.log(`    ${line}`);
+    attachments(r, out, '    ');
+  }
   others(root);
 }
 
@@ -133,27 +140,32 @@ function placeOf(at: string, first: string | undefined): void {
   );
 }
 
-/** What's attached, with the command to look at each, downloaded to `out` where it's given. */
-function attachments(root: Message, out: string | undefined): void {
-  if (root.attachments.length > 0) console.log('\nAttached:');
-  if (out !== undefined) mkdirSync(out, { recursive: true });
-  for (const a of root.attachments) {
+/**
+ * A message's files, with the command to look at each, downloaded to `out` where it's given. The task's own are read
+ * by its ID; a reply's recording by where it replays, and its voice note by the clip's ID.
+ */
+function attachments(message: Message, out: string | undefined, indent: string, task?: string): void {
+  if (out !== undefined && message.attachments.length > 0) mkdirSync(out, { recursive: true });
+  const recordings = message.attachments.filter((a) => a.name.startsWith('recording-'));
+  for (const a of message.attachments) {
     const kb = `${Math.round(a.size / 1024)} KB`;
     if (out !== undefined) download(a, join(out, a.name));
     const saved = out === undefined ? '' : ` → ${join(out, a.name)}`;
     // To a file's path: the CLI writes what it's given, and refuses a folder.
     const get = saved || `: ${ME} vb download ${a.id} ${a.name}`;
     if (a.name.startsWith('recording-')) {
-      console.log(`  ${a.name} (${kb})${saved}`);
-      console.log(`    timeline: ${ME} recording ${root.id}`);
-      console.log(`    frames:   ${ME} frame ${root.id}`);
+      const ref = task ?? message.labels[`deictic.recording.${recordings.indexOf(a) + 1}.replay`];
+      console.log(`${indent}${a.name} (${kb})${ref === undefined ? get : saved}`);
+      if (ref === undefined) continue;
+      console.log(`${indent}  timeline: ${ME} recording ${ref}`);
+      console.log(`${indent}  frames:   ${ME} frame ${ref}`);
     } else if (a.name.startsWith('voice-')) {
-      console.log(`  ${a.name} (${kb}), a voice clip${saved}`);
-      console.log(`    speech:   ${ME} voice ${root.id}`);
+      console.log(`${indent}${a.name} (${kb}), a voice clip${saved}`);
+      console.log(`${indent}  speech:   ${ME} voice ${task ?? /^voice-(.+)\.\w+$/.exec(a.name)?.[1] ?? a.id}`);
     } else if (a.name === 'element.html') {
-      console.log(`  ${a.name} (${kb}), the element's HTML as it rendered, if you need it${get}`);
+      console.log(`${indent}${a.name} (${kb}), the element's HTML as it rendered, if you need it${get}`);
     } else {
-      console.log(`  ${a.name} (${a.type}, ${kb})${get}`);
+      console.log(`${indent}${a.name} (${a.type}, ${kb})${get}`);
     }
   }
 }

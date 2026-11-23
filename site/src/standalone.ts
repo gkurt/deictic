@@ -10,7 +10,7 @@
  */
 import type { Standalone, Target } from 'deictic';
 import type { Model as Classes, Op as ClassOp } from 'deictic/tailwind';
-import type { Listed, Model as Tasks, Op as TaskOp, Reply, Task, Thread } from 'deictic/tasks';
+import type { Answer, Attached, Listed, Model as Tasks, Op as TaskOp, Reply, Task, Thread } from 'deictic/tasks';
 
 interface Body {
   plugin: string;
@@ -34,6 +34,10 @@ const threads = new Map<string, Reply[]>();
 const history = new Map<string, { done: Step[]; undone: Step[] }>();
 /** The recordings made here, for the replay page to ask for. */
 const recordings = new Map<string, unknown>();
+/** Where each shot and voice clip kept here is, by its ID: what a task or a reply attaches shows from there. */
+const urls = new Map<string, string>();
+/** What each task attached, by its ID. */
+const files = new Map<string, Attached[]>();
 let made = 0;
 let added = 0;
 
@@ -62,8 +66,26 @@ function changeTasks(at: string, change: TaskOp): Step {
     open: true,
     ...(point === undefined ? {} : { point }),
   };
+  files.set(task.id, attachedOf(change));
   const put = (list: Task[]) => () => void tasks.set(place, list);
   return { label: `add "${task.title}"`, undo: put(before), redo: put([...before, task]) };
+}
+
+/** What a task or a reply attaches, as the drawer shows it: each from where it's kept here. */
+function attachedOf({ screenshots, recordings: made, voice }: Answer): Attached[] {
+  const at = (id: string, name: string, type: string, more: Partial<Attached> = {}): Attached => ({
+    id,
+    name,
+    type,
+    size: 0,
+    ...(urls.has(id) ? { url: urls.get(id) } : {}),
+    ...more,
+  });
+  return [
+    ...(screenshots ?? []).map(({ id }) => at(id, `${id}.png`, 'image/png')),
+    ...(made ?? []).map(({ id, replay }) => at(id, `recording-${id}.json`, 'application/json', { replay })),
+    ...(voice ?? []).map(({ id }) => at(id, `voice-${id}.webm`, 'audio/webm')),
+  ];
 }
 
 /** The tasks as the drawer lists them: each with its place, where it has one, and how its thread stands. */
@@ -87,21 +109,27 @@ const listed = (): Listed[] =>
 async function task(request: Request, asked: string, id: string): Promise<Response> {
   const found = () => listed().find((each) => each.id === id);
   if (found() === undefined) return refuse(`#${id} isn't a task of this page's any more: it was deleted`, 422);
-  const { text = '' } = request.method === 'POST' ? ((await request.json()) as { text?: string }) : {};
+  const sent = request.method === 'POST' ? ((await request.json()) as Partial<Answer>) : {};
+  const text = sent.text ?? '';
   const change = (to: (task: Task) => Task[]) => {
     const changed = (list: Task[]) => list.flatMap((each) => (each.id === id ? to(each) : [each]));
     for (const [place, list] of tasks) tasks.set(place, changed(list));
   };
   if (asked === 'reply') {
     const before = threads.get(id) ?? [];
-    threads.set(id, [...before, { id: `${id}-${before.length + 1}`, by: 'you', kind: 'person', text, at: new Date().toISOString() }]);
+    const said = text.trim() === '' ? 'See what is attached' : text.trim();
+    const files = attachedOf({ text, ...sent });
+    threads.set(id, [
+      ...before,
+      { id: `${id}-${before.length + 1}`, by: 'you', kind: 'person', text: said, at: new Date().toISOString(), files },
+    ]);
   }
   if (asked === 'edit') change((each) => [{ ...each, text, title: text.split('\n')[0] ?? '' }]);
   if (asked === 'remove') {
     change(() => []);
     return Response.json({});
   }
-  const thread: Thread = { task: found()!, replies: threads.get(id) ?? [] };
+  const thread: Thread = { task: found()!, files: files.get(id) ?? [], replies: threads.get(id) ?? [] };
   return Response.json(thread);
 }
 
@@ -128,7 +156,10 @@ const changes: Record<string, (place: string, op: never) => Step> = { tasks: cha
 async function keepShot(request: Request): Promise<Response> {
   const type = request.headers.get('content-type') ?? '';
   if (type !== 'image/png') return refuse('send the shot as image/png: the `dom()` renderer does', 415);
-  return Response.json({ id: idOf('shot'), url: URL.createObjectURL(new Blob([await request.arrayBuffer()], { type })) });
+  const id = idOf('shot');
+  const url = URL.createObjectURL(new Blob([await request.arrayBuffer()], { type }));
+  urls.set(id, url);
+  return Response.json({ id, url });
 }
 
 /** Unlike any other tab's, as a replay asks every page of the site for a recording by it. */
@@ -188,7 +219,9 @@ async function keepClip(request: Request, id = idOf('clip')): Promise<Response> 
   const type = before?.type ?? request.headers.get('content-type') ?? '';
   const clip = new Blob([...(before === undefined ? [] : [before]), await request.arrayBuffer()], { type });
   await hold('clips', id, clip);
-  return Response.json({ id, url: URL.createObjectURL(clip) });
+  const url = URL.createObjectURL(clip);
+  urls.set(id, url);
+  return Response.json({ id, url });
 }
 
 /** The recordings plugin's `begin`, `part/<id>`, `end/<id>` and `discard/<id>`. */

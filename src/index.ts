@@ -192,7 +192,6 @@ export interface ToolPanel {
   pick: () => Promise<Spot | undefined>;
 }
 
-/** Something a plugin made on the page that nothing has taken yet: a shot, a recording, a voice clip. */
 /**
  * The drawer: on the window's side, where what the plugins have for the page lands, a section each. It
  * shows while a shortcut's keys are held and a section has something, and stays while it's in use.
@@ -200,7 +199,8 @@ export interface ToolPanel {
 export interface Drawer {
   /**
    * Adds a section, in the order added, or before the others with `first`. A section that has nothing to show sets
-   * its own `hidden`: the drawer stays away while every one is.
+   * its own `hidden`: the drawer stays away while every one is. Folded away, the drawer counts what the sections
+   * have: each says how many things it lists in `data-count`, and how many are unread in `data-unread`.
    */
   add: (section: HTMLElement, options?: { first?: boolean }) => void;
   /**
@@ -212,6 +212,7 @@ export interface Drawer {
   keep: () => () => void;
 }
 
+/** Something a plugin made on the page that nothing has taken yet: a shot, a recording, a voice clip. */
 export interface TrayItem {
   /** The plugin that made it. */
   plugin: string;
@@ -260,6 +261,11 @@ export interface ClientContext {
   tray: Tray;
   /** The drawer, to add this plugin's section to. */
   drawer: Drawer;
+  /**
+   * Lights an element on the page as pointing at it does, for something of the overlay's own that stands for it (a
+   * task's row in the drawer, while the pointer is on it); none puts the light back as it was.
+   */
+  light: (element?: Element) => void;
   /**
    * Shows `items` in the lightbox over everything, at `at` (the first by default), stepping between them with
    * ← and →. With `from`, it grows out of that element (the chip clicked) and shrinks back into it on close.

@@ -4,7 +4,7 @@ import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
 import { dom, screenshots } from '#src/plugins/screenshots/index.ts';
-import { type Model, tasks } from '#src/plugins/tasks/index.ts';
+import { type Model, tasks, type Thread } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 import { clientModule } from '#src/vite.ts';
 
@@ -186,4 +186,46 @@ test('a task attaches each shot, labelling where the element is in the one taken
   expect(message.labels['deictic.screenshot.1.position']).toBeUndefined();
   expect(message.labels['deictic.screenshot.2.note.1']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
+});
+
+test("shows a task's files and a reply's, and attaches a shot to a reply", async () => {
+  const { p, ask, add } = setup();
+  const json = (path: string, body: unknown) =>
+    ask(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(
+      async (res) => (await res.json()) as Thread & { model: Model; problem?: string },
+    );
+  const shot = await add();
+  const page = { page: `${ORIGIN}/`, viewport: { width: 800, height: 600 }, count: 1 };
+  const { model } = await json('apply', {
+    plugin: 'tasks',
+    target: p.target('src/App.tsx', 'h1'),
+    op: { text: 'Too tight', ...page, screenshots: [{ id: shot.id }], html: '<h1>Pricing</h1>' },
+  });
+  const id = model.tasks.at(-1)!.id;
+  const reply = await add();
+  const thread = await json(`plugins/tasks/reply/${id}`, {
+    text: ' ',
+    screenshots: [{ id: reply.id, marks: { count: 1, notes: ['Here'] } }],
+  });
+  expect(thread.files.map((f) => [f.name, f.type])).toEqual([
+    [`${shot.id}.png`, 'image/png'],
+    ['element.html', 'text/html'],
+  ]);
+  // Nothing typed: the reply says what's attached, and what the shot's notes say as labels, as a task does.
+  expect(thread.replies.map((r) => [r.text, r.files.map((f) => f.name)])).toEqual([['See the screenshot', [`${reply.id}.png`]]]);
+  expect((await team.thread(id)).replies[0]!.labels['deictic.screenshot.1.note.1']).toBe('Here');
+
+  // A picture as it is; HTML as its text, escaped, so it's read on the dev server's origin, never run.
+  const png = await ask(`plugins/tasks/file/${id}/${thread.replies[0]!.files[0]!.id}`);
+  expect(png.headers.get('content-type')).toBe('image/png');
+  expect(new Uint8Array(await png.arrayBuffer())).toEqual(PNG);
+  const html = await ask(`plugins/tasks/file/${id}/${thread.files[1]!.id}`);
+  expect(html.headers.get('content-security-policy')).toStartWith("sandbox; default-src 'none'");
+  const text = await html.text();
+  expect(text).toContain('<body>&lt;h1&gt;Pricing&lt;/h1&gt;');
+  expect(text).not.toContain('<h1>');
+  // Only a file of the task's own.
+  const other = await json('apply', { plugin: 'tasks', target: p.target('src/App.tsx', 'h1'), op: { text: 'Another', ...page } });
+  const res = await ask(`plugins/tasks/file/${other.model.tasks.at(-1)!.id}/${thread.files[0]!.id}`);
+  expect(((await res.json()) as { problem: string }).problem).toMatch(/has no file/);
 });

@@ -11,13 +11,15 @@ import type { Listed } from './index.ts';
 const FRESH = 4000;
 /** Where what's been read is kept: each task's ID, and how its thread stood when it was last opened. */
 const SEEN = 'deictic:tasks:seen';
-/** The states of a task that's over, as a board names them: nothing more happens to it. */
+/** Where the finished tasks put away are kept: each one's ID, and how its thread stood then. */
+const ARCHIVED = 'deictic:tasks:archived';
+/** The states of a finished task, as a board names them: nothing more happens to it. */
 export const OVER = new Set(['completed', 'failed']);
 /** The states whose coming is news in itself, whoever said nothing as it came. */
 const NEWS = new Set(['blocked', 'completed', 'failed']);
 
 export interface Store {
-  /** The tasks as read last: those still to do, oldest first, then those lately over. */
+  /** The tasks as read last: those still to do, oldest first, then the latest finished. */
   tasks: () => Listed[];
   /** The channel, and its page on the board where there's one to link to: nothing before the first read. */
   channel: () => { name: string; link?: string } | undefined;
@@ -31,15 +33,19 @@ export interface Store {
   read: (task: Listed) => string | undefined;
   /** Says a task is read, as its thread stands. */
   seen: (task: Listed) => void;
+  /** Whether a finished task was put away here, and nothing has happened to it since. */
+  archived: (task: Listed) => boolean;
+  /** Puts finished tasks away, read: out of the drawer until something happens to one. */
+  archive: (tasks: Listed[]) => void;
 }
 
 /** How a task's thread stands: its newest reply, and its state where that's news. */
 const markOf = (task: Listed) => `${task.last ?? ''}|${NEWS.has(task.state) ? task.state : ''}`;
 
-/** What's been read, or nothing where this browser has kept none yet. */
-function kept(): Record<string, string> | undefined {
+/** What's kept under `key` (what's been read, what's put away), or nothing where this browser has kept none yet. */
+function kept(key = SEEN): Record<string, string> | undefined {
   try {
-    const seen: unknown = JSON.parse(localStorage.getItem(SEEN) ?? 'null');
+    const seen: unknown = JSON.parse(localStorage.getItem(key) ?? 'null');
     return typeof seen === 'object' && seen !== null ? (seen as Record<string, string>) : undefined;
   } catch {
     // Storage can be off, or hold something else: nothing's been kept, then.
@@ -63,9 +69,10 @@ export function storeOf(context: ClientContext): Store {
   const tell = () => {
     for (const listener of listeners) listener();
   };
-  const keep = () => {
+  let away = kept(ARCHIVED) ?? {};
+  const keep = (key = SEEN, value: unknown = seen) => {
     try {
-      localStorage.setItem(SEEN, JSON.stringify(seen));
+      localStorage.setItem(key, JSON.stringify(value));
     } catch {
       // Not kept past the page, then.
     }
@@ -105,6 +112,17 @@ export function storeOf(context: ClientContext): Store {
       if (seen?.[task.id] === markOf(task)) return;
       // Another tab may have read others since: theirs are kept too.
       seen = { ...seen, ...kept(), [task.id]: markOf(task) };
+      keep();
+      tell();
+    },
+    archived: (task) => OVER.has(task.state) && away[task.id] === markOf(task),
+    archive: (finished) => {
+      const marks = Object.fromEntries(finished.filter((task) => OVER.has(task.state)).map((task) => [task.id, markOf(task)]));
+      // Only what the board still lists: the rest have gone from it, and needn't be kept.
+      const listed = new Set(tasks.map((task) => task.id));
+      away = Object.fromEntries(Object.entries({ ...away, ...kept(ARCHIVED), ...marks }).filter(([id]) => listed.has(id)));
+      keep(ARCHIVED, away);
+      seen = { ...seen, ...kept(), ...marks };
       keep();
       tell();
     },

@@ -24,7 +24,8 @@ command to read each, and whether the line still reads as the task saw it.
   project says to run it, by its path. Never ask for or use their session. Say in the result what you couldn't see.
 - **Still unsure**: `vb reply 68 "<what you understood, and the question>"`, then `vb tasks block 68 "<why>"` while
   they answer. They read it on the page, where the task is marked unread, and answer in its thread: the watch says
-  `reply on`.
+  `reply on`. A reply may attach what a task does (a screenshot, a recording, a voice note): `npx deictic task 68`
+  lists each under its reply, with the command to read it.
 
 Other endings: `vb tasks release 68` (someone else can take it), `vb tasks fail 68 "<why, and what would make it
 possible>"`.

@@ -29,7 +29,7 @@ import { watchersOf } from './watchers.ts';
 export { local, type LocalBoard, type LocalOptions } from './local.ts';
 
 /** What the plugin uses of a board: `board()` from `@vercel/board` is one. */
-export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'threads' | 'reply' | 'discovery' | 'upload' | 'edit' | 'actors'>;
+export type TaskBoard = Pick<Board, 'tasks' | 'thread' | 'threads' | 'reply' | 'discovery' | 'upload' | 'download' | 'edit' | 'actors'>;
 
 export interface TasksOptions {
   /**
@@ -115,6 +115,24 @@ export interface Listed extends Task {
 /** A task with a place, as its mark has it: what the page pins to the element there. */
 export type Placed = Listed & { place: string };
 
+/** A file attached to a task or to a reply in its thread, as the board keeps it. */
+export interface Attached {
+  /** The board's ID for it. */
+  id: string;
+  name: string;
+  /** Its MIME type: `image/png`, `audio/webm`, `application/json` for a recording, `text/html` for an element's HTML. */
+  type: string;
+  /** In bytes. */
+  size: number;
+  /**
+   * Where the page gets it: by default the plugin's `file/<task>/<id>` route, which serves an image or a sound as it
+   * is and anything else as text. A `standalone` server answers its own.
+   */
+  url?: string;
+  /** Where a recording plays back, as the message says. */
+  replay?: string;
+}
+
 /** A message in a task's thread, oldest first. */
 export interface Reply {
   id: string;
@@ -125,13 +143,23 @@ export interface Reply {
   text: string;
   /** When, as an ISO date. */
   at: string;
+  /** What it has attached. */
+  files: Attached[];
 }
 
 /** A task with its thread, as the drawer opens it. */
 export interface Thread {
   task: Listed;
+  /** What the task has attached: its shots, recordings, voice notes and elements' HTML. */
+  files: Attached[];
   replies: Reply[];
 }
+
+/**
+ * A reply, as the drawer's composer sends it to the `reply/<id>` route: its words, and what's attached, as a task
+ * attaches it. A reply with nothing typed says what's attached instead.
+ */
+export type Answer = Pick<Op, 'text' | 'screenshots' | 'recordings' | 'voice' | 'annotations'>;
 
 export interface Model {
   channel: string;
@@ -267,7 +295,7 @@ export type Kept = Added | Edited | Removed;
 type Message = Awaited<ReturnType<TaskBoard['thread']>>['message'];
 /** A task's thread at a glance, as a board lists tasks. */
 type Summary = Awaited<ReturnType<TaskBoard['tasks']['list']>>['tasks'][number];
-/** How many of the tasks lately over the drawer lists: what an agent said as it ended one is there to read. */
+/** How many of the latest finished tasks the drawer lists: what an agent said as it ended one is there to read. */
 const OVER = 10;
 
 /** How many tasks a page is asked about at most: past that it has more pins than anyone reads. */
@@ -452,6 +480,7 @@ export function tasks(options: TasksOptions = {}) {
     kind: message.author?.kind ?? 'unknown',
     text: message.text,
     at: message.createdAt,
+    files: filesOf(message),
   });
   /** A task of ours with its thread, the newest replies a board answers at once. */
   const threadOf = async (id: string): Promise<Thread> => {
@@ -461,14 +490,46 @@ export function tasks(options: TasksOptions = {}) {
       throw new Refusal(`#${id} isn't a task of deictic's in #${channel}: reload the page for the ones that are`);
     const said = replies.filter((reply) => !reply.deleted);
     const [actors, page] = await Promise.all([actorsOf(team, message.task?.claim ? [message.task.claim.actor] : []), linkOf()]);
-    return { task: listedOf({ message, replies: said.length, last: said.at(-1) ?? null }, actors, page), replies: said.map(replyOf) };
+    return {
+      task: listedOf({ message, replies: said.length, last: said.at(-1) ?? null }, actors, page),
+      files: filesOf(message),
+      replies: said.map(replyOf),
+    };
   };
   /** The task a route's request names, as its last segment, and what it sent. */
   const named = async (req: Request) => {
     const id = decodeURIComponent(new URL(req.url).pathname.split('/').at(-1) ?? '');
-    const body: unknown = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-    const { text } = (typeof body === 'object' && body !== null ? body : {}) as { text?: unknown };
-    return { id, text: typeof text === 'string' ? text : '' };
+    const sent: unknown = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const body = (typeof sent === 'object' && sent !== null ? sent : {}) as Partial<Answer>;
+    return { id, text: typeof body.text === 'string' ? body.text : '', body };
+  };
+  /**
+   * A file of a task's, `file/<task>/<file>`: one attached to the task or to a reply in its thread, and to nothing
+   * else on the board. An image or a sound is served as it is; anything else as its text, escaped, in a page of the
+   * lightbox's dark colours, so an element's HTML is read there, never run, on the dev server's origin.
+   */
+  const fileOf = async (req: Request): Promise<Response> => {
+    const [task = '', file = ''] = (new URL(req.url).pathname.split('/file/')[1] ?? '').split('/').map(decodeURIComponent);
+    const team = await boardOf();
+    const { message, replies } = await team.thread(task);
+    if (message.channel !== channel || !ours(message))
+      throw new Refusal(`#${task} isn't a task of deictic's in #${channel}: reload the page for the ones that are`);
+    const found = [message, ...replies].flatMap((m) => m.attachments).find((a) => a.id === file);
+    if (found === undefined) throw new Refusal(`task ${task} has no file ${file}: reload the page for what it has`);
+    const res = await team.download(found.id);
+    const media = /^(image|audio|video)\//.test(found.type);
+    const body = media ? res.body : textPage(found.name, await res.text());
+    return new Response(body, {
+      headers: {
+        'content-type': media ? found.type : 'text/html; charset=utf-8',
+        'content-disposition': `inline; filename="${found.name.replaceAll('"', '')}"`,
+        'x-content-type-options': 'nosniff',
+        // Its own style and nothing else: no script, no request anywhere.
+        'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src 'self' blob:; media-src 'self' blob:",
+        // A board's file never changes under its ID.
+        'cache-control': 'private, max-age=86400, immutable',
+      },
+    });
   };
 
   // Kept from `setup`, to `use` another plugin when an op asks for it.  // Kept from `setup`, to `use` another plugin when an op asks for it.
@@ -478,7 +539,7 @@ export function tasks(options: TasksOptions = {}) {
    * The op with only the screenshots, recordings and voice clips still kept, their files, and what's left out: a file
    * goes once newer ones pass its plugin's `keep`, or `deictic clean` takes it, and that's no reason to lose the task.
    */
-  const keptOf = (op: Op) => {
+  const keptOf = <T extends Attaching>(op: T) => {
     const clipOf = (id: string): ReturnType<Clips['read']> => context?.use('voice')?.read(id);
     // In the op's order, each kind's: the Nth PNG is `deictic.screenshot.N`'s, the Nth recording `deictic.recording.N`'s.
     const files: Upload[] = [];
@@ -508,7 +569,7 @@ export function tasks(options: TasksOptions = {}) {
       if (typeof other.html !== 'string' || other.html === '') continue;
       files.push({ data: new TextEncoder().encode(other.html.slice(0, HTML)), name: `element.${i + 2}.html`, type: 'text/html' });
     }
-    const kept: Op = {
+    const kept: T = {
       ...op,
       ...(op.screenshots === undefined ? {} : { screenshots }),
       ...(op.recordings === undefined ? {} : { recordings }),
@@ -549,12 +610,33 @@ export function tasks(options: TasksOptions = {}) {
       thread: async (req) => Response.json(await asked(async () => threadOf((await named(req)).id))),
       // What the drawer does to a task: a reply in its thread, other words for it, or its end, which cancels it
       // on the board. Each answers the thread as it is after.
+      // What a task has attached, or a reply in its thread, for the drawer to show.
+      file: (req) => asked(() => fileOf(req)),
       reply: (req) =>
         asked(async () => {
-          const { id, text } = await named(req);
-          if (text.trim() === '') throw new Refusal('say something first');
+          const { id, text, body } = await named(req);
+          const answer: Answer = {
+            text,
+            ...(Array.isArray(body.screenshots) ? { screenshots: body.screenshots } : {}),
+            ...(Array.isArray(body.recordings) ? { recordings: body.recordings } : {}),
+            ...(Array.isArray(body.voice) ? { voice: body.voice } : {}),
+            ...(body.annotations === undefined ? {} : { annotations: body.annotations }),
+          };
+          if (wordsOf(answer) === '') throw new Refusal('say something first');
           await threadOf(id);
-          await (await boardOf()).reply(id, clip(text.trim(), 10_000));
+          const { op: kept, files, dropped } = keptOf(answer);
+          const verb = dropped.length === 1 ? "isn't" : "aren't";
+          if (wordsOf(kept) === '') throw new Refusal(`${listOf(dropped)} ${verb} kept any more: attach again, or say something`);
+          // What the files don't say, as a task has it: where each recording replays, the notes drawn.
+          const labels = attachedLabels(kept, dropped);
+          const attachments = await upload(files);
+          await (
+            await boardOf()
+          ).reply(id, {
+            text: clip(wordsOf(kept), 10_000),
+            ...(Object.keys(labels).length === 0 ? {} : { labels }),
+            ...(attachments === undefined ? {} : { attachments }),
+          });
           return Response.json(await threadOf(id));
         }),
       edit: (req) =>
@@ -672,8 +754,35 @@ async function localPage(team: TaskBoard, channel: string): Promise<string | und
   return `${url.origin}${url.pathname.slice(0, -'/api/board'.length)}/c/${channel.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+/**
+ * A file's text as a page to read it in: escaped, so nothing in it runs or loads, in the lightbox's colours, as the
+ * browser's own text page is black on nothing and the lightbox is dark under it.
+ */
+function textPage(name: string, text: string): string {
+  const escape = (raw: string) => raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const style =
+    ':root{color-scheme:dark}body{margin:0;padding:16px;font:12px/1.5 ui-monospace,monospace;color:#e4e4e7;background:#18181b;white-space:pre-wrap;overflow-wrap:anywhere}';
+  return `<!doctype html><meta charset="utf-8"><title>${escape(name)}</title><style>${style}</style><body>${escape(text)}`;
+}
+
 /** What may be left out of a task as no longer kept, as `deictic.dropped.N` names it. */
 type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
+
+/** What a task or a reply attaches: files, and what the labels say of them. */
+type Attaching = Partial<Pick<Op, 'screenshots' | 'recordings' | 'voice' | 'annotations' | 'html' | 'pointed' | 'also'>>;
+
+/**
+ * A message's files, as the drawer shows them: each recording with where it replays, which its
+ * `deictic.recording.N.replay` label says, the Nth being the Nth recording attached.
+ */
+function filesOf({ attachments, labels }: Message): Attached[] {
+  const recordings = attachments.filter((a) => a.name.startsWith('recording-'));
+  return attachments.map(({ id, name, type, size }) => {
+    const n = recordings.findIndex((r) => r.id === id);
+    const replay = n === -1 ? undefined : labels[`deictic.recording.${n + 1}.replay`];
+    return { id, name, type, size, ...(replay === undefined ? {} : { replay }) };
+  });
+}
 
 /**
  * What the attached files don't say, as labels numbered from 1, so each value is short and none is read out of the
@@ -682,7 +791,7 @@ type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
  * plays back; `deictic.note.M` a note drawn on the page; `deictic.dropped.N` what wasn't kept any more;
  * `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
  */
-function attachedLabels(op: Op, dropped: Kind[]): Record<string, string> {
+function attachedLabels(op: Attaching, dropped: Kind[]): Record<string, string> {
   const labels: Record<string, string> = {};
   // A board takes no control characters in a label: a note's lines go on one.
   const set = (key: string, value: string) => {
@@ -809,10 +918,10 @@ function placeIn(labels: Record<string, string>): Place | undefined {
 }
 
 /** The task's words: what was typed, or where nothing was, a line that sends the reader to what's attached. */
-const wordsOf = (op: Op) => (op.text.trim() === '' ? (shown(op) ?? '') : op.text.trim());
+const wordsOf = (op: Attaching & Pick<Op, 'text'>) => (op.text.trim() === '' ? (shown(op) ?? '') : op.text.trim());
 
 /** `See the recording and the voice note`: what stands for the words of a task sent with none, where something is attached. */
-function shown(op: Op): string | undefined {
+function shown(op: Attaching): string | undefined {
   const named = (count: number | undefined, word: string) =>
     count === undefined || count === 0 ? [] : [`the ${word}${count === 1 ? '' : 's'}`];
   const attached = [

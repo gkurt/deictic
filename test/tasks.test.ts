@@ -264,7 +264,14 @@ test("reads a task's thread, and answers in it", async () => {
   const before = await get<Thread>(`plugins/tasks/thread/${id}`);
   expect(before.task).toMatchObject({ id, place: 'src/App.tsx:1:26', tag: 'h1', replies: 1 });
   expect(before.replies).toEqual([
-    { id: expect.any(String), by: 'codex', kind: expect.any(String), text: 'Which headline, the first?', at: expect.any(String) },
+    {
+      id: expect.any(String),
+      by: 'codex',
+      kind: expect.any(String),
+      text: 'Which headline, the first?',
+      at: expect.any(String),
+      files: [],
+    },
   ]);
 
   const after = await post<Thread>(`plugins/tasks/reply/${id}`, { text: ' The first.\n' });
@@ -370,6 +377,7 @@ test("links the channel to a local board's page, to the page `link` names, or no
     thread: team.thread,
     threads: team.threads,
     reply: (...said: Parameters<typeof team.reply>) => team.reply(...said),
+    download: (...asked: Parameters<typeof team.download>) => team.download(...asked),
     edit: team.edit,
     actors: team.actors,
     upload: (input: Parameters<typeof team.upload>[0]) => team.upload(input),

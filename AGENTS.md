@@ -34,7 +34,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes,
   `open(plugin, element, at?)` to open the popup at a tab (on a `Point` of the element, with `at`, which the panel
-  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`), `drawer` (the drawer, a `Drawer`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
+  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`), `drawer` (the drawer, a `Drawer`), `tray` (a `Tray`) and
+  `light(element?)`, which lights an element as pointing does (the overlay's `lit`, kept over pointing's own light
+  while it's set). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
   answered), `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
@@ -159,9 +161,12 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   stays away). It shows while a shortcut's keys are held (`point`, which the overlay calls), the pointer or the focus
   is in it, something keeps it (`keep()`) or an item is open, and goes `LINGER` after. `show(view, { title, closed })`
   opens an item in the sections' place, under a head with a way back, and answers what closes it; Esc is the item's
-  while the focus is in the drawer or no popup is open (never a `data-deictic-modal`'s). `trayed(context, plugin, title,
-row)` is a section of a plugin's tray items, a row each that opens it and a × that removes it: screenshots',
-  recordings' and voice's sections are that, each opening the lightbox. `playMark()` is a row's play icon.
+  while the focus is in the drawer or no popup is open (never a `data-deictic-modal`'s). `.drawer-fold`, in its corner,
+  folds it to `.drawer-pill` (`deictic:drawer` in `localStorage`, open again by the pill or an item shown), which
+  counts the shown sections' `data-unread`, or their `data-count` where nothing's unread. `trayed(context, plugin,
+title, row)` is a section of a plugin's tray items, a row each that opens it and a × that removes it (and its
+  `data-count`): screenshots', recordings' and voice's sections are that, each opening the lightbox. `playMark()` is a
+  row's play icon.
 - `src/client/lighting.ts`: what's drawn on the page itself, `spotlight(root)`, a `Lighting`: `point` (what's under
   the pointer while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel, at?)`
   (the popup's element, for as long as it's open, or with `at` a circle of `SPOT` around that point of it: `spotOf`). It dims the page around the element with one shadow (`.veil`, under
@@ -343,22 +348,43 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   older records of an edit or a removal are still undone and redone.
   The routes are the drawer's: `page` answers the channel's tasks as `Listed` (a `Task` with its `place`, `tag` and
   `page` where it has them, its `replies` count, its newest reply's ID as `last`, and what it came to as `said`): those
-  still to do, oldest first, then the `OVER` (10) lately completed or failed; `thread/<id>` a `Thread` (the task and its
-  `Reply`s: who, `kind`, text, when); `reply/<id>`, `edit/<id>` (the words before the `---`) and `remove/<id>` (canceled)
-  take `{ text }` and answer the thread after. All only for a task of the channel's that's deictic's (`ours`: it has
-  `deictic.at` or `deictic.page`), and the last two only while it's open.
+  still to do, oldest first, then the `OVER` (10) latest finished, completed or failed; `thread/<id>` a `Thread` (the
+  task, its `files`, and its `Reply`s: who, `kind`, text, when, `files`), each file an `Attached` (the board's ID, name,
+  type, size, and a recording's `replay` from its message's `deictic.recording.N.replay`); `file/<task>/<file>` one of
+  them (an image or a sound as it is, anything else as its text escaped in a dark page, `textPage`, under a CSP that
+  runs and loads nothing; only a file of that task's or its replies'); `reply/<id>` takes an `Answer` (words, and
+  what's attached as an op attaches it: `keptOf`, `attachedLabels` as the reply's labels, `shown` for no words),
+  `edit/<id>` (the words before the `---`) and `remove/<id>` (canceled) take `{ text }`, and each answers the thread
+  after. All only for a task of the channel's that's deictic's (`ours`: it has `deictic.at` or `deictic.page`), and
+  the last two only while it's open. `deictic task` prints each reply's attachments under it, with the commands to read
+  them (a recording by where it replays, a voice note by its clip's ID).
   `store.ts` is those tasks on the page (`storeOf(context)`, one per overlay root): `load()` reads `page`, not again
   within `FRESH`, and `subscribe` tells of each read. What's unread is its: `deictic:tasks:seen` in `localStorage`, each
   task's mark as last opened (its newest reply's ID, and its state once blocked, completed or failed); `unread(task)` is
-  a mark that differs, `seen(task)` writes it, and a browser's first read marks every task seen.
+  a mark that differs, `seen(task)` writes it, and a browser's first read marks every task seen. `archive(tasks)` puts
+  finished ones away (`deictic:tasks:archived`, each one's mark then, and read): `archived(task)` while the mark is
+  still that, so one with a new reply is back.
   `drawer.ts` is the tasks' section in the drawer (`drawerOf(context)`, added first): a row per task (state dot, title,
-  state and who has it, what it's about as `tell(named())` or `<tag> on /page`, replies, an unread mark), those over
-  folded in a `details`. A row opens the task in the drawer (`context.drawer.show`): `.stands` (state, the board's link,
-  Edit and a Delete pressed twice within `SURE`, for an open one), `.where` (the element, outlined on the page as
-  `.task-about` while it's open, scrolled to by a press), the words (a field while edited), what it came to, the thread
-  (`.task-thread`; replies after the one last read are `.new`, never one written here) and a reply field. It reads
-  `thread/<id>` again every `AGAIN`, and marks the task seen as it does. `open(tasks)` is a pin's: the task, or a list
-  to pick from for several.
+  state and who has it, what it's about as `tell(named())` or `<tag> on /page`, replies, an unread mark; the pointer on
+  it lights the element, `context.light`), the finished folded in a `details` ("N finished", and Archive all), the
+  archived left out; `data-count` is what's still to do, `data-unread` what's unread. A row opens the task in the drawer
+  (`context.drawer.show`): `.stands` (state, the board's link, Edit and a Delete pressed twice within `SURE` for an open
+  one, Archive for a finished one), `.where` (the element, outlined on the page as `.task-about` while it's open, lit
+  while pointed at, scrolled to by a press), the words (a field while edited: Enter saves, Shift+Enter a new line),
+  `.task-files` (a chip per file, the lightbox for all of them: an image, a sound, a recording's replay, the rest as
+  text from `file/`), what it came to, the thread (`.task-thread`, each reply's files under it; replies after the one
+  last read are `.new`, never one written here), redrawn only when it changed, and a composer (`composerIn`, as the
+  Task tab's but with no elements and no shot unless asked; Record keeps what's typed, closes the drawer and records,
+  and the recording is in the tray for the task opened again). What's typed in a reply is kept per task in
+  `sessionStorage` (`deictic:tasks:drafts`). It reads `thread/<id>` again every `AGAIN`, and marks the task seen as it
+  does. `open(tasks)` is a pin's: the task, or a list to pick from for several.
+  `composer.ts` is the composer both share (`composerIn(context, options)`, answering a `Composer`): the chips, the
+  textarea (as tall as what's typed, to `GROWN`; Enter sends, Shift+Enter is a new line, not while an IME composes),
+  and `.attach`, icon buttons made with `toolButton`, as below. Its options say what differs: `about` (the elements
+  attached to begin with, and their chips, picker and HTML snapshot: a task's), `shoot` (a shot as it's sent while
+  nothing else is attached), `at`, `here`, `over`, `record` (what Record does), `submit` (answers whether it was taken,
+  which empties it: the tray, the page's marks, the words) and `changed`. `attachedOf` is what's attached as an op or
+  an `Answer` sends it. `draft`/`restore` are what's typed and asked for, over `away`.
   `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
   root), from the store: each place with an element
   on the page and a task still to do gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along, a dot where one is unread), followed
@@ -370,7 +396,7 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   the channel and who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none).
-  A task that's added reloads the store, and the tab says it's in the drawer. With
+  A task that's added reloads the store, and the tab says it's in the drawer. Its composer is `composer.ts`'s. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
@@ -378,7 +404,7 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. The field is
   a composer (`.composer`): the chips, the textarea (as tall as what's typed, to `GROWN`), and `.attach`, icon
   buttons made with `toolButton`: Screenshot and HTML snapshot (`aria-pressed`), Element, Draw, Record, Voice, and
-  Add (an arrow, Ctrl or ⌘ Enter). The elements the task is about are chips too (`about`, each an `About`: its
+  Add (an arrow, Enter). The elements the task is about are chips too (`about`, each an `About`: its
   target, the element where this page has it, and what the page said of it, `Seen`): the popup's own to begin with,
   and each the Element button picks (`tools.pick()`, only a press on a marked element), outlined on the page while
   attached (`.task-about`, followed each frame). The first is the task's place: the op is sent on it

@@ -257,12 +257,12 @@ export const STYLE = `
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: 340px;
+  width: 296px;
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 24px);
   border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 14px;
-  font: 13px/1.4 system-ui, sans-serif;
+  border-radius: 12px;
+  font: 12px/1.4 system-ui, sans-serif;
   color: var(--deictic-fg);
   background: linear-gradient(rgb(39 39 42 / 0.92), rgb(24 24 27 / 0.96));
   backdrop-filter: blur(24px) saturate(1.8);
@@ -274,16 +274,26 @@ export const STYLE = `
 .drawer.left { right: auto; left: 12px; }
 .drawer.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
 .drawer [hidden] { display: none; }
-.drawer-sections, .drawer-view { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 12px; overflow-y: auto; scrollbar-width: thin; }
-.drawer-view { gap: 10px; }
-.drawer-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--deictic-muted); }
+.drawer-sections, .drawer-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 10px; overflow-y: auto; scrollbar-width: thin; }
+.drawer-view { gap: 8px; }
+.drawer-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font: 600 10px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--deictic-muted); }
 .drawer-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .drawer-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 8px; background: rgb(255 255 255 / 0.04); }
 .drawer-row:hover { border-color: rgb(255 255 255 / 0.16); }
 .drawer-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; border: 0; text-align: left; font-size: 12px; }
-.drawer-open img { display: block; height: 32px; border-radius: 4px; }
+.drawer-open img { display: block; height: 24px; border-radius: 4px; }
 .drawer-open svg { flex: none; width: 12px; height: 12px; }
-.drawer-head { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 -4px; }
+.drawer-head { display: flex; align-items: center; gap: 6px; margin: -4px 24px 0 -4px; }
+/* Folding it away: the button in its corner, and the pill it folds to, which counts what's in it. */
+.drawer-fold { position: absolute; top: 6px; right: 6px; z-index: 1; width: 22px; height: 22px; border-radius: 6px; color: var(--deictic-muted); }
+.drawer-fold svg { width: 14px; height: 14px; }
+.drawer-sections > .drawer-section:first-child h3 { margin-right: 22px; }
+.drawer-pill { display: none; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: inherit; font: 600 12px/1 system-ui, sans-serif; color: var(--deictic-fg); }
+.drawer-pill svg { width: 16px; height: 16px; }
+.drawer-pill.news span { padding: 2px 6px; border-radius: 8px; color: var(--deictic-on-accent); background: var(--deictic-accent); }
+.drawer.folded { width: auto; }
+.drawer.folded > :not(.drawer-pill) { display: none; }
+.drawer.folded .drawer-pill { display: inline-flex; }
 .drawer-title { font-weight: 600; }
 /* What a tool that picks a point takes the pointer with, over the page and under the popup. */
 .tool-surface { position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair; }
@@ -345,10 +355,11 @@ export const STYLE = `
   padding: 0;
   border: 1px solid var(--deictic-line);
   border-radius: 50%;
-  font-size: 22px;
-  line-height: 1;
+  display: grid;
+  place-items: center;
   background: var(--deictic-bg);
 }
+.lb-prev svg, .lb-next svg { width: 20px; height: 20px; }
 .lb-prev { left: 16px; }
 .lb-next { right: 16px; }
 .lightbox.pinned { position: relative; inset: auto; z-index: auto; display: block; padding: 0 64px; }

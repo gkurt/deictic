@@ -227,6 +227,10 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     open: (plugin, element, at) => panel?.guard() !== true && openAt(plugin, element, at),
     lightbox: (items, options) => openLightbox(root, items, options),
     drawer,
+    light: (element) => {
+      lit = element?.isConnected === true ? element : undefined;
+      relight();
+    },
     tools,
     tray: kept,
   });
@@ -318,12 +322,20 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
           }
         });
   };
+  // An element a plugin lights from the overlay's own UI (`context.light`): lit while it says so, whatever the keys.
+  let lit: Element | undefined;
+  const relight = () => {
+    const target = lit === undefined ? undefined : targetOf(lit);
+    if (lit !== undefined && target !== undefined) return lighting.point({ el: lit, target, names: [], count: sameAs(lit).length });
+    if (held.length > 0 || picking) return show(false);
+    lighting.hide();
+  };
   const hide = () => {
     held = [];
     tools.point(false);
     drawer.point(false);
     glance(false);
-    lighting.hide();
+    relight();
   };
   /** The marked element at a point of the window, or the nearest to it where none is under it, and the point in it. */
   const spotAt = (x: number, y: number): Spot | undefined => {
@@ -351,7 +363,10 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     frame = 0;
     // On something of ours that takes the pointer (a task's pin, the tool panel): the light stays where it was, as
     // the pointer is on its way to a press there, not to another element.
-    if (pointer !== undefined && !picking && held.length > 0 && document.elementFromPoint(pointer.x, pointer.y) === host) return;
+    if (pointer !== undefined && !picking && held.length > 0 && document.elementFromPoint(pointer.x, pointer.y) === host) {
+      if (lit !== undefined) relight();
+      return;
+    }
     const hit = pointer === undefined || (held.length === 0 && !picking) ? undefined : hitAt(pointer.x, pointer.y, picking);
     const el = hit?.el;
     const target = el === undefined ? undefined : targetOf(el);
