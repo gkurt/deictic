@@ -1,3 +1,165 @@
+## deictic@0.7.0
+
+### A task's elements are attached, and there can be several
+
+The element the popup is on is a chip in the Task tab's composer, with what else is attached. The crosshair button
+attaches another: the next press on the page picks it. A task about several is listed and pinned at its first, names
+the rest as `deictic.also.N` (`src/Nav.tsx:4:7 <a>`, each one's HTML in `element.N.html`), and has them all outlined
+in its screenshot. With every element taken out, the task is about the page, and has no `deictic.at`. `deictic task`
+says both.
+
+### An element is named by its component
+
+The caption while pointing, the popup's bar and a pin's card say the component whose JSX has the element, with React
+in development: `<Plan> <li>`, or `<Badge>` alone for the only element a component writes. Without, it's the tag, as
+before.
+
+### A panel can apply on another element: `apply(op, on)`
+
+For an op that's about another element than the popup's. The model answered is then that element's.
+
+### Paste a picture into the composer
+
+A picture pasted into the Task tab's composer or a reply's, or dropped on it, is attached as a screenshot, which its
+chip's lightbox offers to draw on.
+
+### The tool panel keeps the capture tools together
+
+Screenshot, Record, the mic and Task sit side by side at the end of the tool panel, after the drawing tools. A plugin
+puts its group in a section with `tools.add(group, { section })`: groups of one section sit together, with no line
+between them, after the groups of none, and `last` puts one at its section's end. The gap after Record is gone, and
+while a recording goes its controls are the only ones in that section.
+
+### Attachments keep one size
+
+Every attachment chip, in a composer and in the drawer, is one height, and a picture's thumbnail one size whatever
+its shape: nothing moves as one is attached or as its picture loads.
+
+### The agent skill is one short file
+
+`skills/deictic/` is a single `SKILL.md`, the loop and nothing else: no `references/`, and no rules on committing or
+on what a task may ask, which are the person's. What the references explained, the commands now say as they run:
+`deictic task` says how to read a task's source chain, the markup pointed at, and a task about the page as a whole,
+and `deictic voice` says how to line speech up with the recording's frames.
+
+### Shorter command output, for an agent's context
+
+`deictic watch` says a ready task as it says a new one (its words, place, page and project), not with every label.
+`deictic task` says how to download what's attached once (`--out <dir>`), not a command per file, and a task's voice
+clips' commands once; its paths are from where it runs. `deictic recording` writes the page's own URLs as paths (a file
+Vite serves from outside its root as the file's path, without a cache-busting query) and the marks all cleared as
+`− all N marks`; `--json` keeps every URL whole. `deictic voice` gives each clip's path from where it runs.
+
+### The overlay is a spotlight
+
+The page dims around the element you point at, which stays lit with guides from its edges across the window. The
+popup opens beside it, tied to it by a line, and the page gets its light back once the pointer is out on it. The
+outline and the popup under it are gone.
+
+It shows the tasks on the page: while the keys are held, each element with a task still to do has a pin on its
+corner, and with the Task tab open a pin reads its tasks under the pointer and opens them with a click. The tab's own
+tasks are cards, read whole, with the window's height to scroll in.
+
+### A plugin can draw on the page while it's pointed on: `pointing(context)`
+
+It answers what takes it away again.
+
+### `context.open` leaves a popup that holds something unsaved
+
+Its button shakes, as it does for a press on the page, and `open` answers false.
+
+### Annotation tools have keys, and no hints
+
+Each drawing tool has a key, and its tooltip is its name and the key, as a keycap. The line of advice under the
+tools is gone. Esc in a note being typed drops the note, and no longer closes what's around it.
+
+### A control's keys show in its tooltip: `aria-keyshortcuts`
+
+A plugin sets `aria-keyshortcuts` (`Control+Z`) on a control, and the overlay's tooltip draws each key as a keycap
+after the control's `title`.
+
+### The drawer
+
+While the shortcut's keys are held, a drawer on the window's side has what there is for the page: every task of the
+channel still to do, the latest finished folded under them, and the screenshots, recordings and voice notes no task has
+taken yet. It stays while the pointer is on it, and goes at once when the last thing in it is deleted.
+
+A task opens in the drawer, from its row or from its pin on the page: its state, its words, what it has attached,
+and its thread. A screenshot, a recording, a voice note or an element's HTML opens in the lightbox. The composer under
+the thread replies on the board, so an agent that asked is answered from the page, and a reply attaches what a task
+does: a screenshot, a drawing, a recording, a voice note. `deictic task` lists a reply's attachments under it. A task
+no one has claimed can be edited and deleted there. The pointer on a task's row lights its element on the page.
+
+The drawer folds away to a pill that counts what's in it, or what's unread. Finished tasks can be archived, one or
+all: they're out of the drawer until something happens to one.
+
+### Unread tasks
+
+A task an agent answered, blocked, completed or failed since you last opened it has a dot, in the drawer and on
+its pin, and the replies that are new are outlined in its thread. It's kept in the browser.
+
+### Enter sends
+
+In the Task tab's composer, and in a reply's, Enter sends and Shift+Enter starts a new line. Enter saves a task's
+edited words too.
+
+### The Task tab is for a new task
+
+It no longer lists the element's tasks or the file's: they're in the drawer. The tasks plugin's `apply` only adds
+a task (the `Change` type, with its `edit` and `remove`, is gone, and so is the model's `elsewhere`), and its `page`
+route answers `{ channel, link, tasks }`, every task with how its thread stands. `thread/<id>` (with each message's
+`files`), `file/<task>/<file>`, `reply/<id>` (with attachments, an `Answer`), `edit/<id>` and `remove/<id>` are new, and a `standalone` module answers them where it keeps tasks.
+
+### A plugin can add to the drawer: `context.drawer`
+
+`add(section)` puts a section in it, `show(view)` opens an item in the sections' place, and `keep()` keeps the drawer
+up. A section with nothing hides itself, and says how many things it has in `data-count` (and unread in `data-unread`)
+for the folded drawer's pill. `context.light(element)` lights an element on the page as pointing does.
+
+### The tool panel
+
+While the shortcut's keys are held, a bar of tools shows at the bottom of the window: drawing on the page, a
+screenshot, a recording, the mic, and a task about a point. It goes a moment after the keys are let go, unless it's
+in use (a tool has the page, a recording or the mic is on, the pointer is on it), and its grip drags it to any edge.
+
+Each tool has a key, which works while the keys are held or a tool has the page: `V` or `Esc` the pointer, `M` box,
+`A` arrow, `B` pen, `N` note, `Ctrl+Z` (`⌘Z`) and `Shift+Backspace` for the marks, `S` screenshot, `R` record and
+stop, `Shift+R` discard, `K` the mic, `T` task.
+
+What the tools make waits for the next task: the Task tab lists each shot, recording and voice note as a chip, and
+the task takes them, and what's drawn on the page, as it's added.
+
+### A task can be about a point
+
+The Task tool's next press on the page opens the Task tab on that point, wherever it is: in the marked element under
+it, or beside the nearest one. The task is pinned there, its screenshot has the point circled, and it says the spot
+as `deictic.point` (`x,y` from the element's top left), which `deictic task` prints.
+
+### The popup is Task and Tailwind, and the Task tab's field is a composer
+
+The Annotate tab is gone: marks are drawn on the page with the tool panel's tools. The recording's own toolbar is
+the tool panel, too.
+
+The Task tab's field has what's attached over the words, a chip each, and its buttons under them, as icons:
+screenshot and HTML snapshot, on or off, then draw (a screenshot to draw on, as Annotate was), record and voice, and
+an arrow that adds the task.
+
+A task's pin is pressed while the keys are held, too: it opens that element's tasks.
+
+- `annotations({ shortcut })` is gone, as it has no tab to open. Its page API has `draw()`, which starts drawing on
+  the page as the tool panel's tools do, and no `tools()`.
+- A screenshot taken from the tool panel has no `box` in a task, so no `deictic.screenshot.N.position` and `.size`.
+- `page: true` on a plugin's page half is gone.
+
+### A plugin can add tools, and what they make: `context.tools`, `context.tray`
+
+`tools.add(group)` puts a group of controls in the tool panel, each button's key in `aria-keyshortcuts`, which the
+panel hears. `hold(left)` takes the page for a tool until the panel gives it back, `keep()` keeps the panel up, and
+`pick()` answers the next point pressed on the page. `tray` is what the tools made that no task has taken.
+`context.open(plugin, element, at)` opens the popup on a point of an element, which the panel gets as `context.at`.
+
+### The `deictic:task` event says where each attached shot is, so a page can show it
+
 ## deictic@0.6.0
 
 ### What a task's element rendered through is a label, `deictic.source`, not a `Source:` line in its text
