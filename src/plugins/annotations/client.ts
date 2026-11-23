@@ -41,7 +41,7 @@ function fixed(z: number): HTMLDivElement {
  * The page's marks, shown in a layer of the overlay that lets the pointer through, redrawn as it scrolls, and kept
  * in the tab's session storage under `key`.
  */
-function marksOnPage(root: ShadowRoot, color: string, measure: Measure, key: string): Annotations {
+function marksOnPage(root: ShadowRoot, color: string, measure: Measure, key: string): Omit<Annotations, 'draw'> {
   let list = stored(key);
   const listeners = new Set<(event: AnnotationEvent) => void>();
   const layer = fixed(LAYER);
@@ -104,22 +104,21 @@ export default defineClientPlugin<never, never, Annotations>({
     const preview = fixed(0);
     surface.append(preview);
     root.append(surface);
-    tools.add(
-      drawing({
-        surface,
-        at: (e) => ({ x: e.clientX + scrollX, y: e.clientY + scrollY }),
-        preview: (shape) => {
-          preview.innerHTML = shape === undefined ? '' : toSvg([mark(shape, color)], viewport(), scroll());
-        },
-        add: (shape) => marks.add(shape),
-        removeLast: () => {
-          const last = marks.list().at(-1);
-          if (last !== undefined) marks.remove(last.id);
-        },
-        clear: () => marks.clear(),
-        hold: tools.hold,
-      }),
-    );
-    return marks;
+    const { group, draw } = drawing({
+      surface,
+      at: (e) => ({ x: e.clientX + scrollX, y: e.clientY + scrollY }),
+      preview: (shape) => {
+        preview.innerHTML = shape === undefined ? '' : toSvg([mark(shape, color)], viewport(), scroll());
+      },
+      add: (shape) => marks.add(shape),
+      removeLast: () => {
+        const last = marks.list().at(-1);
+        if (last !== undefined) marks.remove(last.id);
+      },
+      clear: () => marks.clear(),
+      hold: tools.hold,
+    });
+    tools.add(group);
+    return { ...marks, draw };
   },
 });

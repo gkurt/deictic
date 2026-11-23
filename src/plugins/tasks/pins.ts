@@ -1,9 +1,8 @@
 /**
  * The page's tasks, each pinned where its element is: what's shown of them on the page itself, beside the Task
  * tab's list of one element's. A pin is the element's outline, faint, and a badge on its corner with how many
- * tasks are still to do there, in the colour of the furthest along. They show while a shortcut's keys are held, to see
- * and no more (the pointer goes through them, to the element), and while the Task tab is open, where a pin under
- * the pointer reads its tasks and a click opens them.
+ * tasks are still to do there, in the colour of the furthest along. They show while a shortcut's keys are held and
+ * while the Task tab is open: a pin under the pointer reads its tasks, and a click opens them.
  *
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
@@ -41,8 +40,6 @@ const STYLE = `
   pointer-events: auto;
   cursor: pointer;
 }
-/* While pointing they're to see: a press is the element's under them. */
-.pins.passive .pin-badge { pointer-events: none; }
 .pin-badge:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .pin-card {
   position: absolute;
@@ -103,10 +100,10 @@ const NAMED = 4;
 const ALONG = ['blocked', 'claimed', 'ready', 'waiting'];
 
 export interface Pins {
-  /** While pointing: there to see, and the pointer goes through them. Answers what takes them away. */
+  /** While pointing: every place's, to read under the pointer and open with a click. Answers what takes them away. */
   glance: () => () => void;
   /**
-   * While the Task tab is open on `element`: every other place's, to read under the pointer and open with a click.
+   * While the Task tab is open on `element`: every other place's, as while pointing.
    * `refresh` reads the tasks again, after a change made here.
    */
   around: (element: Element) => { refresh: () => void; release: () => void };
@@ -274,7 +271,6 @@ export function pinsIn(context: ClientContext): Pins {
         follow();
       });
     }
-    layer.classList.toggle('passive', open === undefined);
     load(again);
   };
 

@@ -91,8 +91,8 @@ While the keys are held the page dims around the element pointed at, which stays
 across the window. The popup opens beside it, tied to it by a line, and the page gets its light back once the
 pointer has been out on it a moment. Nothing of it takes the pointer from the page.
 
-The tasks are on the page, too. While the keys are held, every element with a task still to do has a pin on its
-corner: how many, in the colour of the furthest along. With the Task tab open, a pin under the pointer reads its
+The tasks are on the page, too. While the keys are held, and while the Task tab is open, every element with a task
+still to do has a pin on its corner: how many, in the colour of the furthest along. A pin under the pointer reads its
 tasks, and a click opens them. The tab has the window's height: each task is a card that says its state and reads
 whole, and they scroll over the field.
 
@@ -187,13 +187,19 @@ tag's first line is still the same and the file has it once.
 
 In the Task tab:
 
-- **Attach a screenshot** adds one of the page as the task goes, the element outlined in it.
-- **Attach HTML snapshot** adds the element as the page has it, as a file.
-- What the tool panel's tools made since the last task is under the field, a chip each: a shot, a recording, a voice
-  note. A chip opens it, and its × leaves it out. With a chip there, no other screenshot is taken. A recording
-  carries on over a reload, or a link to another page of your site: stop it there, and it's the next task's.
-- What's drawn on the page goes with the task, in its screenshot and as `deictic.note` labels, and is cleared once
-  the task is added.
+- The field is a composer: what's attached is over the words, a chip each, and the buttons that attach are under
+  them, each an icon named by its tooltip. `Ctrl+Enter` (`⌘Enter`), or the arrow, adds the task.
+- **Screenshot** is on or off: on, a shot of the page goes with the task as it's added, the element outlined in it.
+  It's on to begin with, and goes off once something else is attached, until you turn it on again.
+- **HTML snapshot** is on or off too: the element as the page has it, as a file.
+- **Draw** starts drawing on the page, with the tool panel's tools: `Esc` gives the page back. What's drawn goes
+  with the task, in its screenshot and as `deictic.note` labels, and is cleared once the task is added.
+- **Record** closes the popup and records the page as you use it. A reload, or a link to another page of your
+  site, leaves it going: stop it in the tool panel, and the Task tab comes back with what you'd typed and the
+  recording, about the element you started on, whether that page has it or not.
+- **Voice** records a note, here.
+- What the tool panel's tools made since the last task is attached too: a shot, a recording, a voice note. A chip
+  opens it, and its × leaves it out.
 - The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed
   can be edited or deleted. Undo takes any of it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add

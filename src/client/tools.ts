@@ -197,16 +197,18 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
       if (e.repeat || !(pointing || holder !== undefined)) return;
       const [target] = e.composedPath();
       const typing = target instanceof HTMLElement && target.matches('input, textarea, select, [contenteditable]');
+      // Esc is the tool's before the popup's, from the popup's field too (a task being typed while marks are drawn):
+      // only a modal's own comes first, as a note being typed drops the note.
+      if (e.key === 'Escape' && holder !== undefined) {
+        if (target instanceof Element && target.closest('[data-deictic-modal]') !== null) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return letGo();
+      }
       // What's typed in a field of ours is the field's (a note, a task's words). A field of the page's has its keys
       // too while they're only held to point: Alt with a letter types one there. Once a tool has the page, the page
       // isn't in use, and a field of its that still has the focus gets none.
       if (typing && (holder === undefined || target.getRootNode() === root)) return;
-      if (e.key === 'Escape' && holder !== undefined) {
-        e.preventDefault();
-        // The popup's too, where one is open: Esc is the tool's first.
-        e.stopImmediatePropagation();
-        return letGo();
-      }
       const control = forKey(e);
       if (control === undefined) return;
       e.preventDefault();

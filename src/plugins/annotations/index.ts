@@ -54,6 +54,11 @@ export interface Annotations {
    * screenshot of that area draws over it. Nothing when there are none.
    */
   svg(area: Area): string | undefined;
+  /**
+   * Starts drawing on the page, as the tool panel's own tools do, with the one used last (the box, first): for
+   * another plugin's button. The page is the marks' until the tool panel gives it back (its pointer, or Esc).
+   */
+  draw(): void;
 }
 
 declare module 'deictic' {

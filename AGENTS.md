@@ -44,7 +44,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
   record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
 - A `ClientPlugin` with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held, and answers
-  what takes it away. No plugin of ours uses `away` now (a recording is the tool panel's): it's there for others'.
+  what takes it away.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -173,7 +173,8 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
   first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
   Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), shows the tool panel
-  meanwhile (`tools.ts`; it lights the page the same way while a tool picks a spot), and opens the popup on
+  meanwhile (`tools.ts`; it lights the page the same way while a tool picks a spot; on a pin or
+  the tool panel, which take the pointer, the light stays where it was), and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
   tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. Opened on a spot (`context.open`'s `at`), it's
   beside the spot, which is what's lit. While it's open over the page its element
@@ -242,10 +243,10 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   arrow, pen, note, in page coordinates) and the factory (`color`). `svg.ts` is `toSvg(annotations, area, scroll)`,
   shapes only (no `foreignObject`), the one drawing both the page's layer and a shot use. `client.ts`: `setup` keeps
   the marks per page in session storage, draws them in a layer of the overlay that lets the pointer through, adds
-  its tools to the tool panel, and answers `list`, `add`, `remove`, `clear`, `subscribe` (for a recording) and
-  `svg(area)`. `draw.ts` is the tools (`drawing`, a group) and the gestures, on a surface over the page that takes
+  its tools to the tool panel, and answers `list`, `add`, `remove`, `clear`, `subscribe` (for a recording),
+  `svg(area)` and `draw()` (picks the tool used last, for another plugin's button: tasks' composer). `draw.ts` is the tools (`drawing`, a group) and the gestures, on a surface over the page that takes
   the pointer only while a tool is picked (`tools.hold`, so the pointer tool, Esc or another plugin's tool gives the
-  page back). No words: each tool is an icon named by its tooltip, with its key (M box, A arrow, B pen, N note,
+  page back; Esc from the popup's field too, and only a modal's own Esc, a note's, comes first). No words: each tool is an icon named by its tooltip, with its key (M box, A arrow, B pen, N note,
   Ctrl or ⌘ Z undo, Shift+Backspace clear, with a modifier as nothing brings the marks back), which the tool panel
   hears. A note being typed has its keys to itself (Enter places it, Esc doesn't). Screenshots' renderers draw
   `svg(area)` over a shot (`overlay` in a `PageCapture`), and a task names the count and notes, and clears the marks
@@ -268,7 +269,8 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   next part's place, the clips, the mic). So a load doesn't end it: `setup` on the
   next page carries on under the same ID (rrweb's own `Meta` and snapshot per page, and for an address that changes with no load, a router's, a custom event,
   `PAGE` in `marks.ts`, with the `href`; the last events go with `keepalive`
-  on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there. It
+  on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
+  `resume` gives the overlay. It
   takes rrweb's own plugins from the plugins that add to a recording (`use('logs')`, `use('network')`: each a `Recorded`,
   whose `plugin({ sinceLoad })` answers a `RecordPlugin`; one that fails is warned of and left out), and
   the page's marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each
@@ -326,8 +328,8 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
   root): the `page` route answers every task still to do with its `place` (`Placed`), and each place with an element
   on the page gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along), followed
-  each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`), the pointer going through them; `around(element)`
-  while the Task tab is open over the page, without that element's, where a badge under the pointer shows a card of
+  each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`), and `around(element)`
+  while the Task tab is open over the page, without that element's: either way a badge under the pointer shows a card of
   its tasks and a click opens them (`context.open`, which a draft refuses). A pin has no layer to stack in: each is
   fixed under the popup, and the one pointed at over it. The tab's own tasks are cards (`.tasks li`:
   the state as a dot and in words, the text whole to four lines and all of it once clicked) in `.thread`, which scrolls
@@ -343,17 +345,27 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
   left out, not the task: `keptOf` drops it from the op, `deictic.dropped.N` says so, which `read`
-  gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. What's in the
-  tray (shots, recordings, voice clips) is the task's to attach: each a chip under the field (removable, which takes
-  it out of the tray; removing the last unticks the box), and every chip opens one lightbox of all that's attached,
-  at itself: a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
+  gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. The field is
+  a composer (`.composer`): the chips, the textarea (as tall as what's typed, to `GROWN`), and `.attach`, icon
+  buttons made with `toolButton`: Screenshot and HTML snapshot (`aria-pressed`), Draw, Record, Voice, and Add (an
+  arrow, Ctrl or ⌘ Enter). What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
+  (removable, which takes it out of the tray), and every chip opens one lightbox of all that's attached, at itself:
+  a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
   (`subscribe`), so a shot taken while it's open is a chip at once, and a task that's added empties it and clears
-  the page's marks. With no shot in the tray, the box takes one as the task goes, and only that one has the element
-  outlined in it (`outlined`, in green dashes `ROOM` off it, or a circle of `SPOT` around the task's spot, drawn on
-  and kept again with `screenshots.upload`), which the op says (`outlined`), not the text. `Op.screenshots` is a
-  list, each with its `box` where it's of the element. `Op.recordings` attaches each one's JSON (and its voice
-  clips, which the JSON names), and a label says where it replays. Its tool in the tool panel (T, last, with a count
-  of what's in the tray) picks a spot (`tools.pick()`) and opens the tab on it: `context.at`, sent as `Op.point`.
+  the page's marks, which have a chip too (`N marks`: it draws more, its × clears them). Screenshot is a shot taken
+  as the task goes (`shooting`): on while nothing is attached, or as it was last pressed (`wanted`; taking the last
+  shot out turns it off). It's sent first, and only it has the element outlined (`outlined`, in green dashes `ROOM`
+  off it, or a circle of `SPOT` around the task's spot, drawn on and kept again with `screenshots.upload`), which
+  the op says (`outlined`), not the text. `Op.screenshots` is a list, each with its `box` where it's of the element.
+  Draw is `annotations.draw()`. Record calls `away` with what's typed and asked for (`Kept`), and the panel comes
+  back with that, the recording in the tray by then; the kept state has `facts` too, what only the element's page
+  says (page, viewport, point, count, chain, pointed, HTML): a recording stopped on a page without the element
+  comes back to a panel with no shot to take, and the task says those. Voice records a take here (`voice.start()`),
+  its time and the mic's live waveform beside the button, and its clip goes in the tray; a take going as the task is
+  sent, as Record leaves, or as the popup closes, is kept first. `Op.recordings` attaches each one's JSON (and its
+  voice clips, which the JSON names), and a label says where it replays. Its tool in the tool panel (T, last, with a
+  count of what's in the tray) picks a spot (`tools.pick()`) and opens the tab on it: `context.at`, sent as
+  `Op.point`, and kept over `away` (`Away.at`).
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
   `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached, and each shot's URL as sent),
   which the playground lists as a board, its shots shown.

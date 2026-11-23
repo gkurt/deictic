@@ -22,13 +22,18 @@ The Task tool's next press on the page opens the Task tab on that point, whereve
 it, or beside the nearest one. The task is pinned there, its screenshot has the point circled, and it says the spot
 as `deictic.point` (`x,y` from the element's top left), which `deictic task` prints.
 
-### The popup is Task and Tailwind
+### The popup is Task and Tailwind, and the Task tab's field is a composer
 
-The Annotate tab is gone, with the Task tab's Annotate, Record and Voice buttons and the editor that drew on a
-screenshot: the tool panel has their tools. The recording's own toolbar is the tool panel, too.
+The Annotate tab is gone, with the editor that drew on a screenshot: marks are drawn on the page, with the tool
+panel's tools. The recording's own toolbar is the tool panel, too.
 
-- `annotations({ shortcut })` is gone, as it has no tab to open, and its page API is the marks alone: `edit`,
-  `flatten` and `tools()` are gone.
+The Task tab's field has what's attached over the words, a chip each, and its buttons under them, as icons:
+screenshot and HTML snapshot, on or off, then draw, record and voice, and an arrow that adds the task.
+
+A task's pin is pressed while the keys are held, too: it opens that element's tasks.
+
+- `annotations({ shortcut })` is gone, as it has no tab to open, and its page API is the marks and `draw()`, which
+  starts drawing as the tool panel's tools do: `edit`, `flatten` and `tools()` are gone.
 - A task's `screenshots` have no `marks`, and no `deictic.screenshot.N.note.M` labels: notes are the page's,
   `deictic.note.M`. One taken from the tool panel has no `box`, so no `.position` and `.size`.
 - `page: true` on a plugin's page half is gone.

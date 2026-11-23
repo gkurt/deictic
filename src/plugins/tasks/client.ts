@@ -7,28 +7,32 @@
  * the source can't tell: the chain of source it rendered through, its HTML (a file attached), and where the
  * annotations plugin is loaded, what's marked on the page.
  *
- * Where the screenshots plugin is loaded, a shot of the page goes with it, unless that's unticked, the element
- * outlined in it as the task goes (or the spot circled, for a task on one): nothing else says which of two rows
- * alike was meant.
+ * The field is a composer, as a chat has: what's attached as chips over the words, and under them the buttons that
+ * attach, each an icon named by its tooltip, and Add. Two are on or off. With the screenshots plugin, a shot of the
+ * page goes with the task as it's added, the element outlined in it (or the spot circled, for a task on one):
+ * nothing else says which of two rows alike was meant. And the element's HTML as it rendered, as a file (not with
+ * the server half's `html` option off, and then there's no button).
  *
- * What the tool panel's tools made since the last task (shots of the window, recordings, voice clips: the tray) is
- * this one's to attach. Each is a chip under the field, which opens it; removing one takes it out of the tray. A
- * shot among them takes the box's place.
+ * The rest make something. Draw starts drawing on the page, with the annotations plugin's tools. Record leaves the
+ * popup (`away`) to record the page, and comes back with what was typed when it's stopped, wherever the page is by
+ * then. Voice records the mic here, its time and waveform beside it.
  *
- * The element's HTML as it rendered goes with it too, as a file, unless its box is unticked (or the server
- * half's `html` option is off, and then there's no box).
+ * What they make, and what the tool panel's tools made since the last task (the tray), is this one's to attach.
+ * Each is a chip, which opens it; removing one takes it out of the tray. With one there, no shot is taken unless
+ * it's asked for again.
  *
  * Its tool in the panel adds a task about a spot: picked, the next press on the page opens this tab on that point,
  * in the marked element under it or the nearest to it.
  */
-import { toolButton } from '#src/client/dom.ts';
+import { MOD, toolButton } from '#src/client/dom.ts';
+import { liveWaveform } from '#src/client/waveform.ts';
 import { defineClientPlugin, type LightboxItem, type Point, type Target } from '#src/index.ts';
 
 // For `use()`'s types: the plugins may not be loaded, and nothing of them runs here.
 import type { Annotation, Annotations } from '#src/plugins/annotations/index.ts';
 import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
-import type { Clip } from '#src/plugins/voice/index.ts';
+import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
 import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
@@ -43,6 +47,24 @@ const STYLE = `
 /* Never squeezed out by the field: a window too low for both scrolls the panel. */
 .thread:has(> .tasks li, .more[open] li) { min-height: 84px; }
 .compose { flex: none; }
+/* One box for what's attached, the words and the buttons, lit as a field is while it's typed in. */
+.composer { border: 1px solid var(--deictic-line); border-radius: 12px; background: rgb(0 0 0 / 0.35); }
+.composer:focus-within { border-color: var(--deictic-accent); box-shadow: 0 0 0 1px var(--deictic-accent); }
+.composer textarea { display: block; min-height: 0; padding: 10px 12px 4px; border: 0; resize: none; background: none; }
+.composer textarea:focus { outline: none; }
+.composer .chips { margin: 0; padding: 8px 8px 0; }
+.composer .attach { display: flex; align-items: center; gap: 2px; padding: 4px 6px 6px; }
+.composer .attach button.icon { width: 28px; height: 28px; border-radius: 8px; }
+.composer .attach button.icon svg { width: 16px; height: 16px; }
+.composer .attach button[aria-pressed='true'] { color: var(--deictic-accent); background: rgb(18 179 88 / 0.14); }
+.composer .attach .gap { width: 1px; height: 16px; margin: 0 4px; background: var(--deictic-line); }
+.composer .attach .mic[aria-pressed='true'], .composer .attach .mic[aria-pressed='true']:hover { color: #fff; background: #ef4444; }
+.composer .hearing { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; font: 12px ui-monospace, monospace; color: var(--deictic-muted); }
+.composer .hearing canvas { width: 56px; height: 18px; }
+.composer .doing { margin-left: auto; padding-right: 6px; font-size: 12px; color: var(--deictic-muted); }
+.composer .attach button.send { border-radius: 50%; color: var(--deictic-on-accent); }
+.composer .attach button.send:hover:not(:disabled) { color: var(--deictic-on-accent); background: var(--deictic-accent); filter: brightness(1.1); }
+.composer [hidden] { display: none; }
 /* The column is no wider than the panel: an \`auto\` one grows to a long word, which then never wraps. */
 .tasks { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .tasks:empty { margin: 0; }
@@ -92,7 +114,7 @@ const STYLE = `
 .tasks li.editing { grid-template: none / minmax(0, 1fr); }
 .tasks li.editing .row { margin-top: 0; }
 .tasks li.editing .actions { display: flex; gap: 6px; }
-textarea { min-height: 76px; resize: vertical; font: 13px/1.4 system-ui, sans-serif; }
+textarea { min-height: 76px; resize: vertical; font: 13px/1.45 system-ui, sans-serif; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; align-items: center; }
 /* Cut short before it pushes Add out: a channel's name and its watchers' may be long. */
 .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--deictic-muted); font-size: 12px; }
@@ -101,9 +123,6 @@ textarea { min-height: 76px; resize: vertical; font: 13px/1.4 system-ui, sans-se
 .watch.on::before { border-color: #4ade80; background: #4ade80; }
 .hint a { color: inherit; }
 .hint a:hover { color: var(--deictic-fg); }
-.shot { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--deictic-muted); }
-.shot label { display: flex; gap: 6px; align-items: center; }
-.shot input { width: auto; margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; font-size: 12px; }
 .chip { display: inline-flex; align-items: center; border: 1px solid var(--deictic-line); border-radius: 6px; }
 .chip button { border: 0; }
@@ -111,11 +130,11 @@ textarea { min-height: 76px; resize: vertical; font: 13px/1.4 system-ui, sans-se
 .chip img { display: block; height: 28px; border-radius: 4px; }
 .chip .play { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: var(--deictic-line); }
 .chip .play svg { width: 12px; height: 12px; }
+.chip .play.drawn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .remove { padding: 0 6px; color: var(--deictic-muted); }
 .chip .remove:hover { color: var(--deictic-fg); }
 .shot-problem { margin-top: 4px; font-size: 12px; color: var(--deictic-problem); }
 .shot-problem:empty { display: none; }
-.shot[hidden], .chips[hidden], label[hidden] { display: none; }
 `;
 
 const TOOL_STYLE = `
@@ -145,6 +164,15 @@ const DELETE = ICON('M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13');
 /** The states of a task that's over, as a board names them: nothing more happens to it. */
 const OVER = new Set(['completed', 'failed']);
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
+/** The composer's buttons, each its strokes on a 24-pixel grid. */
+const CAMERA = '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
+const CODE = '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14"/>';
+const PEN = '<path d="M4 20l1-4L16 5a2.1 2.1 0 0 1 3 3L8 19z"/>';
+const RECORD = '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>';
+const MIC = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+const SEND = '<path d="M12 19V5M6 11l6-6 6 6"/>';
+/** How tall the field grows with what's typed, in pixels, before it scrolls. */
+const GROWN = 200;
 
 /** Marks as a task tells of them: how many, and what the notes say. */
 function marksOf(list: readonly Annotation[]): Marks {
@@ -159,6 +187,22 @@ function annotationsOf(marks: Annotations | undefined): Pick<Op, 'annotations'> 
 
 /** A shot as the op attaches it, and where it is, for the page to hear of; the op goes without that. */
 type Sent = NonNullable<Op['screenshots']>[number] & { url: string };
+
+/** What a task says that only the page with the element on it knows. */
+type Facts = Pick<Op, 'page' | 'viewport' | 'point' | 'pointed' | 'count' | 'chain'> & {
+  /** The element's HTML, as it would be attached. */
+  html: string;
+};
+
+/** What the panel keeps while it's away recording: what's typed and asked for. What's attached is the tray's. */
+interface Kept {
+  text: string;
+  /** Whether a shot was asked for, or asked not to be, where either was. */
+  shot?: boolean;
+  html: boolean;
+  /** What the page said of the element as the panel left, for a task added where the page no longer has it. */
+  facts: Facts;
+}
 
 const clock = (ms: number) => {
   const s = Math.round(ms / 1000);
@@ -385,16 +429,17 @@ export default defineClientPlugin<Model, Change>({
     group.append(element('style', { textContent: TOOL_STYLE }), button);
     tools.add(group, { last: true });
   },
+  // What the page before this left the tab for: a recording, where it carries on here.
+  resume: ({ use }) => use('recordings')?.going(),
   // The page's tasks, where they are, while it's pointed on.
   pointing: (context) => pinsIn(context).glance(),
   mount: (panel, context) => {
     const style = element('style', { textContent: STYLE });
     const list = element('ul', { className: 'tasks' });
-    const text = element('textarea', { placeholder: 'What should change here?' });
-    const add = element('button', { type: 'button', className: 'primary', textContent: 'Add task' });
+    const text = element('textarea', { placeholder: 'What should change here?', rows: 2 });
     const hint = element('span', { className: 'hint' });
     const row = element('div', { className: 'row' });
-    row.append(hint, add);
+    row.append(hint);
     // The file's other tasks, folded away: the panel is about this element. It stays as it's left while the panel is up.
     const fold = element('details', { className: 'more' });
     const count = element('summary');
@@ -409,7 +454,6 @@ export default defineClientPlugin<Model, Change>({
     const thread = element('div', { className: 'thread' });
     thread.append(list, closed, fold);
     const compose = element('div', { className: 'compose' });
-    compose.append(text);
     panel.append(style, thread, compose);
     // The page's other tasks, pinned where they are: not for a popup a page shows in place, which is in a root of
     // its own.
@@ -417,26 +461,59 @@ export default defineClientPlugin<Model, Change>({
 
     const shots = context.use('screenshots');
     const notes = context.use('annotations');
+    const recorder = context.use('recordings');
+    const voice = context.use('voice');
     const { tray } = context;
-    // The server half's `html` option, which takes the box away; a page half with no options (a `standalone` server's) has it.
+    const back = context.resumed;
+    // Back from a recording on a page without the element: nothing of it to shoot or read here.
+    const here = context.element.isConnected;
+    // The server half's `html` option, which takes the button away; a page half with no options (a `standalone` server's) has it.
     const sendsHtml = (context.options as { html?: boolean } | undefined)?.html !== false;
 
-    const attach = element('input', { type: 'checkbox', checked: true });
-    const toggle = element('label', { hidden: shots === undefined });
-    toggle.append(attach, 'Attach a screenshot');
-    const shot = element('div', { className: 'shot' });
-    shot.append(toggle);
+    // A shot as the task goes: said (on, or off), or else only while nothing else is attached, which says it.
+    let wanted: boolean | undefined;
+    const shooting = () => shots !== undefined && here && (wanted ?? attachedCount() === 0);
+    let withHtml = true;
+
     const chipsEl = element('div', { className: 'chips' });
+    const camera = toolButton(CAMERA, 'Attach a screenshot, taken as the task is added', undefined, () => {
+      wanted = !shooting();
+      showChips();
+    });
+    camera.hidden = shots === undefined || !here;
+    const code = toolButton(CODE, 'Attach an HTML snapshot: the element as the page has it now, as a file', undefined, () => {
+      withHtml = !withHtml;
+      showChips();
+    });
+    code.hidden = !sendsHtml;
+    const gap = element('span', { className: 'gap', hidden: (camera.hidden && code.hidden) || (notes ?? recorder ?? voice) === undefined });
+    const pen = toolButton(PEN, 'Draw on the page', undefined, () => notes?.draw());
+    pen.hidden = notes === undefined;
+    const record = toolButton(RECORD, 'Record the page, and come back here', undefined, () => void leave());
+    record.hidden = recorder === undefined;
+    const mic = toolButton(MIC, 'Record your voice', undefined, () => void (take === undefined ? speakOn() : speakOff()));
+    mic.classList.add('mic');
+    mic.hidden = voice === undefined;
+    // The time and the mic's live waveform while a take goes, so it's plain it hears.
+    const time = element('span');
+    const wave = element('canvas');
+    const hearing = element('span', { className: 'hearing', hidden: true });
+    hearing.append(time, wave);
+    // What Add waits on, while it does: a shot being taken.
+    const doing = element('span', { className: 'doing' });
+    const add = toolButton(SEND, 'Add task', `${MOD}+Enter`, () => void send());
+    add.classList.add('send', 'primary');
+    const attach = element('div', { className: 'attach' });
+    attach.append(camera, code, gap, pen, record, mic, hearing, doing, add);
+    const composer = element('div', { className: 'composer' });
+    composer.append(chipsEl, text, attach);
     const problem = element('div', { className: 'shot-problem' });
-    compose.append(shot, chipsEl, problem);
-    // Its own line: the screenshot's gives way to the chips, and this is asked whatever else is attached.
-    const withHtml = element('input', { type: 'checkbox', checked: true });
-    const htmlToggle = element('label', { title: 'The element as the page has it now, as a file: element.html' });
-    htmlToggle.append(withHtml, 'Attach HTML snapshot');
-    const htmlRow = element('div', { className: 'shot' });
-    htmlRow.append(htmlToggle);
-    if (sendsHtml) compose.append(htmlRow);
-    compose.append(row);
+    compose.append(composer, problem, row);
+    // As tall as what's typed, to a point: the popup has the rest of the window for the tasks.
+    const grow = () => {
+      text.style.height = 'auto';
+      text.style.height = `${Math.min(text.scrollHeight, GROWN)}px`;
+    };
 
     // What the tool panel's tools made and no task has taken: this one's to attach, as each plugin said it.
     const held = <T>(plugin: string) => tray.list(plugin).map((item) => item.value as T);
@@ -445,7 +522,7 @@ export default defineClientPlugin<Model, Change>({
     const attachedCount = () => KINDS.reduce((n, plugin) => n + tray.list(plugin).length, 0);
     // A task goes with words, or with something attached that says it; not while one is going.
     let sending = false;
-    const able = () => (add.disabled = sending || (text.value.trim() === '' && attachedCount() === 0));
+    const able = () => (add.disabled = sending || (text.value.trim() === '' && attachedCount() === 0 && take === undefined));
     const chip = (content: (string | Node)[], title: string, at: number, remove: string, drop: () => void) => {
       const opener = element('button', { type: 'button', className: 'open', title });
       opener.append(...content);
@@ -479,17 +556,18 @@ export default defineClientPlugin<Model, Change>({
         })),
       ];
     };
-    /** Takes one out of the tray. Back to the box, unticked, once the last is gone: what was attached isn't, until it's asked for again. */
+    /** Takes one out of the tray. A shot that was the last thing attached leaves none asked for: taking it out said so. */
     const drop = (plugin: string, id: string) => () => {
       tray.remove(plugin, id);
-      if (attachedCount() === 0) attach.checked = false;
+      if (plugin === 'screenshots' && attachedCount() === 0) wanted = false;
+      showChips();
     };
     const showChips = () => {
       const { shots: pictures, recordings, voices } = taken();
-      // The box stands for a shot taken as the task goes, so it's away while anything else is attached.
-      const attached = attachedCount() > 0;
-      shot.hidden = attached;
-      chipsEl.hidden = !attached;
+      const marked = notes?.list().length ?? 0;
+      camera.setAttribute('aria-pressed', String(shooting()));
+      code.setAttribute('aria-pressed', String(withHtml));
+      chipsEl.hidden = attachedCount() === 0 && marked === 0;
       chipsEl.replaceChildren(
         ...pictures.map((s, i) => {
           const name = named('Screenshot', i, pictures.length);
@@ -518,11 +596,85 @@ export default defineClientPlugin<Model, Change>({
             drop('voice', v.id),
           );
         }),
+        ...(marked === 0 ? [] : [drawn(marked)]),
       );
       able();
     };
-    // As the tray changes: a shot taken from the panel while this is open is a chip at once.
-    const unsubscribe = tray.subscribe(showChips);
+    /** What's drawn on the page, which goes with the task: its chip draws more, and its × clears it. */
+    const drawn = (marked: number) => {
+      const opener = element('button', { type: 'button', className: 'open', title: 'Draw more on the page' });
+      const icon = element('span', { className: 'play drawn', innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${PEN}</svg>` });
+      opener.append(icon, `${marked} mark${marked === 1 ? '' : 's'}`);
+      opener.addEventListener('click', () => notes?.draw());
+      const remover = element('button', { type: 'button', className: 'remove', textContent: '×', title: 'Clear the marks' });
+      remover.addEventListener('click', () => notes?.clear());
+      const el = element('span', { className: 'chip' });
+      el.append(opener, remover);
+      return el;
+    };
+    // As the tray changes: a shot taken from the panel while this is open is a chip at once. The marks too.
+    const unsubscribe = [tray.subscribe(showChips), notes?.subscribe(showChips)];
+
+    // Record: the popup goes, the page is recorded, and it comes back with what's typed and the recording attached.
+    const leave = async () => {
+      if (recorder === undefined || sending) return;
+      problem.textContent = '';
+      if (recorder.recording()) {
+        problem.textContent = "A recording is going already: stop it in the tool panel, and it's attached here";
+        return;
+      }
+      // A take going on is kept first, as a chip, to come back to with the rest.
+      await speakOff();
+      const kept: Kept = { text: text.value, ...(wanted === undefined ? {} : { shot: wanted }), html: withHtml, facts: facts() };
+      context.away(kept, () => recorder.record());
+    };
+
+    // The mic, here: its button starts a take, and stops it, and it's a chip.
+    let take: Take | undefined;
+    let ticking: ReturnType<typeof setInterval> | undefined;
+    let stopWave: (() => void) | undefined;
+    const speakOn = async () => {
+      if (voice === undefined) return;
+      problem.textContent = '';
+      mic.disabled = true;
+      try {
+        take = await voice.start();
+      } catch (e) {
+        problem.textContent = messageOf(e);
+        return;
+      } finally {
+        mic.disabled = false;
+      }
+      const { started, stream } = take;
+      stopWave = liveWaveform(wave, stream, { played: '#ef4444', rest: '#52525b' });
+      const tick = () => (time.textContent = clock(Date.now() - started));
+      tick();
+      ticking = setInterval(tick, 250);
+      hearing.hidden = false;
+      mic.setAttribute('aria-pressed', 'true');
+      mic.title = 'Stop, and attach it';
+      able();
+      mark();
+    };
+    const speakOff = async () => {
+      const ending = take;
+      if (ending === undefined) return;
+      take = undefined;
+      clearInterval(ticking);
+      stopWave?.();
+      stopWave = undefined;
+      hearing.hidden = true;
+      mic.setAttribute('aria-pressed', 'false');
+      mic.title = 'Record your voice';
+      try {
+        const clip = await ending.stop();
+        tray.add('voice', clip.id, clip);
+      } catch (e) {
+        problem.textContent = messageOf(e);
+      }
+      able();
+      mark();
+    };
 
     // The task whose words are open to change, by ID, and the tasks as last read.
     let editing: string | undefined;
@@ -530,8 +682,8 @@ export default defineClientPlugin<Model, Change>({
     const whole = new Set<string>();
     // The Save of a listed task whose words were changed and not kept yet.
     let edited: HTMLElement | undefined;
-    /** Tells the popup what leaving now would lose: a listed task's changed words, or a new one's. What's attached is the tray's, and stays. */
-    const mark = () => context.unsaved(edited ?? (text.value.trim() === '' ? undefined : add));
+    /** Tells the popup what leaving now would lose: a listed task's changed words, a new one's, or a take. What's attached is the tray's, and stays. */
+    const mark = () => context.unsaved(edited ?? (text.value.trim() === '' && take === undefined ? undefined : add));
     let shown = context.model;
     /** Asks for a change to a listed task and shows the tasks as they are after; the panel's status says why not. */
     const change = async (op: Change) => {
@@ -701,56 +853,74 @@ export default defineClientPlugin<Model, Change>({
     };
 
     /**
-     * The shots to attach: those in the tray, each the window as it was taken, or with none there, a shot taken now
-     * where the box is ticked. Only that one has the element outlined in it, or the spot circled (or is as it was
-     * taken, where that can't be drawn): nothing else in it says what it's about.
+     * What the page says of the element: read now, while the page has it, and as the panel left it where the
+     * page has moved on without it (a recording that went on to another), which is the page the task is about.
+     */
+    const facts = (): Facts => {
+      const { element: el, elements, pointed, at } = context;
+      if (!here && back !== undefined) return (back.state as Kept).facts;
+      const chain = chainOf(el, context.target.loc.file);
+      return {
+        page: location.href,
+        viewport: { width: innerWidth, height: innerHeight },
+        ...(at === undefined ? {} : { point: at }),
+        ...(pointed === undefined ? {} : { pointed: { path: pathTo(pointed, el), html: pointed.outerHTML.slice(0, 4000) } }),
+        count: elements.length,
+        ...(chain.length === 0 ? {} : { chain }),
+        html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML),
+      };
+    };
+
+    /**
+     * The shots to attach: one taken now, where that's on, and those in the tray, each the window as it was taken.
+     * Only the first has the element outlined in it, or the spot circled (or is as it was taken, where that can't
+     * be drawn), so it's first: nothing else in a shot says what the task is about.
      */
     const screenshotsOf = async (): Promise<Sent[] | undefined> => {
       if (shots === undefined) return undefined;
-      const { shots: pictures } = taken();
-      if (pictures.length > 0) return pictures.map(({ id, url }) => ({ id, url }));
-      // With anything else attached the box is away, so no shot is asked for.
-      if (!attach.checked || attachedCount() > 0) return undefined;
-      add.textContent = 'Capturing…';
+      const kept: Sent[] = taken().shots.map(({ id, url }) => ({ id, url }));
+      if (!shooting()) return kept.length === 0 ? undefined : kept;
+      doing.textContent = 'Capturing…';
       const now = await shots.capture(context.element);
       try {
         const { id, url } = await shots.upload(await outlined(now.url, now, context.at), now);
-        return [{ id, url, box: now.box, outlined: true }];
+        return [{ id, url, box: now.box, outlined: true }, ...kept];
       } catch {
-        return [{ id: now.id, url: now.url, box: now.box }];
+        return [{ id: now.id, url: now.url, box: now.box }, ...kept];
       }
     };
 
     const send = async () => {
-      if (sending || able()) return;
+      if (sending) return;
       sending = true;
+      // A take still going is kept first: it may be all there is to send.
+      await speakOff();
+      if (text.value.trim() === '' && attachedCount() === 0) {
+        sending = false;
+        able();
+        return;
+      }
       able();
       problem.textContent = '';
       let screenshots: Sent[] | undefined;
       try {
         screenshots = await screenshotsOf();
       } catch (e) {
-        // Said under the box, which stays as it is: untick it to send without.
+        // Said under the field, which stays as it is: turn the screenshot off to send without.
         problem.textContent = messageOf(e);
-        add.textContent = 'Add task';
+        doing.textContent = '';
         sending = false;
         able();
         return;
       }
-      add.textContent = 'Add task';
+      doing.textContent = '';
       try {
-        const { element: el, elements, pointed, at } = context;
         const { recordings, voices } = taken();
-        const chain = chainOf(el, context.target.loc.file);
+        const { html, ...said } = facts();
         const op: Op = {
           text: text.value,
-          page: location.href,
-          viewport: { width: innerWidth, height: innerHeight },
-          ...(at === undefined ? {} : { point: at }),
-          ...(pointed === undefined ? {} : { pointed: { path: pathTo(pointed, el), html: pointed.outerHTML.slice(0, 4000) } }),
-          count: elements.length,
-          ...(chain.length === 0 ? {} : { chain }),
-          ...(sendsHtml && withHtml.checked ? { html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML) } : {}),
+          ...said,
+          ...(sendsHtml && withHtml ? { html } : {}),
           ...(screenshots === undefined ? {} : { screenshots: screenshots.map(({ url: _, ...taken }) => taken) }),
           ...(recordings.length === 0
             ? {}
@@ -775,10 +945,11 @@ export default defineClientPlugin<Model, Change>({
           (screenshots ?? []).map((taken) => taken.url),
         );
         text.value = '';
+        grow();
         // The task has them now: what was made for it, and what was drawn on the page for it.
         for (const plugin of KINDS) tray.remove(plugin);
         notes?.clear();
-        attach.checked = true;
+        wanted = undefined;
         showChips();
         mark();
         const dropped = model.tasks.at(-1)?.dropped;
@@ -790,7 +961,17 @@ export default defineClientPlugin<Model, Change>({
       able();
     };
 
+    // Back from recording: what was typed and asked for, and why there's no recording, where there's none.
+    if (back !== undefined) {
+      const kept = back.state as Kept;
+      text.value = kept.text;
+      wanted = kept.shot;
+      withHtml = kept.html;
+      if (back.problem !== undefined) problem.textContent = back.problem;
+    }
+
     text.addEventListener('input', () => {
+      grow();
       able();
       mark();
     });
@@ -799,13 +980,15 @@ export default defineClientPlugin<Model, Change>({
       e.preventDefault();
       void send();
     });
-    add.addEventListener('click', () => void send());
     showChips();
     render(context.model);
+    grow();
     text.focus();
     return () => {
       around?.release();
-      unsubscribe();
+      for (const stop of unsubscribe) stop?.();
+      // A take the popup closes on is kept, in the tray: the next task's.
+      void speakOff();
     };
   },
 });

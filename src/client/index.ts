@@ -352,6 +352,9 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   };
   const show = (glide: boolean) => {
     frame = 0;
+    // On something of ours that takes the pointer (a task's pin, the tool panel): the light stays where it was, as
+    // the pointer is on its way to a press there, not to another element.
+    if (pointer !== undefined && !picking && held.length > 0 && document.elementFromPoint(pointer.x, pointer.y) === host) return;
     const hit = pointer === undefined || (held.length === 0 && !picking) ? undefined : hitAt(pointer.x, pointer.y, picking);
     const el = hit?.el;
     const target = el === undefined ? undefined : targetOf(el);
@@ -444,7 +447,14 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
         // Rendered again while away, or gone from the page, which moved on: the popup comes back all the same, on
         // the element as it was left, since what it kept (a recording) is about it wherever the page is now.
         const found = element.isConnected ? element : (sameAs(element)[0] ?? element);
-        openTab(again, found, targetOf(found) ?? target, kept, pointed?.isConnected === true && found === element ? pointed : undefined);
+        openTab(
+          again,
+          found,
+          targetOf(found) ?? target,
+          kept,
+          pointed?.isConnected === true && found === element ? pointed : undefined,
+          at,
+        );
       },
     });
   };
@@ -460,7 +470,9 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       const { loc, tag } = away.target;
       const absent = document.createElement(tag);
       absent.setAttribute(ATTRIBUTE, `${loc.file}:${loc.line}:${loc.column}`);
-      openTab(tab, sameAs(absent).find((el) => el.localName === tag) ?? absent, away.target, resumed);
+      const found = sameAs(absent).find((el) => el.localName === tag);
+      // The spot only where this page has the element: there's nowhere for it otherwise.
+      openTab(tab, found ?? absent, away.target, resumed, undefined, found === undefined ? undefined : away.at);
     };
     task.then(
       (result) => back({ state: away.state, result }),
@@ -717,7 +729,7 @@ function openPanel({
         const tab = current;
         done(true);
         // For the tab's next page too, should this one go before the task is done. Not one a page pinned: that's the page's own.
-        if (!pinned) keepAway({ tab: tab.plugin.name, target, state });
+        if (!pinned) keepAway({ tab: tab.plugin.name, target, state, ...(spot === undefined ? {} : { at: spot }) });
         const back = (resumed: Resumed) => {
           if (!pinned) dropAway();
           reopen(tab, element, resumed);

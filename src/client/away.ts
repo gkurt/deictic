@@ -5,12 +5,14 @@
  * The state may hold what JSON can't (a drawn screenshot is a `Blob`), so it's in IndexedDB, which is the
  * origin's: the tab's session storage holds the key, so each tab comes back to its own.
  */
-import type { Target } from '#src/index.ts';
+import type { Point, Target } from '#src/index.ts';
 
 /** What the next page needs to come back: which tab, on what, with what. */
 export interface Away {
   tab: string;
   target: Target;
+  /** The spot in the element the popup was on, where it was on one. */
+  at?: Point;
   state: unknown;
 }
 

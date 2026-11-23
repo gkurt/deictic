@@ -54,16 +54,21 @@ export interface DrawingOptions {
   hold: ToolPanel['hold'];
 }
 
-/**
- * Draws on `surface` with the tool picked: answers the tools, as a group for the tool panel (the tools, then
- * removing the last mark or all).
- */
-export function drawing({ surface, at, preview, add, removeLast, clear, hold }: DrawingOptions): HTMLElement {
+export interface Drawing {
+  /** The tools, as a group for the tool panel: the tools, then removing the last mark or all. */
+  group: HTMLElement;
+  /** Picks the tool used last, the box first: what a button elsewhere starts drawing with. */
+  draw: () => void;
+}
+
+/** Draws on `surface` with the tool picked. */
+export function drawing({ surface, at, preview, add, removeLast, clear, hold }: DrawingOptions): Drawing {
   const tools = document.createElement('div');
   tools.className = 'tool-group annotations-tools';
 
   // None until one is picked: the page is the page's.
   let tool: Tool | undefined;
+  let last: Tool = 'box';
   let release: (() => void) | undefined;
   const picks = TOOLS.map((t) => ({ t, el: toolButton(ICONS[t], NAMES[t], KEYS[t], () => pick(t)) }));
   const show = () => {
@@ -72,6 +77,7 @@ export function drawing({ surface, at, preview, add, removeLast, clear, hold }: 
   };
   const pick = (t: Tool) => {
     tool = t;
+    last = t;
     // The page's, once: another of these tools takes over from the one that had it.
     release ??= hold(() => {
       tool = undefined;
@@ -155,5 +161,5 @@ export function drawing({ surface, at, preview, add, removeLast, clear, hold }: 
     field.focus();
   };
 
-  return tools;
+  return { group: tools, draw: () => pick(last) };
 }
