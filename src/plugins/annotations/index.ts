@@ -59,6 +59,21 @@ export interface Annotations {
    * another plugin's button. The page is the marks' until the tool panel gives it back (its pointer, or Esc).
    */
   draw(): void;
+  /**
+   * Opens `picture` over everything, to draw on with the same tools: the marks on Save, in the picture's CSS
+   * pixels, or nothing on Cancel, Esc or `signal`. Start it with `marks`, to change them. They're the picture's
+   * alone, not the page's.
+   */
+  edit(picture: Picture, marks?: readonly Annotation[], options?: { signal?: AbortSignal }): Promise<Annotation[] | undefined>;
+  /** The picture with the marks drawn over it, as a PNG at the picture's own resolution. */
+  flatten(picture: Picture, marks: readonly Annotation[]): Promise<Blob>;
+}
+
+/** An image to draw on: where it loads from (the page's origin, so a canvas may read it), and its size in CSS pixels, which marks on it are in. */
+export interface Picture {
+  url: string;
+  width: number;
+  height: number;
 }
 
 declare module 'deictic' {

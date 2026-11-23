@@ -156,10 +156,11 @@ export interface Op {
   html?: string;
   /**
    * Shots the screenshots plugin took, to attach, where that plugin is loaded: each with where the element is in
-   * it (`box`, for one taken of the element; one taken of the window from the tool panel has none), and whether
-   * it's `outlined` there (dashes drawn around it, or around the spot, in the PNG).
+   * it (`box`, for one taken of the element; one taken of the window from the tool panel has none), whether
+   * it's `outlined` there (dashes drawn around it, or around the spot, in the PNG), and the marks drawn on it in
+   * the Task tab, where there are any.
    */
-  screenshots?: { id: string; box?: Box; outlined?: boolean }[];
+  screenshots?: { id: string; box?: Box; outlined?: boolean; marks?: Marks }[];
   /**
    * Recordings the recordings plugin made, to attach, where that plugin is loaded: how long each ran,
    * where it plays back, and the voice plugin's clips of the mic in it, attached too.
@@ -575,7 +576,7 @@ type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
 /**
  * What the attached files don't say, as labels numbered from 1, so each value is short and none is read out of the
  * text. `deictic.screenshot.N` is the Nth PNG attached: its `.position` and `.size` where the element is in it (CSS
- * pixels from its top left), for one taken of the element. `deictic.recording.N.replay` is where the Nth recording
+ * pixels from its top left), for one taken of the element, `.note.M` a note drawn on it. `deictic.recording.N.replay` is where the Nth recording
  * plays back; `deictic.note.M` a note drawn on the page; `deictic.dropped.N` what wasn't kept any more;
  * `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
  */
@@ -585,10 +586,11 @@ function attachedLabels(op: Op, dropped: Kind[]): Record<string, string> {
   const set = (key: string, value: string) => {
     labels[`deictic.${key}`] = clip(value.replace(/\p{Cc}+/gu, ' '), LABEL);
   };
-  for (const [i, { box }] of (op.screenshots ?? []).entries()) {
+  for (const [i, { box, marks }] of (op.screenshots ?? []).entries()) {
+    const n = `screenshot.${i + 1}`;
+    for (const [j, note] of (marks?.notes ?? []).entries()) set(`${n}.note.${j + 1}`, note);
     // One of the window, from the tool panel, says nothing of the element: it may not be in it.
     if (box === undefined) continue;
-    const n = `screenshot.${i + 1}`;
     const [x, y, width, height] = boxOf(box);
     set(`${n}.position`, `${x},${y}`);
     set(`${n}.size`, `${width}x${height}`);

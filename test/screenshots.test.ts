@@ -143,7 +143,7 @@ test('takes a PNG and nothing else from a renderer without render', async () => 
   expect(await add('{}', 'application/json')).toMatchObject({ status: 415, problem: 'send the shot as image/png' });
 });
 
-test('a task attaches each shot, labelling where the element is in the one taken of it, the spot and the notes on the page', async () => {
+test('a task attaches each shot, labelling where the element is in the one taken of it, the spot and the notes drawn', async () => {
   const { p, ask, add } = setup();
   const [one, two] = [await add(), await add()];
   const res = await ask('apply', {
@@ -158,8 +158,11 @@ test('a task attaches each shot, labelling where the element is in the one taken
         viewport: { width: 800, height: 600 },
         point: { x: 12.4, y: -3 },
         count: 1,
-        // The first is the window's, from the tool panel: it says nothing of the element.
-        screenshots: [{ id: one.id }, { id: two.id, box: { x: 0, y: 0, width: 300, height: 24 }, outlined: true }],
+        // The first is the window's, drawn on since: it says nothing of the element, and has notes of its own.
+        screenshots: [
+          { id: one.id, marks: { count: 2, notes: ['On the shot'] } },
+          { id: two.id, box: { x: 0, y: 0, width: 300, height: 24 }, outlined: true },
+        ],
         annotations: { count: 3, notes: ['Too close', 'Two\nlines'] },
       },
     }),
@@ -173,6 +176,7 @@ test('a task attaches each shot, labelling where the element is in the one taken
   // The Nth PNG attached is `deictic.screenshot.N`'s.
   expect(message.labels).toMatchObject({
     'deictic.point': '12,-3',
+    'deictic.screenshot.1.note.1': 'On the shot',
     'deictic.screenshot.2.position': '0,0',
     'deictic.screenshot.2.size': '300x24',
     'deictic.note.1': 'Too close',
@@ -180,5 +184,6 @@ test('a task attaches each shot, labelling where the element is in the one taken
     'deictic.note.2': 'Two lines',
   });
   expect(message.labels['deictic.screenshot.1.position']).toBeUndefined();
+  expect(message.labels['deictic.screenshot.2.note.1']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
 });

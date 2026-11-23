@@ -9,7 +9,7 @@
  */
 import type { Spot, ToolPanel } from '#src/index.ts';
 
-import { div } from './dom.ts';
+import { controlFor, div } from './dom.ts';
 
 type Edge = 'top' | 'bottom' | 'left' | 'right';
 /** Where the bar is: the edge it's docked to, and how far along it, from 0 to 1. */
@@ -171,36 +171,16 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
   };
   pointer.addEventListener('click', letGo);
 
-  /** The control a key is for, by its `aria-keyshortcuts`: a key alone, or with the keys it names. */
-  const forKey = (e: KeyboardEvent): HTMLElement | undefined => {
-    // By the letter typed, and by where the key is where it types no Latin letter (another layout, or Alt held).
-    const key = /^[a-z]$/i.test(e.key) ? e.key.toUpperCase() : e.code.startsWith('Key') ? e.code.slice(3) : e.key;
-    const held = [e.ctrlKey && 'Control', e.metaKey && 'Meta', e.shiftKey && 'Shift'].filter((m) => m !== false);
-    for (const el of bar.querySelectorAll<HTMLElement>('[aria-keyshortcuts]')) {
-      if (el instanceof HTMLButtonElement && el.disabled) continue;
-      // One that isn't shown now: a recording's Stop while none is going.
-      if (el.offsetParent === null) continue;
-      for (const keys of (el.getAttribute('aria-keyshortcuts') ?? '').split(' ')) {
-        const named = keys.split('+');
-        if (named.at(-1) !== key) continue;
-        const mods = named.slice(0, -1);
-        // While the keys are held to point, a key alone is its tool whatever is held with it.
-        if (mods.length === 0 ? pointing || held.length === 0 : mods.length === held.length && mods.every((m) => held.includes(m)))
-          return el;
-      }
-    }
-    return undefined;
-  };
   window.addEventListener(
     'keydown',
     (e) => {
       if (e.repeat || !(pointing || holder !== undefined)) return;
+      // A modal of ours has the keys while it's there: a note being typed, a picture drawn on, the lightbox.
+      if (root.querySelector('[data-deictic-modal]') !== null) return;
       const [target] = e.composedPath();
       const typing = target instanceof HTMLElement && target.matches('input, textarea, select, [contenteditable]');
-      // Esc is the tool's before the popup's, from the popup's field too (a task being typed while marks are drawn):
-      // only a modal's own comes first, as a note being typed drops the note.
+      // Esc is the tool's before the popup's, from the popup's field too (a task being typed while marks are drawn).
       if (e.key === 'Escape' && holder !== undefined) {
-        if (target instanceof Element && target.closest('[data-deictic-modal]') !== null) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         return letGo();
@@ -209,7 +189,8 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
       // too while they're only held to point: Alt with a letter types one there. Once a tool has the page, the page
       // isn't in use, and a field of its that still has the focus gets none.
       if (typing && (holder === undefined || target.getRootNode() === root)) return;
-      const control = forKey(e);
+      // While the keys are held to point, a key alone is its tool whatever is held with it.
+      const control = controlFor(bar, e, pointing);
       if (control === undefined) return;
       e.preventDefault();
       e.stopImmediatePropagation();

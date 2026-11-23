@@ -129,8 +129,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
-- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with, and
-  `toolButton(strokes, name, keys, run)`, a tool panel's icon button (`MOD` is Control, or Meta on a Mac).
+- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with,
+  `toolButton(strokes, name, keys, run)`, a tool panel's icon button (`MOD` is Control, or Meta on a Mac), and
+  `controlFor(within, e, loose)`, the control a key is for by its `aria-keyshortcuts`.
 - `src/client/tools.ts`: `toolPanel(root, { spotAt, aim })`, the tool panel (`.tool-panel`; "panel" alone is a tab's
   body, as in `PanelContext`), `context.tools`: a bar docked to an edge (`deictic:tools` in `localStorage`, bottom
   centre first), dragged by its grip to the nearest of the four. It shows while a shortcut's keys are held (`point`,
@@ -140,7 +141,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   others'). Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
   page, while the keys are held or a tool holds: a control's `aria-keyshortcuts` is its key, which clicks it (a key
   alone, whatever is held while pointing; never one typed in a field of ours, or of the page's while only pointing),
-  and Esc gives the page back. So a tool never listens for keys itself. `pick()` answers the next press on the page
+  and Esc gives the page back. Not while a `data-deictic-modal` is in the root: the keys are the modal's. So a tool never listens for keys itself. `pick()` answers the next press on the page
   as a `Spot` (`spotAt`, in the overlay: the marked element under the point, through the overlay, or the nearest
   one, and the point from its top left), over a `.tool-surface` that takes the press, the page lit as for pointing.
 - `src/client/tray.ts`: `tray()`, `context.tray`: what the tools made that no task has taken (`add(plugin, id,
@@ -244,9 +245,11 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   shapes only (no `foreignObject`), the one drawing both the page's layer and a shot use. `client.ts`: `setup` keeps
   the marks per page in session storage, draws them in a layer of the overlay that lets the pointer through, adds
   its tools to the tool panel, and answers `list`, `add`, `remove`, `clear`, `subscribe` (for a recording),
-  `svg(area)` and `draw()` (picks the tool used last, for another plugin's button: tasks' composer). `draw.ts` is the tools (`drawing`, a group) and the gestures, on a surface over the page that takes
+  `svg(area)`, `draw()` (picks the tool used last, for another plugin's UI: the tasks' marks chip),
+  `edit(picture, marks)` (the same tools in a bar over a picture, in a modal over everything, with Cancel and Save;
+  marks in the picture's CSS pixels; its bar hears its keys, `controlFor`) and `flatten` (its PNG with them drawn in). `draw.ts` is the tools (`drawing`, a group) and the gestures, on a surface over the page that takes
   the pointer only while a tool is picked (`tools.hold`, so the pointer tool, Esc or another plugin's tool gives the
-  page back; Esc from the popup's field too, and only a modal's own Esc, a note's, comes first). No words: each tool is an icon named by its tooltip, with its key (M box, A arrow, B pen, N note,
+  page back; Esc from the popup's field too). No words: each tool is an icon named by its tooltip, with its key (M box, A arrow, B pen, N note,
   Ctrl or ⌘ Z undo, Shift+Backspace clear, with a modifier as nothing brings the marks back), which the tool panel
   hears. A note being typed has its keys to itself (Enter places it, Esc doesn't). Screenshots' renderers draw
   `svg(area)` over a shot (`overlay` in a `PageCapture`), and a task names the count and notes, and clears the marks
@@ -305,7 +308,7 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url` where it fits, `viewport`, `count`, `source`), under
   the user's own `labels`; the source isn't sent. What the attached files don't say is labels numbered from 1
   (`attachedLabels`): `screenshot.N.position` and `.size` for the Nth PNG attached, where it's a shot of the element
-  (it has a `box`; the window's, from the tool panel, has none), `note.M` on the page, `point` (`x,y` from the
+  (it has a `box`; the window's, from the tool panel, has none), `.note.M` for a note drawn on it, `note.M` on the page, `point` (`x,y` from the
   element's top left, for a task about a spot: `Op.point`, read back as `Task.point`),
   `recording.N.replay` for the Nth recording, `dropped.N` and `pointed` (the path; its HTML is in `element.html`, or `pointed.html` without
   it). Control characters become spaces and a value is cut at 256. `deictic task` prints them. A task added before has them
@@ -356,8 +359,12 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   as the task goes (`shooting`): on while nothing is attached, or as it was last pressed (`wanted`; taking the last
   shot out turns it off). It's sent first, and only it has the element outlined (`outlined`, in green dashes `ROOM`
   off it, or a circle of `SPOT` around the task's spot, drawn on and kept again with `screenshots.upload`), which
-  the op says (`outlined`), not the text. `Op.screenshots` is a list, each with its `box` where it's of the element.
-  Draw is `annotations.draw()`. Record calls `away` with what's typed and asked for (`Kept`), and the panel comes
+  the op says (`outlined`), not the text. `Op.screenshots` is a list, each with its `box` where it's of the element
+  and its `marks` where it was drawn on.
+  Draw captures a shot and `edit`s it: saved, the `flatten`ed PNG is kept (`screenshots.upload`) and put in the
+  tray as a `Pictured`, a shot with what it was made of (`drawn`: the shot as taken, the marks, the element's
+  place), so its chip's lightbox has Change marks, and the op has its `marks` (count and notes) and its `box` where
+  the task is about the element it was taken of. Record calls `away` with what's typed and asked for (`Kept`), and the panel comes
   back with that, the recording in the tray by then; the kept state has `facts` too, what only the element's page
   says (page, viewport, point, count, chain, pointed, HTML): a recording stopped on a page without the element
   comes back to a panel with no shot to take, and the task says those. Voice records a take here (`voice.start()`),

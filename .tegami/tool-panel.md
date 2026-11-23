@@ -24,18 +24,18 @@ as `deictic.point` (`x,y` from the element's top left), which `deictic task` pri
 
 ### The popup is Task and Tailwind, and the Task tab's field is a composer
 
-The Annotate tab is gone, with the editor that drew on a screenshot: marks are drawn on the page, with the tool
-panel's tools. The recording's own toolbar is the tool panel, too.
+The Annotate tab is gone: marks are drawn on the page with the tool panel's tools. The recording's own toolbar is
+the tool panel, too.
 
 The Task tab's field has what's attached over the words, a chip each, and its buttons under them, as icons:
-screenshot and HTML snapshot, on or off, then draw, record and voice, and an arrow that adds the task.
+screenshot and HTML snapshot, on or off, then draw (a screenshot to draw on, as Annotate was), record and voice, and
+an arrow that adds the task.
 
 A task's pin is pressed while the keys are held, too: it opens that element's tasks.
 
-- `annotations({ shortcut })` is gone, as it has no tab to open, and its page API is the marks and `draw()`, which
-  starts drawing as the tool panel's tools do: `edit`, `flatten` and `tools()` are gone.
-- A task's `screenshots` have no `marks`, and no `deictic.screenshot.N.note.M` labels: notes are the page's,
-  `deictic.note.M`. One taken from the tool panel has no `box`, so no `.position` and `.size`.
+- `annotations({ shortcut })` is gone, as it has no tab to open. Its page API has `draw()`, which starts drawing on
+  the page as the tool panel's tools do, and no `tools()`.
+- A screenshot taken from the tool panel has no `box` in a task, so no `deictic.screenshot.N.position` and `.size`.
 - `page: true` on a plugin's page half is gone.
 
 ### A plugin can add tools, and what they make: `context.tools`, `context.tray`

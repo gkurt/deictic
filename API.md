@@ -170,8 +170,8 @@ In the Task tab a task's dot says its state, and who holds it while it's claimed
 A task's text is the words typed, and nothing else. The rest is its attachments and labels: `deictic.project`,
 `deictic.at` (the element's `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your
 own beside them. What the attached files don't say is numbered from 1: `deictic.screenshot.1.position` and `.size`
-are where the element is in the first PNG attached, where that's a shot taken of it; `deictic.note.1` is a note drawn
-on the page; `deictic.recording.1.replay` is where the first recording plays back; `deictic.pointed` is the path to
+are where the element is in the first PNG attached, where that's a shot taken of it, and `.note.1` a note drawn on
+it; `deictic.note.1` is a note drawn on the page; `deictic.recording.1.replay` is where the first recording plays back; `deictic.pointed` is the path to
 what was pointed at inside the element; `deictic.dropped.1` is something attached that wasn't kept any more.
 `deictic.point` is the spot a task about a point is on, `x,y` in CSS pixels from the element's top left.
 `deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared
@@ -179,7 +179,8 @@ component's line is the same wherever it's used; these say where: with React in 
 it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
 Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the
-box has the element outlined in it, or the point circled; one taken from the tool panel is the window as it was.
+button has the element outlined in it, or the point circled; one you drew on is as you drew it, and one taken from
+the tool panel is the window as it was.
 
 The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
 that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening
@@ -192,8 +193,10 @@ In the Task tab:
 - **Screenshot** is on or off: on, a shot of the page goes with the task as it's added, the element outlined in it.
   It's on to begin with, and goes off once something else is attached, until you turn it on again.
 - **HTML snapshot** is on or off too: the element as the page has it, as a file.
-- **Draw** starts drawing on the page, with the tool panel's tools: `Esc` gives the page back. What's drawn goes
-  with the task, in its screenshot and as `deictic.note` labels, and is cleared once the task is added.
+- **Draw** takes a screenshot and opens it to draw boxes, arrows and notes on, with the tool panel's drawing tools
+  and their keys: `Ctrl+Enter` (`⌘Enter`) saves it as a chip, `Esc` leaves it. Open the chip to change its marks.
+- What's drawn on the page itself, with the tool panel, goes with the task too, in its screenshot and as
+  `deictic.note` labels, and is cleared once the task is added.
 - **Record** closes the popup and records the page as you use it. A reload, or a link to another page of your
   site, leaves it going: stop it in the tool panel, and the Task tab comes back with what you'd typed and the
   recording, about the element you started on, whether that page has it or not.

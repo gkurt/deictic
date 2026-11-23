@@ -10,8 +10,8 @@ command to read each, and whether the line still reads as the task saw it.
 - **`Pointed at, inside it:`** is markup inside the element that no line marks (a dependency's): what they mean. Its
   HTML is in the file named beside it. Find it by its classes.
 - **`About the spot at x,y`** (the `deictic.point` label): the task is about that point, not the whole element,
-  which is only the nearest one the source marks. The point may be outside it. A screenshot taken of the element has
-  the point circled.
+  which is only the nearest one the source marks. The point may be outside it. A screenshot taken as the task was
+  added has the point circled.
 - **The element is one place**: what they mean may be its parent, a sibling, or every element the line renders. The
   words and the marks decide.
 - **`element.html`** is the element as it rendered. Read it only when the task and the screenshot don't settle which

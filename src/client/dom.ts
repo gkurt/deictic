@@ -29,5 +29,27 @@ export function toolButton(strokes: string, name: string, keys: string | undefin
   return el;
 }
 
+/**
+ * The control in `within` that a key is for, by its `aria-keyshortcuts`: a key alone, or with the keys it names.
+ * `loose` takes a key alone whatever is held with it, for while a shortcut's keys are held to point.
+ */
+export function controlFor(within: ParentNode, e: KeyboardEvent, loose = false): HTMLElement | undefined {
+  // By the letter typed, and by where the key is where it types no Latin letter (another layout, or Alt held).
+  const key = /^[a-z]$/i.test(e.key) ? e.key.toUpperCase() : e.code.startsWith('Key') ? e.code.slice(3) : e.key;
+  const held = [e.ctrlKey && 'Control', e.metaKey && 'Meta', e.shiftKey && 'Shift'].filter((m) => m !== false);
+  for (const el of within.querySelectorAll<HTMLElement>('[aria-keyshortcuts]')) {
+    if (el instanceof HTMLButtonElement && el.disabled) continue;
+    // One that isn't shown now: a recording's Stop while none is going.
+    if (el.offsetParent === null) continue;
+    for (const keys of (el.getAttribute('aria-keyshortcuts') ?? '').split(' ')) {
+      const named = keys.split('+');
+      if (named.at(-1) !== key) continue;
+      const mods = named.slice(0, -1);
+      if (mods.length === 0 ? loose || held.length === 0 : mods.length === held.length && mods.every((m) => held.includes(m))) return el;
+    }
+  }
+  return undefined;
+}
+
 /** The key held with a letter for a command, as the platform has it, by the name `aria-keyshortcuts` gives it. */
 export const MOD = typeof navigator !== 'undefined' && /Mac|iP(?:hone|ad)/.test(navigator.platform) ? 'Meta' : 'Control';

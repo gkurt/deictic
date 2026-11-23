@@ -13,7 +13,8 @@
  * nothing else says which of two rows alike was meant. And the element's HTML as it rendered, as a file (not with
  * the server half's `html` option off, and then there's no button).
  *
- * The rest make something. Draw starts drawing on the page, with the annotations plugin's tools. Record leaves the
+ * The rest make something. Draw takes a shot and opens it to draw on, in the annotations plugin's editor: saved,
+ * it's a chip, whose lightbox opens it to change the marks. Record leaves the
  * popup (`away`) to record the page, and comes back with what was typed when it's stopped, wherever the page is by
  * then. Voice records the mic here, its time and waveform beside it.
  *
@@ -29,7 +30,7 @@ import { liveWaveform } from '#src/client/waveform.ts';
 import { defineClientPlugin, type LightboxItem, type Point, type Target } from '#src/index.ts';
 
 // For `use()`'s types: the plugins may not be loaded, and nothing of them runs here.
-import type { Annotation, Annotations } from '#src/plugins/annotations/index.ts';
+import type { Annotation, Annotations, Picture } from '#src/plugins/annotations/index.ts';
 import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
@@ -184,6 +185,13 @@ function annotationsOf(marks: Annotations | undefined): Pick<Op, 'annotations'> 
   const list = marks?.list() ?? [];
   return list.length === 0 ? {} : { annotations: marksOf(list) };
 }
+
+/**
+ * A shot as the tray has it: the window's, from the tool panel, or one that was drawn on here. That one's PNG has the
+ * marks in it, and it keeps what it was made of, to draw on it again: the shot as taken, the marks, and the element it
+ * was taken of (`file:line:column`), as only a task about that element can say where the element is in it.
+ */
+type Pictured = Shot & { drawn?: { shot: Shot; marks: Annotation[]; about: string } };
 
 /** A shot as the op attaches it, and where it is, for the page to hear of; the op goes without that. */
 type Sent = NonNullable<Op['screenshots']>[number] & { url: string };
@@ -389,7 +397,7 @@ function announce(model: Model, op: Op, target: Target, shots: string[]): void {
       screenshots: op.screenshots?.length ?? 0,
       recordings: op.recordings?.length ?? 0,
       voice: op.voice?.length ?? 0,
-      marks: op.annotations?.count ?? 0,
+      marks: (op.annotations?.count ?? 0) + (op.screenshots ?? []).reduce((n, shot) => n + (shot.marks?.count ?? 0), 0),
     },
     screenshots: shots,
   };
@@ -486,14 +494,18 @@ export default defineClientPlugin<Model, Change>({
       showChips();
     });
     code.hidden = !sendsHtml;
-    const gap = element('span', { className: 'gap', hidden: (camera.hidden && code.hidden) || (notes ?? recorder ?? voice) === undefined });
-    const pen = toolButton(PEN, 'Draw on the page', undefined, () => notes?.draw());
-    pen.hidden = notes === undefined;
+    const pen = toolButton(PEN, 'Draw on a screenshot', undefined, () => void draw());
+    pen.hidden = shots === undefined || notes === undefined || !here;
     const record = toolButton(RECORD, 'Record the page, and come back here', undefined, () => void leave());
     record.hidden = recorder === undefined;
     const mic = toolButton(MIC, 'Record your voice', undefined, () => void (take === undefined ? speakOn() : speakOff()));
     mic.classList.add('mic');
     mic.hidden = voice === undefined;
+    // Between what's on or off and what makes something, where there's some of both.
+    const gap = element('span', {
+      className: 'gap',
+      hidden: (camera.hidden && code.hidden) || (pen.hidden && record.hidden && mic.hidden),
+    });
     // The time and the mic's live waveform while a take goes, so it's plain it hears.
     const time = element('span');
     const wave = element('canvas');
@@ -517,7 +529,7 @@ export default defineClientPlugin<Model, Change>({
 
     // What the tool panel's tools made and no task has taken: this one's to attach, as each plugin said it.
     const held = <T>(plugin: string) => tray.list(plugin).map((item) => item.value as T);
-    const taken = () => ({ shots: held<Shot>('screenshots'), recordings: held<Recording>('recordings'), voices: held<Clip>('voice') });
+    const taken = () => ({ shots: held<Pictured>('screenshots'), recordings: held<Recording>('recordings'), voices: held<Clip>('voice') });
     const KINDS = ['screenshots', 'recordings', 'voice'];
     const attachedCount = () => KINDS.reduce((n, plugin) => n + tray.list(plugin).length, 0);
     // A task goes with words, or with something attached that says it; not while one is going.
@@ -539,7 +551,12 @@ export default defineClientPlugin<Model, Change>({
     const viewed = (): LightboxItem[] => {
       const { shots: pictures, recordings, voices } = taken();
       return [
-        ...pictures.map((s, i) => ({ kind: 'image' as const, url: s.url, title: named('Screenshot', i, pictures.length) })),
+        ...pictures.map((s, i) => ({
+          kind: 'image' as const,
+          url: s.url,
+          title: named('Screenshot', i, pictures.length),
+          ...(s.drawn === undefined ? {} : { actions: [{ label: 'Change marks', title: 'Draw on it again', run: () => void draw(s) }] }),
+        })),
         ...recordings.map((r, i) => ({
           kind: 'page' as const,
           // The replay filling the frame, without a header of its own: the lightbox names it.
@@ -596,12 +613,12 @@ export default defineClientPlugin<Model, Change>({
             drop('voice', v.id),
           );
         }),
-        ...(marked === 0 ? [] : [drawn(marked)]),
+        ...(marked === 0 ? [] : [marksChip(marked)]),
       );
       able();
     };
     /** What's drawn on the page, which goes with the task: its chip draws more, and its × clears it. */
-    const drawn = (marked: number) => {
+    const marksChip = (marked: number) => {
       const opener = element('button', { type: 'button', className: 'open', title: 'Draw more on the page' });
       const icon = element('span', { className: 'play drawn', innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${PEN}</svg>` });
       opener.append(icon, `${marked} mark${marked === 1 ? '' : 's'}`);
@@ -614,6 +631,38 @@ export default defineClientPlugin<Model, Change>({
     };
     // As the tray changes: a shot taken from the panel while this is open is a chip at once. The marks too.
     const unsubscribe = [tray.subscribe(showChips), notes?.subscribe(showChips)];
+
+    // Draw: a shot is taken and opened to draw on, or a chip's opened again. Saved, the PNG of both is kept as a
+    // shot of its own, in the tray, so it's a chip as any other is.
+    const { file, line, column } = context.target.loc;
+    const place = `${file}:${line}:${column}`;
+    const aborts = new AbortController();
+    let drawing = false;
+    const draw = async (old?: Pictured) => {
+      if (shots === undefined || notes === undefined || drawing || sending) return;
+      drawing = true;
+      problem.textContent = '';
+      try {
+        if (old === undefined) doing.textContent = 'Capturing…';
+        const shot = old?.drawn?.shot ?? (await shots.capture(context.element));
+        doing.textContent = '';
+        const picture: Picture = { url: shot.url, ...shot.size };
+        const marks = await notes.edit(picture, old?.drawn?.marks ?? [], { signal: aborts.signal });
+        if (marks === undefined) return;
+        doing.textContent = 'Saving…';
+        const kept = await shots.upload(await notes.flatten(picture, marks), shot);
+        if (old !== undefined) tray.remove('screenshots', old.id);
+        const pictured: Pictured = { ...kept, drawn: { shot, marks, about: old?.drawn?.about ?? place } };
+        tray.add('screenshots', kept.id, pictured);
+      } catch (e) {
+        problem.textContent = messageOf(e);
+      } finally {
+        doing.textContent = '';
+        drawing = false;
+        // Back to the words: the editor gave the focus to the button that opened it.
+        text.focus();
+      }
+    };
 
     // Record: the popup goes, the page is recorded, and it comes back with what's typed and the recording attached.
     const leave = async () => {
@@ -878,7 +927,13 @@ export default defineClientPlugin<Model, Change>({
      */
     const screenshotsOf = async (): Promise<Sent[] | undefined> => {
       if (shots === undefined) return undefined;
-      const kept: Sent[] = taken().shots.map(({ id, url }) => ({ id, url }));
+      // One drawn on says its notes, and where the element is in it, where it's this element it was taken of.
+      const kept: Sent[] = taken().shots.map(({ id, url, drawn }) => ({
+        id,
+        url,
+        ...(drawn?.about === place ? { box: drawn.shot.box } : {}),
+        ...(drawn === undefined || drawn.marks.length === 0 ? {} : { marks: marksOf(drawn.marks) }),
+      }));
       if (!shooting()) return kept.length === 0 ? undefined : kept;
       doing.textContent = 'Capturing…';
       const now = await shots.capture(context.element);
@@ -987,6 +1042,7 @@ export default defineClientPlugin<Model, Change>({
     return () => {
       around?.release();
       for (const stop of unsubscribe) stop?.();
+      aborts.abort();
       // A take the popup closes on is kept, in the tray: the next task's.
       void speakOff();
     };
