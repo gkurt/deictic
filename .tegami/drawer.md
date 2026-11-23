@@ -7,7 +7,7 @@ packages:
 
 While the shortcut's keys are held, a drawer on the window's side has what there is for the page: every task of the
 channel still to do, the latest finished folded under them, and the screenshots, recordings and voice notes no task has
-taken yet. It stays while the pointer is on it.
+taken yet. It stays while the pointer is on it, and goes at once when the last thing in it is deleted.
 
 A task opens in the drawer, from its row or from its pin on the page: its state, its words, what it has attached,
 and its thread. A screenshot, a recording, a voice note or an element's HTML opens in the lightbox. The composer under

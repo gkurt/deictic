@@ -161,7 +161,8 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   window's right (its left while `crowded`, the tool panel docked right), what the plugins have for the page, a
   section each (`add(section, { first })`; a section with nothing sets its own `hidden`, and the drawer with none shown
   stays away). It shows while a shortcut's keys are held (`point`, which the overlay calls), the pointer or the focus
-  is in it, something keeps it (`keep()`) or an item is open, and goes `LINGER` after. `show(view, { title, closed })`
+  is in it, something keeps it (`keep()`) or an item is open, and goes `LINGER` after (at once, `.emptied`, when its
+  last section empties). `show(view, { title, closed })`
   opens an item in the sections' place, under a head with a way back, and answers what closes it; Esc is the item's
   while the focus is in the drawer or no popup is open (never a `data-deictic-modal`'s). `.drawer-fold`, in its corner,
   folds it to `.drawer-pill` (`deictic:drawer` in `localStorage`, open again by the pill or an item shown), which

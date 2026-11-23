@@ -113,6 +113,13 @@ export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawe
     leaving = undefined;
     const on = !empty() && (pointing || over || keeps > 0 || leave !== undefined || drawer.contains(root.activeElement));
     if (on === shown()) return;
+    // Emptied, it goes at once, not shrunk to its corner's button for a while: nothing is left to get the pointer to.
+    if (!on && empty()) {
+      drawer.classList.add('emptied');
+      drawer.classList.remove('shown');
+      return;
+    }
+    drawer.classList.remove('emptied');
     if (!on) {
       // Not at once: the keys are let go on the way to it.
       leaving = setTimeout(() => drawer.classList.remove('shown'), LINGER);

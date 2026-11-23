@@ -276,6 +276,7 @@ export const STYLE = `
 }
 .drawer.left { right: auto; left: 12px; }
 .drawer.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
+.drawer.emptied { transition: none; }
 .drawer [hidden] { display: none; }
 .drawer-sections, .drawer-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 10px; overflow-y: auto; scrollbar-width: thin; }
 .drawer-view { gap: 8px; }
