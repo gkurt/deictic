@@ -18,7 +18,10 @@ export interface Pointed {
   /** What's under the pointer inside it, where that differs. */
   pointed?: Element;
   target: Target;
-  /** What a press would open, each by its tab's label: several where shortcuts share keys and differ by button. */
+  /**
+   * The tabs that plugins' own shortcuts would open, each by its label: several where they share keys and differ by
+   * button, and none for deictic's own shortcut alone.
+   */
   names: string[];
   /** How many elements on the page are from its place in the source. */
   count: number;
@@ -137,7 +140,8 @@ export function spotlight(root: ShadowRoot): Lighting {
       inner.classList.toggle('shown', pointed !== undefined);
       if (pointed !== undefined) place(inner, pointed.getBoundingClientRect());
 
-      // What it is, where it's from, how big, how many share its place, what's pointed at in it, and what a press opens.
+      // What it is, where it's from, how big, how many share its place, what's pointed at in it, and the tab a
+      // plugin's own shortcut opens.
       const dim = [
         `${Math.round(box.width)}×${Math.round(box.height)}`,
         ...(count > 1 ? [`×${count}`] : []),
@@ -151,7 +155,7 @@ export function spotlight(root: ShadowRoot): Lighting {
           part('tag', texts.tag),
           part('', texts.from),
           ...dim.map((text) => part('dim', text)),
-          part('opens', texts.opens),
+          ...(names.length === 0 ? [] : [part('opens', texts.opens)]),
         );
       }
       caption.classList.toggle('below', r.top < 40);

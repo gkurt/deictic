@@ -83,6 +83,10 @@ deictic({
 | `plugins`  | The plugins to load. None by default.                                                        |
 | `shortcut` | `{ modifiers, button }`: held to point, pressed to open. Alt and the left button by default. |
 
+The button is `'left'`, `'middle'` or `'right'`: `shortcut: { modifiers: ['Alt'], button: 'right' }` opens on Alt
+and a right-click, which the browser's own menu then doesn't answer. A plugin's own `shortcut` is the same, for its
+tab: while its keys are held, the element's caption names that tab.
+
 While the keys are held the page dims around the element pointed at, which stays lit, with guides from its edges
 across the window. The popup opens beside it, tied to it by a line, and the page gets its light back once the
 pointer has been out on it a moment. Nothing of it takes the pointer from the page.

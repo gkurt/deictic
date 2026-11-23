@@ -256,11 +256,11 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   // What opens the popup, and at which tab: deictic's own shortcut at the one used last, each
   // plugin's at its own.
   const plugins = [
-    ...(own === undefined || tabs.length === 0 ? [] : [{ shortcut: own, gesture: gestureOf(own), tab: last }]),
+    ...(own === undefined || tabs.length === 0 ? [] : [{ shortcut: own, gesture: gestureOf(own), tab: last, named: false }]),
     ...given.flatMap(({ plugin, shortcut }) => {
       if (shortcut === undefined) return [];
       const tab = tabs.find((t) => t.plugin === plugin);
-      if (tab !== undefined) return [{ shortcut, gesture: gestureOf(shortcut), tab: () => tab }];
+      if (tab !== undefined) return [{ shortcut, gesture: gestureOf(shortcut), tab: () => tab, named: true }];
       console.error(`deictic: ${plugin.name} has a shortcut, but its page half has no \`mount\` to draw a tab with`);
       return [];
     }),
@@ -317,11 +317,13 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     const el = hit?.el;
     const target = el === undefined ? undefined : targetOf(el);
     if (el === undefined || target === undefined) return lighting.hide();
-    // The button, where it isn't the left: what the keys alone don't tell apart.
-    const names = held.map(({ tab, shortcut }) => {
+    // A plugin's own shortcut says its tab, and its button where it isn't the left, which the keys alone don't tell
+    // apart. deictic's own says nothing: it opens whichever tab was used last.
+    const names = held.flatMap(({ tab, shortcut, named }) => {
+      if (!named) return [];
       const { plugin } = tab();
       const name = plugin.label ?? plugin.name;
-      return shortcut.button === 'left' ? name : `${name} (${shortcut.button})`;
+      return [shortcut.button === 'left' ? name : `${name} (${shortcut.button})`];
     });
     lighting.point({ el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), target, names, count: sameAs(el).length }, glide);
   };
