@@ -4,7 +4,7 @@
  * it too. `--wav` writes each clip as 16 kHz mono WAV, what speech-to-text tools take.
  */
 import { mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { clock, ME } from './board.ts';
 import { ffmpeg, voiceClips } from './find.ts';
@@ -42,10 +42,10 @@ export async function run(ref: string, values: { noise: string; gap: string; wav
   }
   for (const r of results) {
     const where = r.recording === undefined ? 'a voice note' : `in recording ${r.recording}, from ${clock(r.at)}`;
-    console.log(`clip ${r.id} (${where}), ${clock(r.length)} long: ${r.file}`);
+    console.log(`clip ${r.id} (${where}), ${clock(r.length)} long: ${relative(process.cwd(), r.file)}`);
     if (r.speech.length === 0) console.log('  no speech found: try a lower --noise, like -45');
     for (const s of r.speech) console.log(`  ${clock(s.from).padStart(6)} – ${clock(s.to).padStart(6)}  speech`);
-    if (wav !== undefined) console.log(`  wav: ${join(wav, `${r.id}.wav`)}`);
+    if (wav !== undefined) console.log(`  wav: ${relative(process.cwd(), join(wav, `${r.id}.wav`))}`);
   }
   // Speech in a recording points at the page: "this one" is what was on screen as it was said.
   if (!results.some((r) => r.recording !== undefined && r.speech.length > 0)) return;

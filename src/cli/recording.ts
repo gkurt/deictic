@@ -4,6 +4,8 @@
  * clips, the page's console and its requests where the project records them, and the end. Or the part of it asked
  * for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, and `--full` for all of each line.
  */
+import { relative } from 'node:path';
+
 import type { Shape } from '#src/plugins/annotations/index.ts';
 
 import { clock, fail, ME } from './board.ts';
@@ -228,7 +230,9 @@ function timelineOf(events: Event[], voice: { id: string; at: number; duration: 
       const added = now.filter((a) => !before.has(key(a)));
       const removed = marks.filter((a) => !after.has(key(a)));
       if (added.length > 0 || removed.length > 0) {
-        const text = [...added.map((a) => `+ ${shapeOf(a)}`), ...removed.map((a) => `− ${shapeOf(a)}`)].join('; ');
+        // All of them cleared (a task added, the page left) is said as that: each was said as it was drawn.
+        const gone = now.length === 0 && removed.length > 1 ? [`− all ${removed.length} marks`] : removed.map((a) => `− ${shapeOf(a)}`);
+        const text = [...added.map((a) => `+ ${shapeOf(a)}`), ...gone].join('; ');
         push(t, 'marks', text, { marks: now.map((a) => a.shape) });
       }
       marks = now;
@@ -295,6 +299,32 @@ function timelineOf(events: Event[], voice: { id: string; at: number; duration: 
   return timeline.sort((a, b) => a.t - b.t);
 }
 
+/**
+ * The page's own URLs as paths, in a line of text: `http://localhost:5180/src/App.tsx?t=1712:9:7` is `/src/App.tsx:9:7`,
+ * and a file Vite serves from outside its root (`/@fs/S:/…/dist/client.js`) is that file's path from here. The header
+ * says the origin once; `--json` keeps every URL whole.
+ */
+function shortener(page: string): (text: string) => string {
+  let origin: string;
+  try {
+    origin = new URL(page).origin;
+  } catch {
+    return (text) => text;
+  }
+  const quoted = origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // A Windows path has a drive's colon in it, which a line and column also follow.
+  const fs = new RegExp(`${quoted}/@fs/([A-Za-z]:)?([^\\s?:)]+)`, 'g');
+  const own = new RegExp(`${quoted}(?=/)`, 'g');
+  return (text) =>
+    text
+      .replace(fs, (_, drive: string | undefined, rest: string) =>
+        relative(process.cwd(), drive ? `${drive}${rest}` : `/${rest}`).replaceAll('\\', '/'),
+      )
+      .replace(own, '')
+      // A bundler's cache-busting query, between a module's path and its line.
+      .replace(/(\.[cm]?[jt]sx?)\?[tv]=[\w.-]+/g, '$1');
+}
+
 export interface Options {
   nth: string;
   json?: boolean;
@@ -349,9 +379,10 @@ export async function run(named: string, values: Options): Promise<void> {
   if (replay !== undefined) console.log(`replays at ${replay} (add ?t=<seconds> to open it paused there)`);
   if (shown.length < timeline.length) console.log(`${shown.length} of its ${timeline.length} lines, as asked`);
   console.log();
-  const under = (line: string) => console.log(`${' '.repeat(22)}${line}`);
+  const short = shortener(kept.page);
+  const under = (line: string) => console.log(`${' '.repeat(22)}${short(line)}`);
   for (const e of shown) {
-    console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${e.text}`);
+    console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${short(e.text)}`);
     // Where a warning or an error came from, its nearest few places: all of them, and every line's, with `--full`.
     if (e.trace && (values.full === true || e.problem === true))
       for (const line of values.full ? e.trace : e.trace.slice(0, 5)) under(`at ${line}`);

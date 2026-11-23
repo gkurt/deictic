@@ -3,7 +3,7 @@
  * page, what's attached with the command to look at each, the replies, and the other open tasks about the same page.
  */
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 import { deicticDirs, download, ME, type Message, read, vbJson } from './board.ts';
 
@@ -32,10 +32,7 @@ export function run(id: string, values: { out?: string }): void {
     ['deictic.at', (v) => `${v} <${label('deictic.tag') ?? '?'}>`],
     // From its own line out: before the label, tasks said it in their text, which is printed below as it is.
     // The first is often a shared component (`ui/label.tsx`), which the task isn't about changing everywhere.
-    [
-      'deictic.source',
-      (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v} (where the first is a shared component, the change is usually at the next)`,
-    ],
+    ['deictic.source', (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v} (a shared component's change is usually at the next)`],
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
     ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
@@ -43,10 +40,10 @@ export function run(id: string, values: { out?: string }): void {
       'deictic.point',
       // Circled only in a shot taken as the task went, which no label tells from one drawn on before.
       (v) =>
-        `About the spot at x,y ${v} in that element (CSS pixels from its top left): a screenshot taken as the task was added has it circled`,
+        `About the spot at x,y ${v} in that element (CSS px from its top left): a screenshot taken as the task was added has it circled`,
     ],
     // A task added before shots were numbered had its one shot's place here.
-    ['deictic.position', (v) => `In the screenshot at x,y ${v}, ${label('deictic.size') ?? '?'} (CSS pixels from its top left)`],
+    ['deictic.position', (v) => `In the screenshot at x,y ${v}, ${label('deictic.size') ?? '?'} (CSS px)`],
   ];
   for (const [key, say] of facts) {
     const value = label(key);
@@ -81,12 +78,15 @@ export function run(id: string, values: { out?: string }): void {
     for (const line of drawn(r)) console.log(`    ${line}`);
     attachments(r, out, '    ');
   }
+  // Said once, not as a command per file: most tasks need their shots, and `--out` gets everything at once.
+  if (out === undefined && [root, ...replies].some((m) => m.attachments.length > 0))
+    console.log(`\nTo download what's attached: ${ME} task ${root.id} --out <dir>`);
   others(root);
 }
 
 /**
  * What the attached files don't say, from the numbered labels: where the element is in each shot and the notes on it, the
- * notes drawn on the page, where each recording replays, and what wasn't kept any more.
+ * notes drawn on the page, and what wasn't kept any more. Where a recording replays, `recording` says.
  */
 function drawn({ labels, attachments }: Message): string[] {
   const numbered = (prefix: string) => {
@@ -103,7 +103,7 @@ function drawn({ labels, attachments }: Message): string[] {
     if (position === undefined) continue;
     const said = notes(shot);
     lines.push(
-      `${name}: the element at x,y ${position}, ${labels[`${shot}.size`] ?? '?'} (CSS pixels from its top left)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
+      `${name}: the element at x,y ${position}, ${labels[`${shot}.size`] ?? '?'} (CSS px)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
     );
   }
   // The others it's about, after the one it names first: the Nth element's HTML is `element.N.html`.
@@ -113,10 +113,6 @@ function drawn({ labels, attachments }: Message): string[] {
   }
   const onPage = notes('deictic');
   if (onPage.length > 0) lines.push(`Notes drawn on the page: ${onPage.join(', ')}`);
-  for (const [i, { name }] of attachments.filter((a) => a.name.startsWith('recording-')).entries()) {
-    const replay = labels[`deictic.recording.${i + 1}.replay`];
-    if (replay !== undefined) lines.push(`${name} replays at ${replay}`);
-  }
   const dropped = numbered('deictic.dropped');
   if (dropped.length > 0) lines.push(`Not attached, as it wasn't kept any more: ${dropped.join(', ')}`);
   return lines;
@@ -134,23 +130,25 @@ function placeOf(at: string, first: string | undefined): void {
     return;
   }
   const lines = readFileSync(path, 'utf8').split('\n');
+  const shown = relative(process.cwd(), path) || path;
   // The tag's first line may follow other code on its line: `const App = () => <h1>`.
   const now = lines[line - 1]?.trim();
   if (first === undefined || now?.includes(first.slice(0, 40))) {
-    console.log(`\nFile: ${path}:${line}, as the task saw it.`);
+    console.log(`\nFile: ${shown}:${line}, as the task saw it.`);
     return;
   }
   const moved = lines.findIndex((l) => l.includes(first.slice(0, 40)));
   console.log(
     moved >= 0
-      ? `\nFile: moved to ${path}:${moved + 1} (the task says line ${line}).`
-      : `\nFile: ${path}:${line} no longer reads as the task saw it; it was:\n  ${first}`,
+      ? `\nFile: moved to ${shown}:${moved + 1} (the task says line ${line}).`
+      : `\nFile: ${shown}:${line} no longer reads as the task saw it; it was:\n  ${first}`,
   );
 }
 
 /**
- * A message's files, with the command to look at each, downloaded to `out` where it's given. The task's own are read
- * by its ID; a reply's recording by where it replays, and its voice note by the clip's ID.
+ * A message's files, with the command to read a recording or voice clip by, downloaded to `out` where it's given. The
+ * task's own are read by its ID (all its voice clips at once); a reply's recording by where it replays, and its voice
+ * note by the clip's ID.
  */
 function attachments(message: Message, out: string | undefined, indent: string, task?: string): void {
   if (out !== undefined && message.attachments.length > 0) mkdirSync(out, { recursive: true });
@@ -158,24 +156,23 @@ function attachments(message: Message, out: string | undefined, indent: string, 
   for (const a of message.attachments) {
     const kb = `${Math.round(a.size / 1024)} KB`;
     if (out !== undefined) download(a, join(out, a.name));
-    const saved = out === undefined ? '' : ` → ${join(out, a.name)}`;
-    // To a file's path: the CLI writes what it's given, and refuses a folder.
-    const get = saved || `: ${ME} vb download ${a.id} ${a.name}`;
+    const saved = out === undefined ? '' : ` → ${relative(process.cwd(), join(out, a.name))}`;
     if (a.name.startsWith('recording-')) {
-      const ref = task ?? message.labels[`deictic.recording.${recordings.indexOf(a) + 1}.replay`];
-      console.log(`${indent}${a.name} (${kb})${ref === undefined ? get : saved}`);
-      if (ref === undefined) continue;
-      console.log(`${indent}  timeline: ${ME} recording ${ref}`);
-      console.log(`${indent}  frames:   ${ME} frame ${ref}`);
+      const n = recordings.indexOf(a) + 1;
+      const ref = task === undefined ? message.labels[`deictic.recording.${n}.replay`] : `${task}${n > 1 ? ` --nth ${n}` : ''}`;
+      console.log(`${indent}${a.name} (${kb})${saved}`);
+      if (ref !== undefined) console.log(`${indent}  ${ME} recording ${ref} (timeline), ${ME} frame ${ref} (frames)`);
     } else if (a.name.startsWith('voice-')) {
       console.log(`${indent}${a.name} (${kb}), a voice clip${saved}`);
-      console.log(`${indent}  speech:   ${ME} voice ${task ?? /^voice-(.+)\.\w+$/.exec(a.name)?.[1] ?? a.id}`);
+      if (task === undefined) console.log(`${indent}  ${ME} voice ${/^voice-(.+)\.\w+$/.exec(a.name)?.[1] ?? a.id} (speech)`);
     } else if (a.name === 'element.html') {
-      console.log(`${indent}${a.name} (${kb}), the element's HTML as it rendered, if you need it${get}`);
+      console.log(`${indent}${a.name} (${kb}), the element's HTML as it rendered, if you need it${saved}`);
     } else {
-      console.log(`${indent}${a.name} (${a.type}, ${kb})${get}`);
+      console.log(`${indent}${a.name} (${kb})${saved}`);
     }
   }
+  if (task !== undefined && message.attachments.some((a) => a.name.startsWith('voice-')))
+    console.log(`${indent}${ME} voice ${task} (speech in every clip), ${ME} transcribe ${task} (the words)`);
 }
 
 /** The other open tasks about the same page, of the same project: left a minute apart, they're often one change. */

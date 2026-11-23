@@ -16,7 +16,7 @@ import { createInterface } from 'node:readline';
 
 import { watcherAt } from '#src/plugins/tasks/watchers.ts';
 
-import { answers, boardIn, boardUrl, deicticDirs, duration, ME, vb, vbCommand, vbJson, whoami } from './board.ts';
+import { answers, boardIn, boardUrl, deicticDirs, duration, ME, type Message, vbCommand, vbJson, whoami } from './board.ts';
 
 /** What `vb tail --json` prints, one per line. */
 interface Tailed {
@@ -98,6 +98,14 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
   const idle = duration(values.idle);
   const say = (line: string) => console.log(line.replace(/\s+/g, ' ').trim());
   const first = (text: string) => (text.split('\n---')[0] ?? '').trim().slice(0, 160);
+  // A task in a line: its words and where, not its labels, which `task` reads out.
+  const about = (text: string, labels: Record<string, string> | undefined) => {
+    const label = (key: string) => labels?.[key];
+    const at = label('deictic.at');
+    const page = label('deictic.page');
+    const project = label('deictic.project');
+    return `"${first(text)}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`;
+  };
 
   // A board nothing has posted to yet has no channel, and won't list or follow one it hasn't: made here, as the first
   // task would make it. One that's there stays as it is; where the board won't let this make one, `vb tasks` says so.
@@ -109,7 +117,7 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
   // Where the channel is now, taken before what's ready is: followed from here, nothing posted between is missed, and
   // a tail started again after the board went away follows on from what this one heard, never from a list taken earlier.
   let cursor = vbJson<{ cursor: string }>(['read', channel, '--limit', '1']).cursor;
-  const ready = vb(['tasks', channel, '--state', 'ready', ...labels]).trim();
+  const ready = vbJson<{ tasks: { message: Message }[] }>(['tasks', channel, '--state', 'ready', ...labels]).tasks.map((t) => t.message);
   const me = whoami();
   // In the `.deictic/` whose board this is, or in each one near here where the board is the environment's.
   const url = boardUrl();
@@ -143,11 +151,10 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
       `you write as ${me.handle ?? me.actor}, the person's own identity, as nothing here says which agent you are: set BOARD_PROFILE=<your name> (claude, codex) on every command, this watch too, and start it again`,
     );
   }
-  const waiting = (ready ? ready.split('\n') : []).filter((line) => /^#\d+/.test(line));
   // The tasks said, by ID: one made after the cursor above and listed as ready is said once.
-  const told = new Set(waiting.map((line) => /^#(\d+)/.exec(line)?.[1]));
-  for (const line of waiting) say(`ready: ${line}`);
-  if (values.once && waiting.length > 0) end(0);
+  const told = new Set(ready.map((m) => String(m.id)));
+  for (const m of ready) say(`ready: #${m.id} ${about(m.text, m.labels)}. Read it: ${ME} task ${m.id}`);
+  if (values.once && ready.length > 0) end(0);
 
   /** One thing to act on: all `--once` waits for. */
   const event = (line: string) => {
@@ -181,13 +188,7 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
     if (e.cursor !== undefined) cursor = e.cursor;
     heard();
     const p = e.payload ?? {};
-    const label = (key: string) => p.labels?.[key];
-    if (e.type === 'message.posted' && p.re === null && p.thread !== undefined) {
-      const at = label('deictic.at');
-      const page = label('deictic.page');
-      const project = label('deictic.project');
-      roots.set(p.thread, `"${first(p.text ?? '')}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`);
-    }
+    if (e.type === 'message.posted' && p.re === null && p.thread !== undefined) roots.set(p.thread, about(p.text ?? '', p.labels));
     if (e.type === 'task.created' && !told.has(String(p.id)))
       event(`new task #${p.id}: ${roots.get(p.thread ?? -1) ?? ''}. Read it: ${ME} task ${p.id}`);
     if (e.type === 'message.posted' && p.re !== null && p.re !== undefined) {

@@ -92,12 +92,17 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(task.out).toContain('Source: src/App.tsx:1 ← Hero (src/Hero.tsx:4)');
   expect(task.out).toContain('Notes drawn on the page: "Bolder"');
   expect(task.out).toContain('Pointed at, inside it: span.icon (its HTML is in pointed.html)');
-  expect(task.out).toContain(`File: ${join(p.root, 'src/App.tsx')}:1, as the task saw it.`);
+  expect(task.out).toContain(`File: ${join('src', 'App.tsx')}:1, as the task saw it.`);
+  // One line for every download, not a command per file.
+  expect(task.out).toContain(`To download what's attached: bunx deictic task ${id} --out <dir>`);
+  expect(task.out).not.toContain('vb download');
 
   const watch = deictic(p.root, 'watch', 'cli', '--once');
   expect(watch.code).toBe(0);
   expect(watch.out).toContain('watching cli on http://127.0.0.1:');
-  expect(watch.out).toContain(`ready: #${id}`);
+  // The task in a line, not its labels.
+  expect(watch.out).toContain(`ready: #${id} "Make it bolder" at src/App.tsx:1:`);
+  expect(watch.out).not.toContain('deictic.');
   // As the agent, with nothing set but what its harness sets: its replies are left out, and nothing says to set a name.
   expect(watch.out).not.toContain('BOARD_PROFILE');
   // Gone with the watch: the page doesn't go on saying someone watches.
@@ -196,6 +201,10 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
   };
   const html = { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'body', attributes: {}, childNodes: [button] }] };
   const t = 1_700_000_000_000;
+  const p = project({ 'package.json': '{}' });
+  // As Vite serves a file from outside its root: `/@fs/S:/…` on Windows, `/@fs/home/…` elsewhere.
+  const fs = p.root.replaceAll('\\', '/').replace(/^\/?/, '/');
+  const note = { id: 'a', shape: { kind: 'note', at: { x: 1, y: 2 }, text: 'here' } };
   const kept: Kept = {
     page: `${ORIGIN}/`,
     viewport: { width: 800, height: 600 },
@@ -208,20 +217,35 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
       {
         type: 6,
         timestamp: t + 1500,
-        data: { plugin: 'rrweb/console@1', payload: { level: 'error', payload: ['"Save failed"'], trace: ['save (App.tsx:12)'] } },
+        data: {
+          plugin: 'rrweb/console@1',
+          payload: {
+            level: 'error',
+            payload: ['"Save failed"'],
+            trace: ['save (App.tsx:12)', `load (${ORIGIN}/src/main.tsx?t=1712:3:9)`, `place (${ORIGIN}/@fs${fs}/dist/x.js?v=ab12:1:2)`],
+          },
+        },
       },
       {
         type: 5,
         timestamp: t + 2000,
         data: {
           tag: 'deictic.annotations',
-          payload: { annotations: [{ id: 'a', shape: { kind: 'note', at: { x: 1, y: 2 }, text: 'here' } }] },
+          payload: { annotations: [note] },
         },
       },
+      {
+        type: 5,
+        timestamp: t + 2200,
+        data: {
+          tag: 'deictic.annotations',
+          payload: { annotations: [note, { id: 'b', shape: { kind: 'box', x: 0, y: 0, width: 9, height: 9 } }] },
+        },
+      },
+      { type: 5, timestamp: t + 2400, data: { tag: 'deictic.annotations', payload: { annotations: [] } } },
       { type: 5, timestamp: t + 3000, data: { tag: 'deictic.end', payload: {} } },
     ],
   };
-  const p = project({ 'package.json': '{}' });
   mkdirSync(join(p.root, '.deictic', 'recordings'), { recursive: true });
   writeFileSync(join(p.root, '.deictic', 'recordings', 'rec-1.json'), JSON.stringify(kept));
 
@@ -230,19 +254,23 @@ test('a recording kept in the project as a timeline, and the part of it asked fo
   expect(all.out).toContain('click         text "Save" at src/App.tsx:9:7 at (40,20) in the viewport');
   expect(all.out).toContain('console.error Save failed');
   expect(all.out).toContain('marks         + note at (1,2): "here"');
+  expect(all.out).toContain('marks         − all 2 marks');
   expect(all.out).toContain('end           recording stopped');
   expect(all.out).toContain('1 problem: --problems lists them');
 
   const problems = deictic(p.root, 'recording', 'rec-1', '--problems');
-  expect(problems.out).toContain('1 of its 5 lines, as asked');
+  expect(problems.out).toContain('1 of its 7 lines, as asked');
   expect(problems.out).toContain('at save (App.tsx:12)');
+  // The page's own URLs as paths, without a bundler's cache-busting query.
+  expect(problems.out).toContain('at load (/src/main.tsx:3:9)');
+  expect(problems.out).toContain('at place (dist/x.js:1:2)');
   expect(problems.out).not.toContain('click');
 
   const json = JSON.parse(deictic(p.root, 'recording', 'rec-1', '--only', 'click', '--json').out) as {
     lines: number;
     timeline: { kind: string }[];
   };
-  expect(json.lines).toBe(5);
+  expect(json.lines).toBe(7);
   expect(json.timeline.map((l) => l.kind)).toEqual(['click']);
 });
 
