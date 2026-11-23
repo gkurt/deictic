@@ -1,4 +1,4 @@
-import { type MouseEvent, type PointerEvent, useEffect, useState } from 'react';
+import { type MouseEvent, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import code, { type Line } from 'virtual:code';
 
 import { cn } from '#src/cn.ts';
@@ -48,16 +48,45 @@ function Copy({ text }: { text: string }) {
   );
 }
 
-/** The outline's label, as the overlay draws it. */
-function Label({ tag }: { tag: Tag }) {
-  return (
-    <span className="pointer-events-none absolute bottom-full -left-0.5 bg-signal px-1.5 font-mono text-[11px] leading-5 font-normal tracking-normal whitespace-nowrap text-on-signal">
-      {FILE}:{AT[tag].line}:{AT[tag].column}
-    </span>
-  );
+/** How far off its element the light's ring is, in pixels, as the overlay's. */
+const CLEAR = 8;
+/** The ring's corner on each: the element's own, that much further out. */
+const CORNER: Record<Tag, number> = { article: 14, h3: 8, p: 8, button: 12 };
+/** A glow in the signal's colour, and around it the dark that dims the rest: far wider than the card's side, which cuts it. */
+const LIGHT = [
+  '0 0 0 4px color-mix(in srgb, var(--color-signal) 14%, transparent)',
+  '0 0 32px color-mix(in srgb, var(--color-signal) 50%, transparent)',
+  '0 0 0 100vmax rgb(9 9 11 / 0.45)',
+].join(', ');
+
+/** Where the ring is in the card's side, in pixels from its top left. */
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
-const OUTLINED = 'outline-2 outline-signal bg-signal/10';
+/**
+ * The overlay's light, in small: the card's side dims around the element, which stays lit in a ring with its
+ * caption, and the light glides to the next. Gone while `shown` isn't, where deictic's own is on the page.
+ */
+function Light({ tag, box, shown }: { tag: Tag; box: Box; shown: boolean }) {
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute z-10 border-[1.5px] border-signal motion-safe:transition-[left,top,width,height,border-radius,opacity] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.3,0.7,0.2,1)]',
+        !shown && 'opacity-0',
+      )}
+      style={{ ...box, borderRadius: CORNER[tag], boxShadow: LIGHT }}
+    >
+      <span className="absolute bottom-[calc(100%+6px)] -left-px flex items-center gap-2 rounded-full border border-white/10 bg-zinc-900/90 py-0.5 pr-2.5 pl-0.5 font-mono text-[11px] leading-5 font-normal tracking-normal whitespace-nowrap text-zinc-100 shadow-lg backdrop-blur">
+        <span className="rounded-full bg-signal px-2 font-semibold text-on-signal">{`<${tag}>`}</span>
+        {FILE}:{AT[tag].line}
+      </span>
+    </div>
+  );
+}
 
 /**
  * deictic runs on this page too, on the dev server and deployed (`standalone`, in `vite.config.ts`): a click in the
@@ -97,50 +126,58 @@ function Demo() {
   }, [pointed, held]);
   const active = pointed ?? TAGS[step % TAGS.length]!;
   const { line, column } = AT[active];
-  // The one outlined in the card, as the overlay would: none while deictic's own popup is open on one, which draws
-  // its own around it and shows the element as it is, with nothing of the demo's on it.
-  const lit = held ? null : active;
   const light = (tag: Tag | null) => {
     if (!held) setPointed(tag);
   };
+  const side = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<Box | null>(null);
+  // Where an element is laid out is the browser's to say: the light is measured over it as it moves to another, as
+  // the window resizes, and as deictic's popup closes, which may have changed the element under it.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const within = side.current;
+      // The card has one of each tag.
+      const el = within?.querySelector(active);
+      if (within === null || el === null || el === undefined) return;
+      const from = within.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      setBox({ left: r.left - from.left - CLEAR, top: r.top - from.top - CLEAR, width: r.width + 2 * CLEAR, height: r.height + 2 * CLEAR });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [active, held]);
 
   // The innermost element under the pointer, not each of its ancestors in turn.
   const point = (tag: Tag) => (e: PointerEvent) => {
     e.stopPropagation();
     light(tag);
   };
-  const mark = (tag: Tag) => (lit === tag ? <Label tag={tag} /> : null);
 
   return (
     <figure className="overflow-hidden rounded-lg border border-line bg-surface font-mono text-sm" onPointerLeave={() => light(null)}>
       <div className="grid sm:grid-cols-2">
-        <div className="flex items-center justify-center border-b border-line px-6 py-12 sm:border-r sm:border-b-0">
+        <div
+          ref={side}
+          className="relative flex items-center justify-center overflow-hidden border-b border-line px-6 py-14 sm:border-r sm:border-b-0"
+        >
           <article
-            className={cn('relative w-52 cursor-pointer rounded-md border border-line p-6 font-sans', lit === 'article' && OUTLINED)}
+            className="w-52 cursor-pointer rounded-md border border-line p-6 font-sans"
             onClick={openDeictic}
             onPointerOver={point('article')}
           >
-            {mark('article')}
-            <h3 className={cn('relative text-lg font-semibold', lit === 'h3' && OUTLINED)} onPointerOver={point('h3')}>
-              {mark('h3')}
+            <h3 className="text-lg font-semibold" onPointerOver={point('h3')}>
               Pro
             </h3>
-            <p className={cn('relative mt-6 text-sm text-muted', lit === 'p' && OUTLINED)} onPointerOver={point('p')}>
-              {mark('p')}
+            <p className="mt-6 text-sm text-muted" onPointerOver={point('p')}>
               $12 / month
             </p>
-            <button
-              type="button"
-              className={cn(
-                'relative mt-7 w-full rounded bg-fg px-3 py-1.5 text-sm text-bg',
-                lit === 'button' && 'outline-2 outline-signal',
-              )}
-              onPointerOver={point('button')}
-            >
-              {mark('button')}
+            <button type="button" className="mt-7 w-full rounded bg-fg px-3 py-1.5 text-sm text-bg" onPointerOver={point('button')}>
               Upgrade
             </button>
           </article>
+          {/* None while deictic's own popup is open on one: it lights the element itself, with nothing of the demo's on it. */}
+          {box !== null && <Light tag={active} box={box} shown={!held} />}
         </div>
         <pre className="overflow-x-auto py-4 leading-6">
           {code.source.map((tokens, i) => {
