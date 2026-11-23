@@ -56,10 +56,11 @@ const STYLE = `
 /* What a task or a reply has attached: a chip each, which opens all of them in the lightbox. */
 .task-files { display: flex; flex-wrap: wrap; gap: 4px; }
 .task-files:empty { display: none; }
-.task-files button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 2px 6px 2px 2px; border: 1px solid var(--deictic-line); border-radius: 6px; font-size: 11px; }
+/* One height, and a thumbnail one size, as the composer's chips: nothing moves as the pictures load. */
+.task-files button { box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 26px; padding: 0 6px 0 2px; border: 1px solid var(--deictic-line); border-radius: 6px; font-size: 11px; }
 .task-files button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-files img { display: block; height: 24px; border-radius: 4px; }
-.task-files .play { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: var(--deictic-line); }
+.task-files img { flex: none; display: block; width: 30px; height: 20px; object-fit: cover; border-radius: 4px; background: var(--deictic-line); }
+.task-files .play { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: var(--deictic-line); }
 .task-files .play svg { width: 10px; height: 10px; }
 .task-thread { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; padding: 8px 0 0; border-top: 1px solid rgb(255 255 255 / 0.08); list-style: none; }
 .task-thread:empty { display: none; }

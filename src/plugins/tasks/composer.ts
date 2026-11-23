@@ -51,17 +51,19 @@ export const COMPOSER_STYLE = `
 .composer .attach button.send { border-radius: 50%; color: var(--deictic-on-accent); }
 .composer .attach button.send:hover:not(:disabled) { color: var(--deictic-on-accent); background: var(--deictic-accent); filter: brightness(1.1); }
 .composer [hidden] { display: none; }
-.chip { display: inline-flex; align-items: center; border: 1px solid var(--deictic-line); border-radius: 6px; }
-.chip button { border: 0; }
-.chip .open { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 2px; }
-.chip img { display: block; height: 28px; border-radius: 4px; }
-.chip .play { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: var(--deictic-line); }
+/* Every chip one height, and a picture's thumbnail one size whatever its shape or whether it has loaded yet: nothing
+   moves as one is attached, or as its picture comes. */
+.chip { box-sizing: border-box; display: inline-flex; align-items: center; height: 30px; border: 1px solid var(--deictic-line); border-radius: 6px; }
+.chip button { height: 100%; border: 0; }
+.chip .open { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 2px; }
+.chip img { display: block; width: 36px; height: 24px; object-fit: cover; border-radius: 4px; background: var(--deictic-line); }
+.chip .play { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: var(--deictic-line); }
 .chip .play svg { width: 12px; height: 12px; }
 .chip .play.drawn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .remove { padding: 0 6px; color: var(--deictic-muted); }
 .chip .remove:hover { color: var(--deictic-fg); }
 /* An element the task is about: named as the caption names it, in the overlay's own green. */
-.chip.about .open { padding: 4px 4px 4px 8px; font: 12px ui-monospace, monospace; color: var(--deictic-accent); }
+.chip.about .open { padding: 0 4px 0 8px; font: 12px ui-monospace, monospace; color: var(--deictic-accent); }
 .chip.about .open span { color: var(--deictic-muted); }
 .compose .shot-problem { margin-top: 4px; font-size: 12px; color: var(--deictic-problem); }
 .compose .shot-problem:empty { display: none; }

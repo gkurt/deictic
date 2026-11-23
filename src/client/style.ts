@@ -280,8 +280,9 @@ export const STYLE = `
 .drawer-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .drawer-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 8px; background: rgb(255 255 255 / 0.04); }
 .drawer-row:hover { border-color: rgb(255 255 255 / 0.16); }
-.drawer-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; border: 0; text-align: left; font-size: 12px; }
-.drawer-open img { display: block; height: 24px; border-radius: 4px; }
+/* A row one height whether it has a picture, and the picture one size, loaded or not: nothing moves as one comes. */
+.drawer-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; padding: 0 6px; border: 0; text-align: left; font-size: 12px; }
+.drawer-open img { flex: none; display: block; width: 36px; height: 24px; object-fit: cover; border-radius: 4px; background: rgb(255 255 255 / 0.08); }
 .drawer-open svg { flex: none; width: 12px; height: 12px; }
 .drawer-head { display: flex; align-items: center; gap: 6px; margin: -4px 24px 0 -4px; }
 /* Folding it away: the button in its corner, and the pill it folds to, which counts what's in it. */
