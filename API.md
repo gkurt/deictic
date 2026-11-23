@@ -70,6 +70,7 @@ React Native isn't supported: there's no DOM to point at.
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt; `false` for none
+  view: 'spotlight', // the page dims around the element; `'popup'` by default
   plugins: recommended({
     tasks: { channel: 'ui', project: 'storefront', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },
@@ -82,6 +83,13 @@ deictic({
 | ---------- | ---------------------------------------------------------------------------------------------- |
 | `plugins`  | The plugins to load. None by default.                                                          |
 | `shortcut` | `{ modifiers, button }`: held to outline, pressed to open. Alt and the left button by default. |
+| `view`     | `'popup'`, the default, or `'spotlight'`: how deictic shows itself over the page.              |
+
+In the `popup` view the element is outlined and the popup opens under it. In the `spotlight` view the page dims
+around the element, which stays lit, with guides from its edges across the window; the popup opens beside it, tied
+to it by a line, and the page gets its light back once the pointer has been out on it a moment. Nothing of either
+takes the pointer from the page. A button in the popup's head switches between them, and the browser keeps what a
+person picked there over the option.
 
 `recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
 network, which put the page's console and its requests in a recording. Each takes its
@@ -309,6 +317,8 @@ export default defineClientPlugin<Model, Op>({
 - `read` and `apply` get the element's source, or a `Refusal` saying why it isn't to be found (the file doesn't parse,
   or the page runs other code than the file has): throw it where the plugin needs the source, or go on without, as
   tasks do. Text edits without it are refused.
+- `page: true` on the page half says its tab works on the page as a whole, as annotations' does: while it's shown,
+  nothing marks the element, and the spotlight view leaves the page its light.
 - A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.
   Where the task outlasts a page load, as a recording does, the page half's `resume` answers it on the next page, and
   the popup comes back there: on the element, or without it (`element.isConnected` is false) where that page has none.

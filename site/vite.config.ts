@@ -16,6 +16,7 @@ import { replay } from './replay.ts';
 // one, and a recording's replay is a page the build publishes (`replay.ts`).
 const deployed = {
   standalone: 'src/standalone.ts',
+  view: 'spotlight' as const,
   plugins: [...recommended({ screenshots: { renderer: dom() } }), tailwind({ css: 'src/site.css' })],
 };
 
@@ -24,7 +25,7 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages serves it under the repository's name (`BASE=/deictic/`, set by the deploy workflow).
   base: process.env.BASE ?? '/',
   plugins: [
-    deictic(command === 'build' ? deployed : { plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
+    deictic(command === 'build' ? deployed : { view: 'spotlight', plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
     react({ compiler: true }),
     tailwindcss(),
     highlighted(),

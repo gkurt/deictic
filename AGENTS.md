@@ -42,6 +42,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
   record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
+- `View` (`src/index.ts`), `'popup'` or `'spotlight'`: how the overlay shows itself, `deictic({ view })`, `'popup'` by
+  default. `prepare` refuses any other, and `clientModule` and `writeClient` hand it to `start`. A `ClientPlugin` with
+  `page: true` (annotations) has a tab that works on the page, not the element: while it's shown, nothing marks the element.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -126,6 +129,16 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
+- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with.
+- `src/client/lighting.ts`: what's drawn on the page itself, one `Lighting` per view: `point` (what's under the pointer
+  while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel)` (the
+  popup's element, for as long as it's open). `outlines` is the popup view's: the box and its label, and `.box.on`.
+  `spotlight` dims the page around the element with one shadow (`.veil`, under annotations' marks), and draws a ring,
+  guides from its edges across the window and a caption (`.aim`); the light glides from one element to the next, by
+  CSS transitions that only `.glide` turns on. Held, the ring and the line to the popup are SVG strokes (`.lit`,
+  followed each frame; a light goes round once and the line is drawn out, both CSS, once), with wide faint strokes
+  for a glow and no filter; the veil is `.lifted` once the pointer has been out of the overlay for `LINGER`. Its
+  classes share the root with every plugin's: name a new one that no plugin's styles have (`.chip` and `.stage` are theirs).
 - `src/client/lightbox.ts`: `openLightbox(root, items, { at, from })`, offered to panels as `context.lightbox`: an
   `image`, a `page` (an iframe) or an `audio` item (a player: play, the clip's waveform lit as it plays, seek by
   clicking or dragging it, the time), big over everything, ← → between items, each item's `actions` beside its
@@ -155,7 +168,12 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`
   (a task names its path and HTML). On an element that's not on the page (back from `away`, where the page moved on or
-  another loaded) it opens in the middle, nothing outlined, its bar saying `not on this page`. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
+  another loaded) it opens in the middle, nothing outlined, its bar saying `not on this page`. The view (`start`'s
+  `view`, or the one kept in `localStorage` `deictic:view`) picks the `Lighting` and the popup's skin (`.panel.spot`:
+  glass, wider, its tabs pills, the tag in its bar); in the spotlight view `keepInView` puts it to the element's right
+  or left where there's room (`APART` from it, level with its top), else below or above. The head's view button switches
+  in place: the tab, its draft and where the popup was dragged are kept, and the element is held by the other `Lighting`.
+  The shown tab is marked by `.thumb`, slid to the next: a line under it, a pill behind it in the spotlight. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
   homepage demo's plain click). As it opens over the page and as it closes, the page hears `deictic:open`
   (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
   `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a

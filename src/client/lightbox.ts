@@ -6,13 +6,13 @@
  */
 import type { LightboxItem, LightboxOptions } from '#src/index.ts';
 
+import { div, reduced } from './dom.ts';
 import { type Colors, drawBars, peaksOf } from './waveform.ts';
 
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
 const PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg>';
 
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /**
@@ -238,12 +238,6 @@ function player(url: string, autoplay: boolean): { element: HTMLElement; leave: 
       cancelAnimationFrame(frame);
     },
   };
-}
-
-function div(className: string): HTMLDivElement {
-  const el = document.createElement('div');
-  el.className = className;
-  return el;
 }
 
 function button(text: string, title: string, className: string): HTMLButtonElement {

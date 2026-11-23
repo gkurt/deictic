@@ -5,14 +5,19 @@
  * the popup there: a tab for each plugin with a panel, at the one used last, or at a plugin's own where
  * its shortcut was pressed.
  *
+ * It shows itself in one of two views (`View`), which a button in the popup switches between: `popup`, as above,
+ * and `spotlight`, where the page dims around the element and the popup opens beside it (`lighting.ts`).
+ *
  * Everything drawn sits in one shadow root, so neither the page's styles nor ours cross over. A
  * panel's undo and redo are its tab's on its element: the latest change that plugin made there.
  */
-import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Standalone, Target } from '#src/index.ts';
+import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Standalone, Target, View } from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
+import { div, nameOf, reduced } from './dom.ts';
 import { openLightbox } from './lightbox.ts';
+import { type Lighting, outlines, ROOM, spotlight } from './lighting.ts';
 import { STYLE } from './style.ts';
 import { tooltips } from './tooltip.ts';
 
@@ -28,6 +33,8 @@ export interface StartOptions {
   plugins: { plugin: ClientPlugin; shortcut?: Required<Shortcut>; options?: unknown }[];
   /** What answers the requests where there's no dev server to: a `standalone` build's. */
   server?: Standalone;
+  /** The view it starts in, unless the person picked one in this browser: the popup's by default. */
+  view?: View;
 }
 
 /** A request to the endpoints, by its URL: to the dev server, or to what stands in for it. */
@@ -48,8 +55,15 @@ const OUT = icon('M7 17 17 7M8 7h9v9', 2.25);
 const UNDO = icon('M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11');
 const REDO = icon('m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13');
 const CLOSE = icon('M18 6 6 18M6 6l12 12');
+// The view each switches to: a light on one thing, and a window.
+const SPOTLIGHT = icon(
+  'M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
+);
+const POPUP = icon('M5 5h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1M4 10h16');
 /** Where the tab used last is kept, for deictic's own shortcut to open it again. */
 const LAST = 'deictic:tab';
+/** Where the view a person picked is kept, over the one the options name. */
+const VIEW = 'deictic:view';
 /** How long a read may take, in milliseconds, before the popup says it's reading. */
 const SLOW = 200;
 const STARTED = Symbol.for('deictic');
@@ -74,12 +88,9 @@ function markedAround(el: Element): Element | undefined {
   return undefined;
 }
 
-/** `div.panel > button.tab`: the element as a selector, the deepest classes only, for a person to tell it by. */
 function icon(path: string, width = 2): string {
   return `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
 }
-
-const nameOf = (el: Element) => `${el.localName}${[...el.classList].map((c) => `.${c}`).join('')}`;
 
 /** What the overlay keeps once started, for `popupIn` to show the popup with. */
 interface Started {
@@ -87,6 +98,8 @@ interface Started {
   send: Send;
   contextOf: (name: string) => ClientContext;
   tabs: Tab[];
+  /** The view it's in now. */
+  view: () => View;
   /** Opens the popup over the page on an element, at a tab or the one used last: `openPopup`. */
   open: (element: Element, tab?: string) => boolean;
 }
@@ -129,6 +142,8 @@ export function popupIn(container: Element, { tab: name, element }: { tab?: stri
   const target = targetOf(element);
   if (target === undefined) throw new Error(`deictic: ${nameOf(element)} has no ${ATTRIBUTE} mark to open the popup on`);
   const { base, send, contextOf, tabs } = started;
+  // Drawn as the view it's in now draws it.
+  const view = started.view();
   // A tab shown here isn't one a person chose: the popup over the page keeps opening at theirs.
   const remember = () => {};
   const tab = tabs.find((t) => t.plugin.name === name) ?? tabs[0];
@@ -151,7 +166,7 @@ export function popupIn(container: Element, { tab: name, element }: { tab?: stri
       remember,
       element,
       target,
-      pinned: true,
+      view,
       onClose: (shown, leaving) => {
         panel = undefined;
         // Closed by its own × or Esc: open again, as the page is there to show it. Leaving for `away` comes back by `reopen`.
@@ -188,7 +203,7 @@ export function lightboxIn(container: Element, items: LightboxItem[], { at }: { 
 }
 
 /** Starts the overlay, once per page: the client module runs again when a module importing it is replaced. */
-export function start({ base, shortcut: own, plugins: given, server }: StartOptions): void {
+export function start({ base, shortcut: own, plugins: given, server, view: wanted = 'popup' }: StartOptions): void {
   const page = globalThis as { [STARTED]?: true };
   if (page[STARTED] === true) return;
   page[STARTED] = true;
@@ -197,13 +212,27 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   const root = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = STYLE;
-  const box = div('box');
-  const label = div('label');
-  box.append(label);
-  // What's under the pointer, outlined inside the marked element around it when they differ.
-  const inner = div('box inner');
-  root.append(style, box, inner);
+  root.append(style);
   tooltips(root);
+  // The view, and what each draws on the page, made when first used: most pages only ever see one.
+  let view = wanted;
+  try {
+    const kept = localStorage.getItem(VIEW);
+    if (kept === 'popup' || kept === 'spotlight') view = kept;
+  } catch {
+    // Storage can be off: the view the options name, then.
+  }
+  const lightings: { [V in View]?: Lighting } = {};
+  const lighting = (of = view) => (lightings[of] ??= of === 'spotlight' ? spotlight(root) : outlines(root));
+  const switched = (to: View) => {
+    lighting().hide();
+    view = to;
+    try {
+      localStorage.setItem(VIEW, to);
+    } catch {
+      // Not kept, then: the next page starts in the options' view.
+    }
+  };
   // What's typed in the popup is the popup's: the page hears a key from in here as one on the host, not in a field,
   // so its own shortcuts (a "/" to search, a "j" to step) would run on a task's words. Ours listen while capturing.
   for (const type of ['keydown', 'keypress', 'keyup'] as const) host.addEventListener(type, (e) => e.stopPropagation());
@@ -239,6 +268,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     send,
     contextOf,
     tabs,
+    view: () => view,
     // Not over a popup holding something unsaved: the press that asked shook its button (`openPanel`).
     open: (element, tab) => tabs.length > 0 && panel?.unsaved() !== true && openAt(tab ?? last().plugin.name, element),
   };
@@ -293,39 +323,33 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     const el = under === undefined || under === host ? undefined : markedAround(under);
     return el === undefined ? undefined : { el, pointed: under === el ? undefined : under };
   };
+  // The plugins whose keys are held now, as the last event said: what's pointed at is shown while there are any.
+  let held: typeof plugins = [];
   const hide = () => {
-    box.classList.remove('shown');
-    inner.classList.remove('shown');
+    held = [];
+    lighting().hide();
   };
-  const show = (held: typeof plugins) => {
+  const show = (glide: boolean) => {
     frame = 0;
-    const hit = pointer === undefined ? undefined : hitAt(pointer.x, pointer.y);
+    const hit = pointer === undefined || held.length === 0 ? undefined : hitAt(pointer.x, pointer.y);
     const el = hit?.el;
     const target = el === undefined ? undefined : targetOf(el);
-    if (el === undefined || target === undefined) return hide();
-    place(box, el.getBoundingClientRect());
-    if (hit?.pointed === undefined) {
-      inner.classList.remove('shown');
-    } else {
-      place(inner, hit.pointed.getBoundingClientRect());
-      inner.classList.add('shown');
-    }
-    const count = sameAs(el).length;
+    if (el === undefined || target === undefined) return lighting().hide();
     // The button, where it isn't the left: what the keys alone don't tell apart.
     const names = held.map(({ tab, shortcut }) => {
       const { plugin } = tab();
       const name = plugin.label ?? plugin.name;
       return shortcut.button === 'left' ? name : `${name} (${shortcut.button})`;
     });
-    const within = hit?.pointed === undefined ? '' : ` › ${nameOf(hit.pointed)}`;
-    label.textContent = `${names.join(' / ')} · <${target.tag}> ${target.loc.file}:${target.loc.line}${count > 1 ? ` · ×${count}` : ''}${within}`;
-    label.classList.toggle('below', el.getBoundingClientRect().top < 24);
-    box.classList.add('shown');
+    lighting().point(
+      { el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), target, names, count: sameAs(el).length },
+      glide,
+    );
   };
   const update = (e: MouseEvent | KeyboardEvent) => {
-    const held = heldBy(e);
+    held = heldBy(e);
     if (held.length === 0) return hide();
-    if (frame === 0) frame = requestAnimationFrame(() => show(held));
+    if (frame === 0) frame = requestAnimationFrame(() => show(true));
   };
 
   window.addEventListener(
@@ -339,6 +363,14 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   window.addEventListener('keydown', update, true);
   window.addEventListener('keyup', update, true);
   window.addEventListener('blur', hide);
+  // The page scrolled under the pointer: another element is under it now, or the same one elsewhere.
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (held.length > 0 && frame === 0) frame = requestAnimationFrame(() => show(false));
+    },
+    { capture: true, passive: true },
+  );
   let press = {};
   let opened: object | undefined;
   // Alt-click on a link would otherwise download it, and on a field focus it.
@@ -382,6 +414,8 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       element: el,
       ...(pointed === undefined ? {} : { pointed }),
       target,
+      view,
+      over: { lighting, switched },
       onClose: () => (panel = undefined),
       ...(resumed === undefined ? {} : { resumed }),
       reopen: (again, element, kept) => {
@@ -436,8 +470,14 @@ interface PanelOptions {
   /** What was under the pointer inside `element`, where that differs. */
   pointed?: Element;
   target: Target;
-  /** Shown where the page put it (`popupIn`), not over the page beside the element; Esc leaves it alone. */
-  pinned?: boolean;
+  /** The view it opens in. */
+  view: View;
+  /**
+   * Over the page, beside the element: what marks the element in a view, and what hears of a switch of view.
+   * Without it the popup is shown where the page put it (`popupIn`): nothing on the page is marked, the view
+   * stays as it is, and Esc leaves it alone.
+   */
+  over?: { lighting: (view: View) => Lighting; switched: (view: View) => void };
   /** Called as it closes: the tab it showed, and whether it's leaving for a tab's `away`, to come back by `reopen`. */
   onClose: (shown: Tab, leaving: boolean) => void;
   /** What the first tab's mount gets, coming back from `away`. */
@@ -457,14 +497,18 @@ function openPanel({
   element,
   pointed,
   target,
-  pinned = false,
+  view: opened,
+  over,
   onClose,
   resumed: coming,
   reopen,
 }: PanelOptions): { close: () => void; unsaved: () => boolean } {
+  const pinned = over === undefined;
+  let view = opened;
   // Given to the first tab's first mount only: another tab, or a remount after an undo, starts afresh.
   let resumed = coming;
   const panel = div('panel');
+  panel.classList.toggle('spot', view === 'spotlight');
   // The tabs, then the element's place and undo and redo, which are the shown tab's on this element.
   const head = div('head');
   head.setAttribute('role', 'tablist');
@@ -473,8 +517,10 @@ function openPanel({
   where.className = 'where';
   const file = document.createElement('span');
   file.textContent = `${target.loc.file}:${target.loc.line}`;
+  // The tag, where the view shows it: the spotlight's, whose caption is gone once the popup is open.
+  const tag = Object.assign(document.createElement('span'), { className: 'tag', textContent: `<${target.tag}>` });
   // An arrow out, as it leaves the page for the editor; its title is the overlay's tooltip (`tooltip.ts`).
-  where.append(file);
+  where.append(tag, file);
   where.insertAdjacentHTML('beforeend', OUT);
   where.title = 'Open in editor';
   where.setAttribute('aria-label', `Open ${file.textContent} in the editor`);
@@ -497,8 +543,24 @@ function openPanel({
     el.addEventListener('click', () => show(tab));
     return { tab, el };
   });
-  close.classList.add('close');
-  head.append(...buttons.map((b) => b.el), close);
+  // What marks the shown tab, under it or behind it by the view, and slides to the next one shown.
+  const thumb = div('thumb');
+  const slide = (to: HTMLElement) => {
+    Object.assign(thumb.style, { left: `${to.offsetLeft}px`, width: `${to.offsetWidth}px` });
+    // Laid out where it is before it may move: the first place is no slide from the head's corner.
+    void thumb.offsetWidth;
+    thumb.classList.add('moves');
+  };
+  // The other view, a click away: the popup stays open as it is, its tab and what's typed in it kept.
+  const swap = iconButton('', 'Switch view', '');
+  const offer = () => {
+    swap.innerHTML = view === 'spotlight' ? POPUP : SPOTLIGHT;
+    swap.title = view === 'spotlight' ? 'Popup view' : 'Spotlight view: light the element, dim the page';
+  };
+  offer();
+  const end = div('end');
+  end.append(...(pinned ? [] : [swap]), close);
+  head.append(thumb, ...buttons.map((b) => b.el), end);
   bar.append(where, undo, redo);
   // Back from `away` on a page that doesn't have the element: said, as nothing on it is outlined.
   if (!element.isConnected)
@@ -509,8 +571,17 @@ function openPanel({
   panel.append(head, bar, body, status);
   root.append(panel);
   if (pinned) panel.classList.add('pinned');
-  const release = pinned ? undefined : keepInView(panel, body, head, element);
-  const unmark = pinned ? undefined : outline(root, element);
+  const release = pinned ? undefined : keepInView(panel, body, head, element, () => view === 'spotlight');
+  // The element marked as the view marks it, while the shown tab is about it: not one that works on the page.
+  let unmark: (() => void) | undefined;
+  let marked: string | undefined;
+  const mark = () => {
+    const now = current.plugin.page === true ? undefined : view;
+    if (over === undefined || now === marked) return;
+    marked = now;
+    unmark?.();
+    unmark = now === undefined ? undefined : over.lighting(now).hold(element, panel);
+  };
   if (!pinned) window.dispatchEvent(new CustomEvent<PopupOpened>(POPUP_OPENED, { detail: { element, tab: first.plugin.name } }));
 
   let cleanup: (() => void) | void;
@@ -602,6 +673,16 @@ function openPanel({
   undo.addEventListener('click', () => void step('undo'));
   redo.addEventListener('click', () => void step('redo'));
   close.addEventListener('click', () => done());
+  swap.addEventListener('click', () => {
+    view = view === 'spotlight' ? 'popup' : 'spotlight';
+    over?.switched(view);
+    panel.classList.toggle('spot', view === 'spotlight');
+    offer();
+    mark();
+    // Its tabs are another size in the other view.
+    const shown = buttons.find((b) => b.tab === current);
+    if (shown !== undefined) slide(shown.el);
+  });
 
   let current = first;
   // A read that a later one overtook (another tab, or the same after an undo) mounts nothing.
@@ -673,7 +754,11 @@ function openPanel({
   };
   const show = (tab: Tab) => {
     current = tab;
-    for (const b of buttons) b.el.setAttribute('aria-selected', String(b.tab === tab));
+    for (const b of buttons) {
+      b.el.setAttribute('aria-selected', String(b.tab === tab));
+      if (b.tab === tab) slide(b.el);
+    }
+    mark();
     remember(tab);
     void steps();
     void load();
@@ -685,48 +770,15 @@ function openPanel({
 /** Shakes a panel's button, in view: what a press outside does where closing would lose something. A blink where motion is reduced. */
 function shake(el: HTMLElement): void {
   el.scrollIntoView({ block: 'nearest' });
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return void el.animate({ opacity: [1, 0.3, 1, 0.3, 1] }, 400);
+  if (reduced()) return void el.animate({ opacity: [1, 0.3, 1, 0.3, 1] }, 400);
   el.animate({ translate: ['0', '-5px', '5px', '-4px', '4px', '-2px', '0'] }, { duration: 360, easing: 'ease-out' });
-}
-
-/** Puts an outline over `r`. */
-function place(el: HTMLElement, r: DOMRect): void {
-  Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-}
-
-/** How far from the element the popup's outline is drawn, in pixels. */
-const ROOM = 4;
-
-/**
- * Outlines the element the popup is open on, for as long as it is: which one it's about, where several look alike
- * or the popup covers it. Dashed, with no fill and a little room around the element, so nothing of it is drawn on:
- * a border, a ring or a colour tried on it shows as it is. Read each frame, as the element moves with the page's
- * scrolling, its layout and what a panel previews on it. Answers what removes it.
- */
-function outline(root: ShadowRoot, element: Element): () => void {
-  const box = div('box on');
-  root.append(box);
-  let frame = 0;
-  let was = '';
-  const follow = () => {
-    frame = requestAnimationFrame(follow);
-    const r = element.getBoundingClientRect();
-    const now = element.isConnected ? `${r.left},${r.top},${r.width},${r.height}` : '';
-    if (now === was) return;
-    was = now;
-    box.classList.toggle('shown', now !== '');
-    place(box, new DOMRect(r.left - ROOM, r.top - ROOM, r.width + 2 * ROOM, r.height + 2 * ROOM));
-  };
-  follow();
-  return () => {
-    cancelAnimationFrame(frame);
-    box.remove();
-  };
 }
 
 const MARGIN = 8;
 // Under this much room on either side, the panel overlaps the element rather than shrink to a sliver beside it.
 const LEAST = 160;
+/** How far from the element the popup is in the spotlight view, in pixels: room for the line between them. */
+const APART = 28;
 
 /** How far a press on the head moves, in pixels, before it's a drag: a click there leaves the popup following. */
 const SLACK = 3;
@@ -736,8 +788,12 @@ const SLACK = 3;
  * moves with the page: below, or above where it fits better, its height capped to the room there, so the body
  * scrolls rather than the panel leaving the window. Dragged by `handle`, it stays where it's put, in the window,
  * and follows the element no more. Fixed, so it never changes the page's own scrolling. Answers a release.
+ *
+ * While `apart` says so (the spotlight view), it's to the element's right, or its left, where there's the room,
+ * level with its top and as tall as the window lets it be, and farther from it, above and below too: the element
+ * is what's lit, so the popup keeps off it, with room for the line between them.
  */
-function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, element: Element): () => void {
+function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, element: Element, apart: () => boolean): () => void {
   let frame = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Where the element was last seen: one gone from the page leaves the popup where it was.
@@ -768,26 +824,43 @@ function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, 
     }
     const top = Math.min(Math.max(r.top, 0), height);
     const bottom = Math.min(Math.max(r.bottom, 0), height);
-    const below = height - bottom - 2 * MARGIN;
-    const above = top - 2 * MARGIN;
+    const gap = apart() ? APART : MARGIN;
+    if (apart()) {
+      const right = width - MARGIN - panel.offsetWidth - (r.right + gap);
+      const left = r.left - gap - panel.offsetWidth - MARGIN;
+      if (right >= 0 || left >= 0) {
+        const room = Math.max(0, height - 2 * MARGIN);
+        Object.assign(panel.style, {
+          left: `${right >= 0 ? r.right + gap : r.left - gap - panel.offsetWidth}px`,
+          top: `${Math.max(MARGIN, Math.min(r.top - ROOM, height - MARGIN - Math.min(wanted, room)))}px`,
+          maxHeight: `${room}px`,
+          // It grows out of the side the element is on, as it opens.
+          transformOrigin: right >= 0 ? '0 24px' : '100% 24px',
+        });
+        return;
+      }
+    }
+    const below = height - bottom - gap - MARGIN;
+    const above = top - gap - MARGIN;
     const cap = Math.max(0, Math.min(height * 0.6, height - 2 * MARGIN));
     let at: number;
     let room: number;
     if (Math.max(below, above) < LEAST) {
       room = height - 2 * MARGIN;
-      at = Math.min(Math.max(bottom + MARGIN, MARGIN), height - MARGIN - Math.min(wanted, room));
+      at = Math.min(Math.max(bottom + gap, MARGIN), height - MARGIN - Math.min(wanted, room));
     } else if (wanted <= below || below >= above) {
       room = Math.min(below, cap);
-      at = bottom + MARGIN;
+      at = bottom + gap;
     } else {
       room = Math.min(above, cap);
-      at = top - MARGIN - Math.min(wanted, room);
+      at = top - gap - Math.min(wanted, room);
     }
     Object.assign(panel.style, {
       left: `${Math.max(MARGIN, Math.min(r.left, width - MARGIN - panel.offsetWidth))}px`,
       top: `${at}px`,
       bottom: '',
       maxHeight: `${room}px`,
+      transformOrigin: at < top ? '24px 100%' : '24px 0',
     });
   };
   // Not in the observers' callbacks, where a change of size is a "ResizeObserver loop" error on the page. The next
@@ -849,12 +922,6 @@ function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, 
     changed.disconnect();
     window.removeEventListener('resize', later);
   };
-}
-
-function div(className: string): HTMLDivElement {
-  const el = document.createElement('div');
-  el.className = className;
-  return el;
 }
 
 /** A button that is a drawing: named for what it does, as its title, the tooltip, changes with what it would do. */

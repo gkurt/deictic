@@ -55,13 +55,13 @@ export function withDeictic<C extends object>(
   options: DeicticNextOptions = {},
 ): (phase: string, context: { defaultConfig: C }) => Promise<C> {
   // Now, so a wrong set of plugins stops the dev server as it starts, rather than the page.
-  const { plugins, shortcut } = prepare(options);
+  const { plugins, shortcut, view } = prepare(options);
   return async (phase, context) => {
     const resolved = typeof next === 'function' ? await next(phase, context) : next;
     if (phase !== DEV) return resolved;
     const root = resolve(options.root ?? process.cwd());
     const base = `${(resolved as { basePath?: string }).basePath ?? ''}/`;
-    const client = writeClient(root, plugins, base, shortcut);
+    const client = writeClient(root, plugins, base, shortcut, view);
     const rules: [string, Rule][] = GLOBS.flatMap((glob) => [
       [glob, { condition: { all: ['browser', { not: 'foreign' }] }, loaders: [{ loader: loaderPath, options: { root, client } }] }],
       [glob, { condition: { all: [{ not: 'browser' }, { not: 'foreign' }] }, loaders: [{ loader: loaderPath, options: { root } }] }],

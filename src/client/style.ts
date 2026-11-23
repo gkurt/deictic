@@ -64,6 +64,7 @@ export const STYLE = `
   from { opacity: 0; translate: 0 4px; }
 }
 .head {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 2px;
@@ -81,8 +82,10 @@ export const STYLE = `
   color: var(--deictic-muted);
 }
 .head .tab:hover { color: var(--deictic-fg); }
-.head .tab[aria-selected='true'] { color: var(--deictic-fg); border-bottom-color: var(--deictic-accent); }
-.head .close { margin: 0 0 3px auto; }
+.head .tab[aria-selected='true'] { color: var(--deictic-fg); }
+/* Under the shown tab, and slid to the next one shown. */
+.head .thumb { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--deictic-accent); pointer-events: none; }
+.head .end { display: flex; gap: 2px; margin: 0 0 3px auto; }
 .bar {
   display: flex;
   align-items: center;
@@ -102,10 +105,148 @@ export const STYLE = `
   text-decoration: none;
 }
 .bar .where span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .where .tag { display: none; }
 .bar .where svg { flex: none; }
 .bar .where:hover, .bar .where:focus-visible { color: var(--deictic-fg); }
 .bar .where:hover span { text-decoration: underline; }
 .bar .absent { flex: none; margin-right: 6px; font-size: 12px; color: var(--deictic-muted); }
+/* The spotlight view (lighting.ts): the page dims around the element, by a shadow far wider than any window. */
+.veil {
+  position: fixed;
+  z-index: 2147483644;
+  box-sizing: border-box;
+  pointer-events: none;
+  box-shadow: 0 0 0 200vmax rgb(9 9 11 / 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0s 0.2s;
+}
+/* A moment late: Alt is pressed for much else, and a page that dimmed with every press would flicker. */
+.veil.shown { opacity: 1; visibility: visible; transition: opacity 0.3s 0.08s; }
+.veil.shown.lifted { opacity: 0; transition: opacity 0.6s; }
+.aim {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s, visibility 0s 0.12s;
+}
+.aim.shown { opacity: 1; visibility: visible; transition: opacity 0.12s; }
+.ring {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--deictic-accent);
+  box-shadow: 0 0 0 4px rgb(18 179 88 / 0.14), 0 0 32px rgb(18 179 88 / 0.5), inset 0 0 24px rgb(18 179 88 / 0.1);
+}
+/* From the element's edges across the window: what it lines up with, anywhere on the page. */
+.guide { position: absolute; left: 0; top: 0; opacity: 0.35; }
+.guide.gx { width: 1px; height: 100%; background: linear-gradient(transparent, var(--deictic-accent) 20% 80%, transparent); }
+.guide.gy { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--deictic-accent) 20% 80%, transparent); }
+.caption {
+  position: absolute;
+  left: -1.5px;
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 3px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  font: 12px/20px ui-monospace, monospace;
+  white-space: nowrap;
+  color: var(--deictic-fg);
+  background: rgb(24 24 27 / 0.86);
+  backdrop-filter: blur(12px) saturate(1.6);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.caption.below { top: calc(100% + 8px); bottom: auto; }
+.caption .tag { padding: 0 8px; border-radius: 999px; font-weight: 600; color: var(--deictic-on-accent); background: var(--deictic-accent); }
+.caption .dim { color: var(--deictic-muted); }
+.caption .opens { padding-left: 8px; border-left: 1px solid rgb(255 255 255 / 0.16); font: 600 12px/20px system-ui, sans-serif; color: var(--deictic-accent); }
+.lit { position: fixed; inset: 0; z-index: 2147483646; display: none; pointer-events: none; }
+.lit.shown { display: block; }
+.lit svg { display: block; width: 100%; height: 100%; fill: none; stroke: var(--deictic-accent); stroke-linecap: round; }
+.lit .halo { stroke-width: 7; opacity: 0.16; }
+.lit .lock, .lit .tether { stroke-width: 1.5; }
+.lit .comet, .lit .flow { stroke: #eafff3; stroke-width: 2; opacity: 0; }
+.lit circle { fill: var(--deictic-accent); stroke: none; }
+.lit:not(.tied) path, .lit:not(.tied) circle { display: none; }
+.pulse {
+  position: fixed;
+  z-index: 2147483646;
+  box-sizing: border-box;
+  pointer-events: none;
+  outline: 2px solid var(--deictic-accent);
+  animation: deictic-pulse 0.5s ease-out forwards;
+}
+.panel.spot {
+  --deictic-line: rgb(255 255 255 / 0.14);
+  width: min(400px, calc(100vw - 16px));
+  border-color: rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  background: linear-gradient(rgb(39 39 42 / 0.9), rgb(24 24 27 / 0.94));
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55), 0 0 56px -12px rgb(18 179 88 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+.panel.spot.pinned { width: min(400px, 100%); }
+.spot .head { align-items: center; padding: 8px 8px 6px; }
+.spot .head .tab { position: relative; padding: 4px 10px; border: 0; border-radius: 8px; }
+/* A pill behind the shown tab, in place of the line under it. */
+.spot .head .thumb {
+  top: 8px;
+  bottom: 6px;
+  height: auto;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.spot .head .end { margin-bottom: 0; }
+.spot .bar { padding: 0 10px 8px 12px; border-top: 0; border-bottom-color: rgb(255 255 255 / 0.08); }
+.spot .bar .where .tag { display: inline; flex: none; color: var(--deictic-accent); }
+.spot .body { padding: 12px; }
+.spot .status { padding: 0 12px 10px; }
+.spot input, .spot textarea { border-radius: 6px; background: rgb(0 0 0 / 0.35); }
+.spot button.primary { box-shadow: 0 4px 16px -4px rgb(18 179 88 / 0.6); }
+@media (prefers-reduced-motion: no-preference) {
+  .head .thumb.moves { transition: left 0.22s cubic-bezier(0.3, 0.7, 0.2, 1), width 0.22s cubic-bezier(0.3, 0.7, 0.2, 1); }
+  /* The light goes from one element to the next, not out and on again. */
+  .veil.shown.glide {
+    transition: opacity 0.3s, left 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), top 0.24s cubic-bezier(0.3, 0.7, 0.2, 1),
+      width 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), height 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), border-radius 0.24s;
+  }
+  .aim.glide .ring {
+    transition: left 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), top 0.24s cubic-bezier(0.3, 0.7, 0.2, 1),
+      width 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), height 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), border-radius 0.24s;
+  }
+  .aim.glide .guide { transition: translate 0.24s cubic-bezier(0.3, 0.7, 0.2, 1); }
+  .panel.spot:not(.pinned) { animation: deictic-rise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards; }
+  /* Once, as the popup opens: a light round the ring, and the line drawn out to the popup with one along it. */
+  .lit .comet { stroke-dasharray: 16 84; animation: deictic-orbit 1.4s 0.05s cubic-bezier(0.4, 0, 0.2, 1); }
+  .lit .tether, .lit path.halo { stroke-dasharray: 1; animation: deictic-draw 0.4s 0.1s ease-out backwards; }
+  .lit .flow { stroke-dasharray: 0.14 1; animation: deictic-flow 0.8s 0.45s ease-out; }
+  .lit circle:last-of-type { animation: deictic-in 0.2s 0.45s backwards; }
+}
+@keyframes deictic-rise {
+  from { opacity: 0; scale: 0.94; filter: blur(6px); }
+}
+@keyframes deictic-orbit {
+  from { stroke-dashoffset: 100; opacity: 1; }
+  70% { opacity: 1; }
+  to { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes deictic-draw {
+  from { stroke-dashoffset: 1; }
+}
+@keyframes deictic-flow {
+  from { stroke-dashoffset: 0.14; opacity: 1; }
+  to { stroke-dashoffset: -1; opacity: 0; }
+}
+@keyframes deictic-pulse {
+  to { outline-offset: 14px; outline-color: transparent; }
+}
 .lightbox {
   position: fixed;
   inset: 0;

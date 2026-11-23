@@ -256,6 +256,7 @@ async function flatten(picture: Picture, marks: readonly Annotation[], measure: 
 export default defineClientPlugin<null, never, Annotations>({
   name: 'annotations',
   label: 'Annotate',
+  page: true,
   setup: ({ root, options }) => {
     const color = (options as { color: string }).color;
     const measure = measurer();

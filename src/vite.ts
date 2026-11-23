@@ -32,7 +32,7 @@ export const CLIENT = 'virtual:deictic/client';
 const CLIENT_ID = '\0deictic/client';
 
 export function deictic(options: ViteOptions = {}): Plugin {
-  const { plugins, shortcut } = prepare(options);
+  const { plugins, shortcut, view } = prepare(options);
   let root = '';
   let base = '/';
   let building = false;
@@ -61,7 +61,7 @@ export function deictic(options: ViteOptions = {}): Plugin {
       if (id !== CLIENT_ID) return undefined;
       // Only a build's page asks the module: the dev server is there to answer.
       const server = building && options.standalone !== undefined ? resolve(root, options.standalone).replaceAll('\\', '/') : undefined;
-      return clientModule(plugins, base, shortcut, server);
+      return clientModule(plugins, base, shortcut, server, view);
     },
     transform: {
       // First of all, not only first of the `pre` plugins: the React Compiler (`react({ compiler: true })`) is
