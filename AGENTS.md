@@ -453,7 +453,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   and `args` (more of `vb serve`'s). The file keeps the options too (`as`): one running with others is stopped first.
 
 `skills/deictic/` is the agent skill, published with the package (`npx skills add gkurt/deictic`, or `./node_modules/deictic` for the installed one):
-one `SKILL.md`, the loop and the rules in a few lines, nothing else. What a command's output can say (what to do on an
+one `SKILL.md`, the loop in a few lines, nothing else: how the person likes work done (commits, what a task may ask) is theirs, not the skill's. What a command's output can say (what to do on an
 event, a setup to ask about, how to find a problem, how to read a line of a task), it says there, not in the skill. Setting deictic up is `npx deictic init`. It has no scripts: the agent runs the project's installed deictic, `npx deictic <command>`, so what reads the tasks and recordings
 is the version that wrote them. In this repository, `bun src/cli.ts <command>` (the root package has no bin of its own).
 
