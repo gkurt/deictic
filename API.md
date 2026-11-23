@@ -94,11 +94,11 @@ pointer has been out on it a moment. Nothing of it takes the pointer from the pa
 
 The tasks are on the page, too. While the keys are held, and while the Task tab is open, every element with a task
 still to do has a pin on its corner: how many, in the colour of the furthest along, with a dot where one has
-something unread. A pin under the pointer reads its tasks, and a click opens them in the drop zone.
+something unread. A pin under the pointer reads its tasks, and a click opens them in the drawer.
 
-### The drop zone
+### The drawer
 
-While the keys are held, a drawer shows on the window's right (its left, with the tool panel docked on the right):
+While the keys are held, the drawer shows on the window's right (its left, with the tool panel docked on the right):
 what there is for the page. It goes a moment after the keys are let go, unless the pointer is on it or a task is open
 in it.
 
@@ -134,7 +134,7 @@ keys work while the shortcut's are held, and while a tool has the page:
 
 A recording, the mic and a drawing tool keep the panel up: stop them (`R`, `K`, `Esc`) and it goes with the keys.
 What the tools make (shots, recordings, voice notes) waits for the next task, whichever element it's about: the Task
-tool counts them, and the Task tab lists each as a chip, to open or to leave out, and the drop zone has them meanwhile. Marks stay on the
+tool counts them, and the Task tab lists each as a chip, to open or to leave out, and the drawer has them meanwhile. Marks stay on the
 page until a task takes them.
 
 A task about a point is pinned on that point, not on an element's corner, and a shot taken as it goes has the point
@@ -184,7 +184,7 @@ recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your mac
 `local()` takes `port`, `dir` (its folder, from the root), `inspect: false` for none of the board's own pages, and
 `args`, more of `vb serve`'s.
 
-In the drop zone a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
+In the drawer a task's dot says its state, and who holds it while it's claimed (`claimed by claude`).
 
 A task's text is the words typed, and nothing else. The rest is its attachments and labels: `deictic.project`,
 `deictic.at` (the element's `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your
@@ -206,7 +206,7 @@ the tool panel is the window as it was.
 A task stays with its element as lines above it change, while the opening tag's first line is still the same and
 the file has it once.
 
-The Task tab is for a new task. The ones there are, are in the drop zone. In the tab:
+The Task tab is for a new task. The ones there are, are in the drawer. In the tab:
 
 - The field is a composer: what's attached is over the words, a chip each, and the buttons that attach are under
   them, each an icon named by its tooltip. `Ctrl+Enter` (`⌘Enter`), or the arrow, adds the task.
@@ -226,7 +226,7 @@ The Task tab is for a new task. The ones there are, are in the drop zone. In the
 - **Voice** records a note, here.
 - What the tool panel's tools made since the last task is attached too: a shot, a recording, a voice note. A chip
   opens it, and its × leaves it out.
-- A task that's added is in the drop zone at once. Undo takes it back.
+- A task that's added is in the drawer at once. Undo takes it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
   now is taken up. It knows of an agent watching with the skill from the project's folder, and of one holding a
   claim on a task of the channel's; with a board that isn't this machine's own it says nothing where it knows of
@@ -327,7 +327,7 @@ export default (async (request) => Response.json({ model: null })) satisfies Sta
 
 What a plugin's routes would keep, the module keeps, and answers with the `url` it's at: screenshots' `add`; voice's
 `add` and then `more/<id>`, a take as it's spoken (the `url` with `?last`); recordings' `begin`, `part/<id>?seq=<n>`
-and `end/<id>` (the `url`) or `discard/<id>`; tasks' `page` (`{ channel, tasks }`, what the drop zone lists) and
+and `end/<id>` (the `url`) or `discard/<id>`; tasks' `page` (`{ channel, tasks }`, what the drawer lists) and
 `thread/<id>`, `reply/<id>`, `edit/<id>` and `remove/<id>`, what it does to one. A recording's is a replay page for the build to publish:
 `replayPage({ player, source })`, from `deictic/recordings`, is its HTML.
 
@@ -393,7 +393,7 @@ export default defineClientPlugin<Model, Op>({
   with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears), `hold(left)` takes the page for a
   tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the
   next point pressed on the page, as a `Spot` (the element and the point in it).
-- `context.zone` is the drop zone, for a page half's `setup`: `add(section)` puts a section in it, which hides
+- `context.drawer` is the drawer, for a page half's `setup`: `add(section)` puts a section in it, which hides
   itself (`hidden`) while it has nothing, `show(view, { title, closed })` opens one of its items in the sections'
   place and answers what closes it, and `keep()` keeps the drawer up while something goes on.
 - `context.tray` is what the tools made that no task has taken: `add(plugin, id, value)`, `list(plugin?)`,

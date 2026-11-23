@@ -1,5 +1,5 @@
 /**
- * The channel's tasks as the page has them: read once for the pins and the drop zone both, and again when one of
+ * The channel's tasks as the page has them: read once for the pins and the drawer both, and again when one of
  * them changes a task. And which of them have something unread: a reply since the task was last opened here, or an
  * end no one has looked at. What's been read is the browser's to keep, as a board keeps it for no one.
  */

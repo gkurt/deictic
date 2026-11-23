@@ -246,10 +246,10 @@ export const STYLE = `
 }
 .tool-panel button.problem { color: var(--deictic-problem); }
 /*
- * The drop zone (zone.ts): a drawer on the window's side, as tall as what's in it, there while it's of use. Its
+ * The drawer (drawer.ts): on the window's side, as tall as what's in it, there while it's of use. Its
  * sections are the plugins', each with its own styles; these are what they share.
  */
-.zone {
+.drawer {
   position: fixed;
   top: 12px;
   right: 12px;
@@ -271,20 +271,20 @@ export const STYLE = `
   visibility: hidden;
   transition: opacity 0.15s, visibility 0s 0.15s;
 }
-.zone.left { right: auto; left: 12px; }
-.zone.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
-.zone [hidden] { display: none; }
-.zone-sections, .zone-view { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 12px; overflow-y: auto; scrollbar-width: thin; }
-.zone-view { gap: 10px; }
-.zone-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--deictic-muted); }
-.zone-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.zone-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 8px; background: rgb(255 255 255 / 0.04); }
-.zone-row:hover { border-color: rgb(255 255 255 / 0.16); }
-.zone-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; border: 0; text-align: left; font-size: 12px; }
-.zone-open img { display: block; height: 32px; border-radius: 4px; }
-.zone-open svg { flex: none; width: 12px; height: 12px; }
-.zone-head { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 -4px; }
-.zone-title { font-weight: 600; }
+.drawer.left { right: auto; left: 12px; }
+.drawer.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
+.drawer [hidden] { display: none; }
+.drawer-sections, .drawer-view { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 12px; overflow-y: auto; scrollbar-width: thin; }
+.drawer-view { gap: 10px; }
+.drawer-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--deictic-muted); }
+.drawer-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.drawer-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 8px; background: rgb(255 255 255 / 0.04); }
+.drawer-row:hover { border-color: rgb(255 255 255 / 0.16); }
+.drawer-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; border: 0; text-align: left; font-size: 12px; }
+.drawer-open img { display: block; height: 32px; border-radius: 4px; }
+.drawer-open svg { flex: none; width: 12px; height: 12px; }
+.drawer-head { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 -4px; }
+.drawer-title { font-weight: 600; }
 /* What a tool that picks a point takes the pointer with, over the page and under the popup. */
 .tool-surface { position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair; }
 .lightbox {

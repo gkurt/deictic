@@ -208,7 +208,7 @@ test("lists an element's own tasks, not its file's others, and keeps them as it 
     ['An old one', undefined],
     ['The headline', undefined],
   ]);
-  // The file's other elements' tasks aren't this one's: the drop zone lists them all.
+  // The file's other elements' tasks aren't this one's: the drawer lists them all.
   expect((await read('h1', 'src/Other.tsx')).tasks).toEqual([]);
 
   // Lines above change, and the page is loaded again: the headline's task is still its own, by its tag and line.
@@ -303,7 +303,7 @@ test('refuses to undo a task someone has claimed', async () => {
   expect(undo.json.problem).toMatch(/^task \d+ is claimed by .+ now: cancel it on the board if you still mean to$/);
 });
 
-test("edits a task's words from the drop zone, keeping what follows them", async () => {
+test("edits a task's words from the drawer, keeping what follows them", async () => {
   const { post, target } = setup('edit');
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;
@@ -317,7 +317,7 @@ test("edits a task's words from the drop zone, keeping what follows them", async
   expect((await post(`plugins/tasks/edit/${id}`, { text: ' ' })).json.problem).toBe('say what should change first');
 });
 
-test('deletes a task from the drop zone by canceling it', async () => {
+test('deletes a task from the drawer by canceling it', async () => {
   const { post, target } = setup('remove');
   const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op });
   const { id } = json.model.tasks[0]!;

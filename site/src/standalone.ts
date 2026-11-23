@@ -66,7 +66,7 @@ function changeTasks(at: string, change: TaskOp): Step {
   return { label: `add "${task.title}"`, undo: put(before), redo: put([...before, task]) };
 }
 
-/** The tasks as the drop zone lists them: each with its place, where it has one, and how its thread stands. */
+/** The tasks as the drawer lists them: each with its place, where it has one, and how its thread stands. */
 const listed = (): Listed[] =>
   [...tasks].flatMap(([place, list]) =>
     list.map((task) => {
@@ -83,7 +83,7 @@ const listed = (): Listed[] =>
     }),
   );
 
-/** What the drop zone does to a task, by the tasks plugin's routes: read its thread, answer in it, change its words, delete it. */
+/** What the drawer does to a task, by the tasks plugin's routes: read its thread, answer in it, change its words, delete it. */
 async function task(request: Request, asked: string, id: string): Promise<Response> {
   const found = () => listed().find((each) => each.id === id);
   if (found() === undefined) return refuse(`#${id} isn't a task of this page's any more: it was deleted`, 422);
@@ -230,7 +230,7 @@ const standalone: Standalone = async (request) => {
   const route = url.pathname.slice(url.pathname.indexOf(PREFIX) + PREFIX.length);
   // A plugin's own route: `plugins/<name>/<route>`, and what it's about after that.
   const [, of, asked, id] = /^plugins\/(\w+)\/(\w+)(?:\/([\w-]+))?$/.exec(route) ?? [];
-  // The tasks plugin's `page`: every task kept here, for the drop zone and the pins.
+  // The tasks plugin's `page`: every task kept here, for the drawer and the pins.
   if (of === 'tasks' && asked === 'page') return Response.json({ channel: 'deictic', tasks: listed() });
   if (of === 'tasks' && id !== undefined && ['thread', 'reply', 'edit', 'remove'].includes(asked ?? '')) return task(request, asked!, id);
   if (of === 'screenshots' && asked === 'add') return keepShot(request);

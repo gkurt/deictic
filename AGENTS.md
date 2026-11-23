@@ -34,7 +34,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes,
   `open(plugin, element, at?)` to open the popup at a tab (on a `Point` of the element, with `at`, which the panel
-  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`), `zone` (the drop zone, a `DropZone`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
+  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`), `drawer` (the drawer, a `Drawer`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
   answered), `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
@@ -153,13 +153,13 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   one, and the point from its top left), over a `.tool-surface` that takes the press, the page lit as for pointing.
 - `src/client/tray.ts`: `tray()`, `context.tray`: what the tools made that no task has taken (`add(plugin, id,
 value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so it's the tab's over page loads.
-- `src/client/zone.ts`: `dropZone(root, { crowded })`, the drop zone (`.zone`), `context.zone`: a drawer on the
-  window's right (its left while `crowded`, the tool panel docked right) of what the plugins have for the page, a
-  section each (`add(section, { first })`; a section with nothing sets its own `hidden`, and the zone with none shown
+- `src/client/drawer.ts`: `drawerIn(root, { crowded })`, the drawer (`.drawer`), `context.drawer`: on the
+  window's right (its left while `crowded`, the tool panel docked right), what the plugins have for the page, a
+  section each (`add(section, { first })`; a section with nothing sets its own `hidden`, and the drawer with none shown
   stays away). It shows while a shortcut's keys are held (`point`, which the overlay calls), the pointer or the focus
   is in it, something keeps it (`keep()`) or an item is open, and goes `LINGER` after. `show(view, { title, closed })`
   opens an item in the sections' place, under a head with a way back, and answers what closes it; Esc is the item's
-  while the focus is in the zone or no popup is open (never a `data-deictic-modal`'s). `trayed(context, plugin, title,
+  while the focus is in the drawer or no popup is open (never a `data-deictic-modal`'s). `trayed(context, plugin, title,
 row)` is a section of a plugin's tray items, a row each that opens it and a × that removes it: screenshots',
   recordings' and voice's sections are that, each opening the lightbox. `playMark()` is a row's play icon.
 - `src/client/lighting.ts`: what's drawn on the page itself, `spotlight(root)`, a `Lighting`: `point` (what's under
@@ -341,7 +341,7 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   (`?thread=<id>` there, or `link(channel, id)`), its whole typed text and whether it's `open`. Undo cancels the task
   unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` only adds a task (`Op`); the history's
   older records of an edit or a removal are still undone and redone.
-  The routes are the drop zone's: `page` answers the channel's tasks as `Listed` (a `Task` with its `place`, `tag` and
+  The routes are the drawer's: `page` answers the channel's tasks as `Listed` (a `Task` with its `place`, `tag` and
   `page` where it has them, its `replies` count, its newest reply's ID as `last`, and what it came to as `said`): those
   still to do, oldest first, then the `OVER` (10) lately completed or failed; `thread/<id>` a `Thread` (the task and its
   `Reply`s: who, `kind`, text, when); `reply/<id>`, `edit/<id>` (the words before the `---`) and `remove/<id>` (canceled)
@@ -351,9 +351,9 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   within `FRESH`, and `subscribe` tells of each read. What's unread is its: `deictic:tasks:seen` in `localStorage`, each
   task's mark as last opened (its newest reply's ID, and its state once blocked, completed or failed); `unread(task)` is
   a mark that differs, `seen(task)` writes it, and a browser's first read marks every task seen.
-  `zone.ts` is the tasks' section in the drop zone (`zoneOf(context)`, added first): a row per task (state dot, title,
+  `drawer.ts` is the tasks' section in the drawer (`drawerOf(context)`, added first): a row per task (state dot, title,
   state and who has it, what it's about as `tell(named())` or `<tag> on /page`, replies, an unread mark), those over
-  folded in a `details`. A row opens the task in the zone (`context.zone.show`): `.stands` (state, the board's link,
+  folded in a `details`. A row opens the task in the drawer (`context.drawer.show`): `.stands` (state, the board's link,
   Edit and a Delete pressed twice within `SURE`, for an open one), `.where` (the element, outlined on the page as
   `.task-about` while it's open, scrolled to by a press), the words (a field while edited), what it came to, the thread
   (`.task-thread`; replies after the one last read are `.new`, never one written here) and a reply field. It reads
@@ -364,13 +364,13 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   on the page and a task still to do gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along, a dot where one is unread), followed
   each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`)
   and while the Task tab is open over the page: a badge under the pointer shows a card of
-  its tasks and a click opens them in the drop zone (`zoneOf(context).open`). A pin has no layer to stack in: each is
+  its tasks and a click opens them in the drawer (`drawerOf(context).open`). A pin has no layer to stack in: each is
   fixed under the popup, and the one pointed at over it.
-  `client.ts` is the Task tab, a composer and nothing else: the tasks there are, are the drop zone's. Under the field,
+  `client.ts` is the Task tab, a composer and nothing else: the tasks there are, are the drawer's. Under the field,
   the channel and who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none).
-  A task that's added reloads the store, and the tab says it's in the drop zone. With
+  A task that's added reloads the store, and the tab says it's in the drawer. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
@@ -384,7 +384,7 @@ row)` is a section of a plugin's tray items, a row each that opens it and a × t
   attached (`.task-about`, followed each frame). The first is the task's place: the op is sent on it
   (`apply(op, on)`),
   the rest go as `Op.also` (place, tag, HTML: labels `deictic.also.N`, files `element.N.html` from 2), and with none
-  the op is `detached`: the page's labels alone, no `deictic.at`, so no pin has it, and the drop zone lists it as about the page. What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
+  the op is `detached`: the page's labels alone, no `deictic.at`, so no pin has it, and the drawer lists it as about the page. What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
   (removable, which takes it out of the tray), and every chip opens one lightbox of all that's attached, at itself:
   a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
   (`subscribe`), so a shot taken while it's open is a chip at once, and a task that's added empties it and clears
@@ -467,7 +467,7 @@ repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
-works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, the tasks' `page`, `thread`, `reply`, `edit` and `remove` routes answered for the drop zone and the pins, a recording's parts and the voice clips in
+works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, the tasks' `page`, `thread`, `reply`, `edit` and `remove` routes answered for the drawer and the pins, a recording's parts and the voice clips in
 IndexedDB for a day, so a recording carries on to the site's next page, class edits
 on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
 publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a

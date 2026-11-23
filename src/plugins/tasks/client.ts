@@ -1,6 +1,6 @@
 /**
- * The Task tab: a field to add a task about the element with. The tasks there already are the drop zone's to list
- * and open (`zone.ts`), and the pins' to show on the page. Beside the channel it says who watches it
+ * The Task tab: a field to add a task about the element with. The tasks there already are the drawer's to list
+ * and open (`drawer.ts`), and the pins' to show on the page. Beside the channel it says who watches it
  * (`Model.watching`), or that no agent does.
  * Ctrl+Enter or Add sends it with the page's URL, the viewport and the element as it rendered, which
  * the source can't tell: the chain of source it rendered through, its HTML (a file attached), and where the
@@ -39,10 +39,10 @@ import type { Recording } from '#src/plugins/recordings/index.ts';
 import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
+import { drawerOf } from './drawer.ts';
 import type { Marks, Model, Op, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
 import { storeOf } from './store.ts';
-import { zoneOf } from './zone.ts';
 
 const STYLE = `
 .compose { flex: none; }
@@ -340,8 +340,8 @@ export default defineClientPlugin<Model, Op>({
   // opens the tab on that spot.
   setup: (context) => {
     const { tools, tray } = context;
-    // The tasks there already, in the drop zone.
-    zoneOf(context);
+    // The tasks there already, in the drawer.
+    drawerOf(context);
     const group = element('div', { className: 'tool-group task-tool' });
     let picking = false;
     const button = toolButton(TASK, 'Task', 'T', () => {
@@ -862,7 +862,7 @@ export default defineClientPlugin<Model, Op>({
         // this tab's to list.
         const on = first?.target ?? context.target;
         const model = await context.apply(op, on);
-        // In the drop zone and on its pin at once: the tab lists none.
+        // In the drawer and on its pin at once: the tab lists none.
         storeOf(context).load(true);
         announce(
           model,
@@ -873,8 +873,8 @@ export default defineClientPlugin<Model, Op>({
         const added = model.tasks.at(-1)?.id;
         note.textContent =
           first === undefined
-            ? 'Added, about the page: it is in the drop zone'
-            : `Added${added === undefined ? '' : ` #${added}`}: it is in the drop zone`;
+            ? 'Added, about the page: it is in the drawer'
+            : `Added${added === undefined ? '' : ` #${added}`}: it is in the drawer`;
         text.value = '';
         grow();
         // The task has them now: what was made for it, and what was drawn on the page for it.

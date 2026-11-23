@@ -14,13 +14,13 @@ import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 import { dropAway, keepAway, keptAway } from './away.ts';
 import { named, tell } from './component.ts';
 import { ATTRIBUTE, div, nameOf, reduced, sameAs, targetOf } from './dom.ts';
+import { drawerIn } from './drawer.ts';
 import { openLightbox } from './lightbox.ts';
 import { CLEAR, type Lighting, spotlight, spotOf } from './lighting.ts';
 import { STYLE } from './style.ts';
 import { toolPanel } from './tools.ts';
 import { tooltips } from './tooltip.ts';
 import { tray } from './tray.ts';
-import { dropZone } from './zone.ts';
 
 // For a plugin's page half that records the mic, or shows a clip: the waveforms the lightbox draws.
 export { drawBars, liveWaveform, peaksOf, type Colors } from './waveform.ts';
@@ -205,7 +205,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     },
   });
   // Out from under the tool panel, where that's on the window's right.
-  const zone = dropZone(root, { crowded: () => tools.edge() === 'right' });
+  const drawer = drawerIn(root, { crowded: () => tools.edge() === 'right' });
   // What's typed in the popup is the popup's: the page hears a key from in here as one on the host, not in a field,
   // so its own shortcuts (a "/" to search, a "j" to step) would run on a task's words. Ours listen while capturing.
   for (const type of ['keydown', 'keypress', 'keyup'] as const) host.addEventListener(type, (e) => e.stopPropagation());
@@ -226,7 +226,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     // Not from under something unsaved, which a press on the page wouldn't close either: its button shakes.
     open: (plugin, element, at) => panel?.guard() !== true && openAt(plugin, element, at),
     lightbox: (items, options) => openLightbox(root, items, options),
-    zone,
+    drawer,
     tools,
     tray: kept,
   });
@@ -321,7 +321,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   const hide = () => {
     held = [];
     tools.point(false);
-    zone.point(false);
+    drawer.point(false);
     glance(false);
     lighting.hide();
   };
@@ -370,7 +370,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     held = heldBy(e);
     if (held.length === 0 && !picking) return hide();
     tools.point(held.length > 0);
-    zone.point(held.length > 0);
+    drawer.point(held.length > 0);
     glance(true);
     if (frame === 0) frame = requestAnimationFrame(() => show(true));
   };

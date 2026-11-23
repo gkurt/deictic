@@ -10,8 +10,8 @@
  * recording's own, and this one is away.
  */
 import { toolButton } from '#src/client/dom.ts';
+import { playMark, trayed } from '#src/client/drawer.ts';
 import { liveWaveform } from '#src/client/waveform.ts';
-import { playMark, trayed } from '#src/client/zone.ts';
 import { defineClientPlugin } from '#src/index.ts';
 
 import type { Clip, Take, Voice } from './index.ts';
@@ -38,7 +38,7 @@ const EVERY = 1000;
 
 export default defineClientPlugin<never, never, Voice>({
   name: 'voice',
-  setup: ({ base, request, tools, tray, zone, lightbox }) => {
+  setup: ({ base, request, tools, tray, drawer, lightbox }) => {
     const start = async (): Promise<Take> => {
       if (typeof MediaRecorder === 'undefined' || navigator.mediaDevices?.getUserMedia === undefined)
         throw new Error("voice: this browser can't record the mic here: it needs a secure page (https or localhost)");
@@ -154,8 +154,8 @@ export default defineClientPlugin<never, never, Voice>({
     mic.setAttribute('aria-pressed', 'false');
     group.append(Object.assign(document.createElement('style'), { textContent: STYLE }), mic, time, wave);
     tools.add(group);
-    // In the drop zone until a task takes them: each plays in the lightbox.
-    zone.add(
+    // In the drawer until a task takes them: each plays in the lightbox.
+    drawer.add(
       trayed({ tray }, 'voice', 'Voice notes', (item, i, all) => {
         const { url, duration } = item.value as Clip;
         const name = `${all.length === 1 ? 'Voice' : `Voice ${i + 1}`} ${clock(duration)}`;

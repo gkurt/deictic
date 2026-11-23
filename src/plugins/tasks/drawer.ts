@@ -1,7 +1,7 @@
 /**
- * The tasks' section of the drop zone: the channel's tasks still to do, each with its state, and those lately
+ * The tasks' section of the drawer: the channel's tasks still to do, each with its state, and those lately
  * over folded under them. One with something unread (a reply since it was last opened here, or an end no one looked
- * at) says so. A task opens in the zone: its words, to change while no one has it, its thread, read as it's opened
+ * at) says so. A task opens in the drawer: its words, to change while no one has it, its thread, read as it's opened
  * and again every few seconds, a field to answer in, and Delete, which cancels it on the board.
  */
 import { named, tell } from '#src/client/component.ts';
@@ -12,9 +12,9 @@ import type { Listed, Thread } from './index.ts';
 import { OVER, storeOf } from './store.ts';
 
 const STYLE = `
-.tasks-zone h3 .unread { padding: 0 6px; border-radius: 8px; font-weight: 700; letter-spacing: 0; color: var(--deictic-on-accent); background: var(--deictic-accent); }
-.tasks-zone h3 a { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; color: inherit; }
-.tasks-zone h3 a:hover { color: var(--deictic-fg); }
+.tasks-drawer h3 .unread { padding: 0 6px; border-radius: 8px; font-weight: 700; letter-spacing: 0; color: var(--deictic-on-accent); background: var(--deictic-accent); }
+.tasks-drawer h3 a { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; color: inherit; }
+.tasks-drawer h3 a:hover { color: var(--deictic-fg); }
 .task-row { display: grid; grid-template: 'state title mark' auto 'state meta mark' auto / auto minmax(0, 1fr) auto; gap: 2px 8px; align-items: center;
   width: 100%; padding: 8px 10px; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 10px; text-align: left; background: rgb(255 255 255 / 0.04); }
 .task-row:hover { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
@@ -31,10 +31,10 @@ const STYLE = `
 .task-state.blocked { border-color: #fbbf24; background: #fbbf24; }
 .task-state.completed { border-color: #4ade80; background: #4ade80; }
 .task-state.failed { border-color: var(--deictic-problem); background: var(--deictic-problem); }
-.tasks-zone details { margin-top: 6px; }
-.tasks-zone summary { cursor: pointer; font-size: 12px; color: var(--deictic-muted); }
-.tasks-zone summary:hover { color: var(--deictic-fg); }
-.tasks-zone details .zone-rows { margin-top: 6px; }
+.tasks-drawer details { margin-top: 6px; }
+.tasks-drawer summary { cursor: pointer; font-size: 12px; color: var(--deictic-muted); }
+.tasks-drawer summary:hover { color: var(--deictic-fg); }
+.tasks-drawer details .drawer-rows { margin-top: 6px; }
 .task-view { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .task-view .stands { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--deictic-muted); }
 .task-view .stands .says { flex: 1; }
@@ -90,25 +90,25 @@ function ago(at: string): string {
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export interface TasksZone {
-  /** Opens a task in the drop zone, or several to pick from: a pin's. */
+export interface TasksDrawer {
+  /** Opens a task in the drawer, or several to pick from: a pin's. */
   open: (tasks: Listed[]) => void;
 }
 
-const made = new WeakMap<ShadowRoot, TasksZone>();
+const made = new WeakMap<ShadowRoot, TasksDrawer>();
 
-/** The tasks' section in the drop zone of the overlay `context` is of: added the first time it's asked for. */
-export function zoneOf(context: ClientContext): TasksZone {
+/** The tasks' section in the drawer of the overlay `context` is of: added the first time it's asked for. */
+export function drawerOf(context: ClientContext): TasksDrawer {
   const known = made.get(context.root);
   if (known !== undefined) return known;
 
   const store = storeOf(context);
-  const section = element('section', { className: 'tasks-zone', hidden: true });
+  const section = element('section', { className: 'tasks-drawer', hidden: true });
   const heading = element('h3');
-  const rows = element('div', { className: 'zone-rows' });
+  const rows = element('div', { className: 'drawer-rows' });
   const over = element('details');
   const overCount = element('summary');
-  const overRows = element('div', { className: 'zone-rows' });
+  const overRows = element('div', { className: 'drawer-rows' });
   over.append(overCount, overRows);
   section.append(element('style', { textContent: STYLE }), heading, rows, over);
 
@@ -165,7 +165,7 @@ export function zoneOf(context: ClientContext): TasksZone {
     overRows.replaceChildren(...ended.map(rowOf));
   };
   store.subscribe(draw);
-  context.zone.add(section, { first: true });
+  context.drawer.add(section, { first: true });
 
   const ask = async <T>(route: string, body?: unknown): Promise<T> => {
     const res = await context.request(
@@ -177,7 +177,7 @@ export function zoneOf(context: ClientContext): TasksZone {
     return answer;
   };
 
-  /** A task, open in the zone: its words, its thread, and what changes them. */
+  /** A task, open in the drawer: its words, its thread, and what changes them. */
   function view(first: Listed): void {
     let task = first;
     let editing = false;
@@ -365,7 +365,7 @@ export function zoneOf(context: ClientContext): TasksZone {
     drawWords();
     void load();
     const again = setInterval(() => void load(), AGAIN);
-    const close = context.zone.show(el, {
+    const close = context.drawer.show(el, {
       title: `#${task.id}`,
       closed: () => {
         clearInterval(again);
@@ -378,17 +378,17 @@ export function zoneOf(context: ClientContext): TasksZone {
 
   /** Several tasks of one place, to pick from. */
   const pick = (tasks: Listed[]) => {
-    const el = element('div', { className: 'zone-rows' });
+    const el = element('div', { className: 'drawer-rows' });
     el.append(...tasks.map(rowOf));
-    context.zone.show(el, { title: `${tasks.length} tasks on ${about(tasks[0]!)}` });
+    context.drawer.show(el, { title: `${tasks.length} tasks on ${about(tasks[0]!)}` });
   };
 
-  const zone: TasksZone = {
+  const drawer: TasksDrawer = {
     open: (tasks) => {
       if (tasks.length === 1) view(tasks[0]!);
       else if (tasks.length > 1) pick(tasks);
     },
   };
-  made.set(context.root, zone);
-  return zone;
+  made.set(context.root, drawer);
+  return drawer;
 }

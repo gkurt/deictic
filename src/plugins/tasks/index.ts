@@ -97,7 +97,7 @@ export interface Place {
   tag: string;
 }
 
-/** A task as the drop zone lists it: with its place, where it has one, and how its thread stands. */
+/** A task as the drawer lists it: with its place, where it has one, and how its thread stands. */
 export interface Listed extends Task {
   /** `file:line:column`, as the element's mark: none for a task about the page. */
   place?: string;
@@ -127,7 +127,7 @@ export interface Reply {
   at: string;
 }
 
-/** A task with its thread, as the drop zone opens it. */
+/** A task with its thread, as the drawer opens it. */
 export interface Thread {
   task: Listed;
   replies: Reply[];
@@ -259,7 +259,7 @@ export interface Removed extends Added {
 
 /**
  * What the history keeps of a change: a task added has no `kind`, as it had none before there were others. The others
- * are no longer made (a task is changed in the drop zone, by the plugin's routes), and still undone where a history has them.
+ * are no longer made (a task is changed in the drawer, by the plugin's routes), and still undone where a history has them.
  */
 export type Kept = Added | Edited | Removed;
 
@@ -267,7 +267,7 @@ export type Kept = Added | Edited | Removed;
 type Message = Awaited<ReturnType<TaskBoard['thread']>>['message'];
 /** A task's thread at a glance, as a board lists tasks. */
 type Summary = Awaited<ReturnType<TaskBoard['tasks']['list']>>['tasks'][number];
-/** How many of the tasks lately over the drop zone lists: what an agent said as it ended one is there to read. */
+/** How many of the tasks lately over the drawer lists: what an agent said as it ended one is there to read. */
 const OVER = 10;
 
 /** How many tasks a page is asked about at most: past that it has more pins than anyone reads. */
@@ -539,15 +539,15 @@ export function tasks(options: TasksOptions = {}) {
       void boardOf().catch(() => {});
     },
     routes: {
-      // The channel's tasks, for the page: the drop zone lists them, and those with a place are pinned where their
+      // The channel's tasks, for the page: the drawer lists them, and those with a place are pinned where their
       // elements are.
       page: async () => {
         const [tasks, link] = await Promise.all([asked(listed), linkOf()]);
         return Response.json({ channel, ...(link === undefined ? {} : { link }), tasks });
       },
-      // A task and its thread, `thread/<id>`: what the drop zone opens.
+      // A task and its thread, `thread/<id>`: what the drawer opens.
       thread: async (req) => Response.json(await asked(async () => threadOf((await named(req)).id))),
-      // What the drop zone does to a task: a reply in its thread, other words for it, or its end, which cancels it
+      // What the drawer does to a task: a reply in its thread, other words for it, or its end, which cancels it
       // on the board. Each answers the thread as it is after.
       reply: (req) =>
         asked(async () => {

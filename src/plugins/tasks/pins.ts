@@ -3,7 +3,7 @@
  * tab's list of one element's. A pin is the element's outline, faint, and a badge on its corner with how many
  * tasks are still to do there, in the colour of the furthest along, and a dot where one has something unread. They
  * show while a shortcut's keys are held and while the Task tab is open: a pin under the pointer reads its tasks, and
- * a click opens them in the drop zone.
+ * a click opens them in the drawer.
  *
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
@@ -11,9 +11,9 @@ import { named, tell } from '#src/client/component.ts';
 import { div, place, reduced } from '#src/client/dom.ts';
 import type { ClientContext, Point } from '#src/index.ts';
 
+import { drawerOf } from './drawer.ts';
 import type { Placed } from './index.ts';
 import { OVER, storeOf } from './store.ts';
-import { zoneOf } from './zone.ts';
 
 const STYLE = `
 /* No box of its own, which its pins would stack in: each is under the popup, and the one pointed at over it, with its card. */
@@ -148,8 +148,8 @@ export function pinsIn(context: ClientContext): Pins {
     // One after another, as they come: where motion is reduced there's no animation to delay.
     if (!reduced()) box.style.animationDelay = `${Math.min(pins.size, 12) * 30}ms`;
     const pin: Pin = { place: at, ...(spot === undefined ? {} : { at: spot }), el, box, badge, count, card, tasks: [] };
-    // In the drop zone, where a task is read and changed: the popup is for a new one.
-    badge.addEventListener('click', () => zoneOf(context).open(pin.tasks));
+    // In the drawer, where a task is read and changed: the popup is for a new one.
+    badge.addEventListener('click', () => drawerOf(context).open(pin.tasks));
     return pin;
   };
 

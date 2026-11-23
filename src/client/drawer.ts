@@ -1,17 +1,17 @@
 /**
- * The drop zone: a drawer on the window's side where what the plugins have for the page lands, a section each (the
+ * The drawer: on the window's side, where what the plugins have for the page lands, a section each (the
  * tasks still to do, the shots and recordings no task has taken). It shows while a shortcut's keys are held, as the
  * tool panel does, and only while a section has something in it; it stays while the pointer is on it, while something
  * goes on in it (`keep`), and while one of its items is open.
  *
- * An item opens in the zone itself (`show`): its view takes the sections' place, with a way back. Esc is the view's
- * while the focus is in the zone, or no popup is open to have it first.
+ * An item opens in the drawer itself (`show`): its view takes the sections' place, with a way back. Esc is the view's
+ * while the focus is in the drawer, or no popup is open to have it first.
  */
-import type { ClientContext, DropZone, TrayItem } from '#src/index.ts';
+import type { ClientContext, Drawer, TrayItem } from '#src/index.ts';
 
 import { div } from './dom.ts';
 
-/** How long the zone outlasts the keys, in milliseconds: time to get the pointer to it. */
+/** How long the drawer outlasts the keys, in milliseconds: time to get the pointer to it. */
 const LINGER = 600;
 const BACK =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
@@ -23,25 +23,25 @@ export function playMark(): HTMLElement {
   return mark;
 }
 
-export interface Zone extends DropZone {
-  /** Whether a shortcut's keys are held: the zone shows while they are. */
+export interface OwnDrawer extends Drawer {
+  /** Whether a shortcut's keys are held: the drawer shows while they are. */
   point: (on: boolean) => void;
 }
 
-export interface ZoneOptions {
-  /** Whether the tool panel is on the window's right: the zone is then on its left, out from under it. */
+export interface DrawerOptions {
+  /** Whether the tool panel is on the window's right: the drawer is then on its left, out from under it. */
   crowded: () => boolean;
 }
 
-export function dropZone(root: ShadowRoot, { crowded }: ZoneOptions): Zone {
-  const zone = div('zone');
-  zone.setAttribute('role', 'complementary');
-  zone.setAttribute('aria-label', 'deictic drop zone');
-  const sections = div('zone-sections');
-  const viewing = div('zone-view');
+export function drawerIn(root: ShadowRoot, { crowded }: DrawerOptions): OwnDrawer {
+  const drawer = div('drawer');
+  drawer.setAttribute('role', 'complementary');
+  drawer.setAttribute('aria-label', 'deictic drawer');
+  const sections = div('drawer-sections');
+  const viewing = div('drawer-view');
   viewing.hidden = true;
-  zone.append(sections, viewing);
-  root.append(zone);
+  drawer.append(sections, viewing);
+  root.append(drawer);
 
   let pointing = false;
   let over = false;
@@ -49,32 +49,32 @@ export function dropZone(root: ShadowRoot, { crowded }: ZoneOptions): Zone {
   // What closes the item that's open, where one is.
   let leave: (() => void) | undefined;
   let leaving: ReturnType<typeof setTimeout> | undefined;
-  const shown = () => zone.classList.contains('shown');
-  // A section with nothing to show hides itself: the zone has nothing then, and stays away.
+  const shown = () => drawer.classList.contains('shown');
+  // A section with nothing to show hides itself: the drawer has nothing then, and stays away.
   const empty = () => leave === undefined && ![...sections.children].some((section) => !section.hasAttribute('hidden'));
   const show = () => {
     clearTimeout(leaving);
     leaving = undefined;
-    const on = !empty() && (pointing || over || keeps > 0 || leave !== undefined || zone.contains(root.activeElement));
+    const on = !empty() && (pointing || over || keeps > 0 || leave !== undefined || drawer.contains(root.activeElement));
     if (on === shown()) return;
     if (!on) {
       // Not at once: the keys are let go on the way to it.
-      leaving = setTimeout(() => zone.classList.remove('shown'), LINGER);
+      leaving = setTimeout(() => drawer.classList.remove('shown'), LINGER);
       return;
     }
-    zone.classList.toggle('left', crowded());
-    zone.classList.add('shown');
+    drawer.classList.toggle('left', crowded());
+    drawer.classList.add('shown');
   };
-  zone.addEventListener('pointerenter', () => {
+  drawer.addEventListener('pointerenter', () => {
     over = true;
     show();
   });
-  zone.addEventListener('pointerleave', () => {
+  drawer.addEventListener('pointerleave', () => {
     over = false;
     show();
   });
-  zone.addEventListener('focusout', () => queueMicrotask(show));
-  // A section fills as its plugin reads what it has: the zone is there once one does.
+  drawer.addEventListener('focusout', () => queueMicrotask(show));
+  // A section fills as its plugin reads what it has: the drawer is there once one does.
   new MutationObserver(show).observe(sections, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
 
   const close = () => {
@@ -92,7 +92,7 @@ export function dropZone(root: ShadowRoot, { crowded }: ZoneOptions): Zone {
     'keydown',
     (e) => {
       if (e.key !== 'Escape' || leave === undefined || root.querySelector('[data-deictic-modal]') !== null) return;
-      if (!zone.contains(root.activeElement) && root.querySelector('.panel') !== null) return;
+      if (!drawer.contains(root.activeElement) && root.querySelector('.panel') !== null) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       close();
@@ -102,7 +102,7 @@ export function dropZone(root: ShadowRoot, { crowded }: ZoneOptions): Zone {
 
   return {
     add: (section, options) => {
-      section.classList.add('zone-section');
+      section.classList.add('drawer-section');
       if (options?.first === true) sections.prepend(section);
       else sections.append(section);
       show();
@@ -117,8 +117,8 @@ export function dropZone(root: ShadowRoot, { crowded }: ZoneOptions): Zone {
       });
       back.setAttribute('aria-keyshortcuts', 'Escape');
       back.addEventListener('click', close);
-      const head = div('zone-head');
-      head.append(back, Object.assign(document.createElement('span'), { className: 'zone-title', textContent: title }));
+      const head = div('drawer-head');
+      head.append(back, Object.assign(document.createElement('span'), { className: 'drawer-title', textContent: title }));
       viewing.replaceChildren(head, view);
       sections.hidden = true;
       viewing.hidden = false;
@@ -158,7 +158,7 @@ export function trayed(
 ): HTMLElement {
   const section = document.createElement('section');
   const heading = Object.assign(document.createElement('h3'), { textContent: title });
-  const list = div('zone-rows');
+  const list = div('drawer-rows');
   section.append(heading, list);
   const draw = () => {
     const items = tray.list(plugin);
@@ -166,7 +166,7 @@ export function trayed(
     list.replaceChildren(
       ...items.map((item, i) => {
         const { label, open } = row(item, i, items);
-        const opener = Object.assign(document.createElement('button'), { type: 'button', className: 'zone-open' });
+        const opener = Object.assign(document.createElement('button'), { type: 'button', className: 'drawer-open' });
         opener.append(...label);
         opener.addEventListener('click', () => open(el));
         const remover = Object.assign(document.createElement('button'), {
@@ -176,7 +176,7 @@ export function trayed(
           title: 'Remove',
         });
         remover.addEventListener('click', () => tray.remove(plugin, item.id));
-        const el = div('zone-row');
+        const el = div('drawer-row');
         el.append(opener, remover);
         return el;
       }),

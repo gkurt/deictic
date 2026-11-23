@@ -13,8 +13,8 @@
  * events: the page's annotations, as SVGs in page coordinates, at the start and at each change.
  */
 import { toolButton } from '#src/client/dom.ts';
+import { playMark, trayed } from '#src/client/drawer.ts';
 import { liveWaveform } from '#src/client/waveform.ts';
-import { playMark, trayed } from '#src/client/zone.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 
@@ -83,7 +83,7 @@ const clock = (ms: number) => {
 
 export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
-  setup: ({ base, root, options, use, request, tools, tray, zone, lightbox }) => {
+  setup: ({ base, root, options, use, request, tools, tray, drawer, lightbox }) => {
     const { masking, canvas } = options as { masking: ResolvedMasking; canvas?: false | { fps: number } };
     let running: Promise<Recording | undefined> | undefined;
 
@@ -99,8 +99,8 @@ export default defineClientPlugin<never, never, Recorder>({
     });
     group.append(Object.assign(document.createElement('style'), { textContent: STYLE }), start, going);
     tools.add(group);
-    // In the drop zone until a task takes them: each plays back in the lightbox.
-    zone.add(
+    // In the drawer until a task takes them: each plays back in the lightbox.
+    drawer.add(
       trayed({ tray }, 'recordings', 'Recordings', (item, i, all) => {
         const { url, duration, voice } = item.value as Recording;
         const name = `${all.length === 1 ? 'Recording' : `Recording ${i + 1}`} ${clock(duration)}`;

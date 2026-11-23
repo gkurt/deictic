@@ -7,7 +7,7 @@
  * tray, for the next task.
  */
 import { toolButton } from '#src/client/dom.ts';
-import { trayed } from '#src/client/zone.ts';
+import { trayed } from '#src/client/drawer.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { Annotations } from '#src/plugins/annotations/index.ts';
 
@@ -73,7 +73,7 @@ export function mask(copy: Node, m: ResolvedMasking): void {
 export function screenshotsClient(capture: PageCapture) {
   return defineClientPlugin<never, never, Capture>({
     name: 'screenshots',
-    setup: ({ base, request, options, use, tools, tray, zone, lightbox }) => {
+    setup: ({ base, request, options, use, tools, tray, drawer, lightbox }) => {
       const { masking, renderer } = options as { masking: ResolvedMasking; renderer: unknown };
       // Asked at each shot: the annotations plugin may be set up after this one.
       const overlay = (area: Box) => {
@@ -129,8 +129,8 @@ export function screenshotsClient(capture: PageCapture) {
       });
       group.append(shoot);
       tools.add(group);
-      // In the drop zone until a task takes them: each opens among the others.
-      zone.add(
+      // In the drawer until a task takes them: each opens among the others.
+      drawer.add(
         trayed({ tray }, 'screenshots', 'Screenshots', (item, i, all) => {
           const name = (n: number) => (all.length === 1 ? 'Screenshot' : `Screenshot ${n + 1}`);
           const thumb = Object.assign(document.createElement('img'), { src: (item.value as Shot).url, alt: '' });
