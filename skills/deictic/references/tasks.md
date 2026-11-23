@@ -12,6 +12,10 @@ command to read each, and whether the line still reads as the task saw it.
 - **`About the spot at x,y`** (the `deictic.point` label): the task is about that point, not the whole element,
   which is only the nearest one the source marks. The point may be outside it. A screenshot taken as the task was
   added has the point circled.
+- **`Also about …`** (the `deictic.also.N` labels): the task is about those elements too, in the order they were
+  attached. Each one's HTML is `element.N.html`, and the screenshot outlines them all.
+- **`About the page as a whole`**: no element was attached, so there's no place in the source. Find it from the
+  words, the page's URL and the screenshot.
 - **The element is one place**: what they mean may be its parent, a sibling, or every element the line renders. The
   words and the marks decide.
 - **`element.html`** is the element as it rendered. Read it only when the task and the screenshot don't settle which

@@ -88,7 +88,8 @@ and a right-click, which the browser's own menu then doesn't answer. A plugin's 
 tab: while its keys are held, the element's caption names that tab.
 
 While the keys are held the page dims around the element pointed at, which stays lit, with guides from its edges
-across the window. The popup opens beside it, tied to it by a line, and the page gets its light back once the
+across the window. Its caption says what it is: with React in development, the component whose JSX has it, `<Plan>
+<li>`, or the component alone, `<Badge>`, for the only element one writes; otherwise its tag. The popup opens beside it, tied to it by a line, and the page gets its light back once the
 pointer has been out on it a moment. Nothing of it takes the pointer from the page.
 
 The tasks are on the page, too. While the keys are held, and while the Task tab is open, every element with a task
@@ -174,6 +175,8 @@ are where the element is in the first PNG attached, where that's a shot taken of
 it; `deictic.note.1` is a note drawn on the page; `deictic.recording.1.replay` is where the first recording plays back; `deictic.pointed` is the path to
 what was pointed at inside the element; `deictic.dropped.1` is something attached that wasn't kept any more.
 `deictic.point` is the spot a task about a point is on, `x,y` in CSS pixels from the element's top left.
+`deictic.also.1` is the next element a task about several is about, as `src/Nav.tsx:4:7 <a>`, its HTML attached as
+`element.2.html`; a task with no element attached has no `deictic.at`, and is about the page.
 `deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared
 component's line is the same wherever it's used; these say where: with React in development the components that use
 it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,
@@ -190,6 +193,9 @@ In the Task tab:
 
 - The field is a composer: what's attached is over the words, a chip each, and the buttons that attach are under
   them, each an icon named by its tooltip. `Ctrl+Enter` (`⌘Enter`), or the arrow, adds the task.
+- The element is attached to begin with, a chip like the rest. **Element** (the crosshair) attaches another: the
+  next press on the page picks it. A task about several is listed and pinned at its first, and names the others;
+  each is outlined in its screenshot. Take every element out, and the task is about the page.
 - **Screenshot** is on or off: on, a shot of the page goes with the task as it's added, the element outlined in it.
   It's on to begin with, and goes off once something else is attached, until you turn it on again.
 - **HTML snapshot** is on or off too: the element as the page has it, as a file.
@@ -364,6 +370,8 @@ export default defineClientPlugin<Model, Op>({
 - `context.open(plugin, element, at?)` opens the popup on another element, or on a point in it (`at`, in CSS pixels
   from its top left, which the panel then gets as `context.at`). Not while the open one holds something `unsaved`:
   its button shakes, and it answers false.
+- A panel's `apply(op, on)` sends an op on another element than the popup's, where the op is about that one: tasks
+  sends a task on the first element attached.
 - `context.tools` is the tool panel, for a page half's `setup`: `add(group)` puts a group of controls in it (buttons
   with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears), `hold(left)` takes the page for a
   tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the

@@ -6,6 +6,7 @@
  *
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
+import { named, tell } from '#src/client/component.ts';
 import { div, place, reduced } from '#src/client/dom.ts';
 import type { ClientContext, Point } from '#src/index.ts';
 
@@ -161,7 +162,7 @@ export function pinsIn(context: ClientContext): Pins {
     pin.box.className = `pin ${state}${pin.at === undefined ? '' : ' spot'}`;
     pin.count.textContent = String(list.length);
     const [, file = '', line = ''] = /^(.*):(\d+):\d+$/.exec(pin.place) ?? [];
-    const tag = `<${pin.el.localName}>`;
+    const tag = tell(named(pin.el));
     pin.badge.setAttribute('aria-label', `${list.length} ${list.length === 1 ? 'task' : 'tasks'} on ${tag}, line ${line}: open`);
     const where = Object.assign(document.createElement('span'), { className: 'pin-where' });
     where.append(Object.assign(document.createElement('b'), { textContent: tag }), ` ${file.split('/').at(-1)}:${line}`);

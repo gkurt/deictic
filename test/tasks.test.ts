@@ -77,6 +77,40 @@ test('adds a task saying what and where, and lists it on the element', async () 
   expect(p.read('src/App.tsx')).toContain('className="text-4xl"');
 });
 
+test('a task names the other elements it is about, and no element where none is attached', async () => {
+  const { post, target } = setup('several');
+  const also = [
+    { at: 'src/Nav.tsx:4:7', tag: 'a', html: '<a>Docs</a>' },
+    { at: 'src/Nav.tsx:9:5', tag: 'button' },
+  ];
+  const added = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, html: '<h1>Pricing</h1>', also } });
+  const { message } = await team.thread(added.json.model.tasks[0]!.id);
+  // The first is its place, as ever; the rest are numbered after it.
+  expect(message.labels).toMatchObject({
+    'deictic.at': 'src/App.tsx:1:26',
+    'deictic.also.1': 'src/Nav.tsx:4:7 <a>',
+    'deictic.also.2': 'src/Nav.tsx:9:5 <button>',
+  });
+  // The Nth element's HTML is `element.N.html`, where it was sent.
+  expect(message.attachments?.map((a) => a.name)).toEqual(['element.html', 'element.2.html']);
+
+  // With none attached it's the page's alone: nothing of the element it was sent on, whose tab doesn't list it.
+  const page = await post<{ model: Model }>('apply', {
+    plugin: 'tasks',
+    target,
+    op: { ...op, text: 'The page feels slow', count: 0, detached: true },
+  });
+  expect(page.json.model.tasks.map((t) => t.title)).toEqual(['The headline wraps on phones']);
+  const { tasks: all } = await team.tasks.list({ channel: 'several', state: 'all' });
+  expect(all.find((t) => t.message.text === 'The page feels slow')?.message.labels).toEqual({
+    team: 'web',
+    'deictic.page': '/pricing',
+    'deictic.url': op.page,
+    'deictic.viewport': '390x844',
+    'board.task': 'ready',
+  });
+});
+
 test("adds and lists tasks where the file has no such element, or doesn't parse: the task is the page's", async () => {
   const { p, post, target } = setup('stale');
   p.write('src/App.tsx', 'export const App = () => <p>Pricing</p>;\n');

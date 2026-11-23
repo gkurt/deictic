@@ -34,7 +34,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
   into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes,
   `open(plugin, element, at?)` to open the popup at a tab (on a `Point` of the element, with `at`, which the panel
-  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`) and `tray` (a `Tray`). A panel's context has `unsaved(action)`: the button that keeps
+  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`) and `tray` (a `Tray`). A panel's context has `apply(op, on?)` (on another element than the popup's, with `on`, whose model is then the one
+  answered), `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
   doesn't lose it: the state is kept for the tab's next page (`src/client/away.ts`), whose overlay asks the plugin's
@@ -129,7 +130,13 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
-- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with,
+- `src/client/component.ts`: who wrote an element, where the page says: React's fibers in development (`fiberOf`,
+  `ownerOf`, `componentOf`, which tasks' `chainOf` reads too). `named(el)` is how an element is told to a person, a
+  `Named` (its tag, the component whose JSX has it, and whether it's the only element that component wrote: counted
+  under the owner's fiber, to `LOOKED`), kept per element; `tell` writes it, `<Plan> <li>`, `<Badge>` or `<li>`. The
+  caption, the popup's bar, a pin's card and tasks' element chips all say an element this way.
+- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with, the mark
+  (`ATTRIBUTE`, `targetOf`, `sameAs`: a plugin's page half reads them from here, not from the overlay),
   `toolButton(strokes, name, keys, run)`, a tool panel's icon button (`MOD` is Control, or Meta on a Mac), and
   `controlFor(within, e, loose)`, the control a key is for by its `aria-keyshortcuts`.
 - `src/client/tools.ts`: `toolPanel(root, { spotAt, aim })`, the tool panel (`.tool-panel`; "panel" alone is a tab's
@@ -350,24 +357,32 @@ value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so
   left out, not the task: `keptOf` drops it from the op, `deictic.dropped.N` says so, which `read`
   gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. The field is
   a composer (`.composer`): the chips, the textarea (as tall as what's typed, to `GROWN`), and `.attach`, icon
-  buttons made with `toolButton`: Screenshot and HTML snapshot (`aria-pressed`), Draw, Record, Voice, and Add (an
-  arrow, Ctrl or ⌘ Enter). What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
+  buttons made with `toolButton`: Screenshot and HTML snapshot (`aria-pressed`), Element, Draw, Record, Voice, and
+  Add (an arrow, Ctrl or ⌘ Enter). The elements the task is about are chips too (`about`, each an `About`: its
+  target, the element where this page has it, and what the page said of it, `Seen`): the popup's own to begin with,
+  and each the Element button picks (`tools.pick()`, only a press on a marked element), outlined on the page while
+  attached (`.task-about`, followed each frame). The first is the task's place: the op is sent on it
+  (`apply(op, on)`; where that isn't the popup's element the tab doesn't list the task, and says so under the field),
+  the rest go as `Op.also` (place, tag, HTML: labels `deictic.also.N`, files `element.N.html` from 2), and with none
+  the op is `detached`: the page's labels alone, no `deictic.at`, so nothing lists or pins it. What's in the tray (shots, recordings, voice clips) is the task's to attach: each a chip
   (removable, which takes it out of the tray), and every chip opens one lightbox of all that's attached, at itself:
   a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
   (`subscribe`), so a shot taken while it's open is a chip at once, and a task that's added empties it and clears
   the page's marks, which have a chip too (`N marks`: it draws more, its × clears them). Screenshot is a shot taken
   as the task goes (`shooting`): on while nothing is attached, or as it was last pressed (`wanted`; taking the last
-  shot out turns it off). It's sent first, and only it has the element outlined (`outlined`, in green dashes `ROOM`
-  off it, or a circle of `SPOT` around the task's spot, drawn on and kept again with `screenshots.upload`), which
+  shot out turns it off). It's of the task's first element (of the page, with none on it), sent first, and only it
+  has the task's elements outlined (`outlined`, each in green dashes `ROOM` off it, the others where the page has
+  them, moved by as much as the shot has the first off; or a circle of `SPOT` around the task's spot; drawn on and
+  kept again with `screenshots.upload`), which
   the op says (`outlined`), not the text. `Op.screenshots` is a list, each with its `box` where it's of the element
   and its `marks` where it was drawn on.
   Draw captures a shot and `edit`s it: saved, the `flatten`ed PNG is kept (`screenshots.upload`) and put in the
   tray as a `Pictured`, a shot with what it was made of (`drawn`: the shot as taken, the marks, the element's
   place), so its chip's lightbox has Change marks, and the op has its `marks` (count and notes) and its `box` where
   the task is about the element it was taken of. Record calls `away` with what's typed and asked for (`Kept`), and the panel comes
-  back with that, the recording in the tray by then; the kept state has `facts` too, what only the element's page
-  says (page, viewport, point, count, chain, pointed, HTML): a recording stopped on a page without the element
-  comes back to a panel with no shot to take, and the task says those. Voice records a take here (`voice.start()`),
+  back with that, the recording in the tray by then; the kept state has the page, the viewport and each element as
+  that page had it (`Seen`: point, count, chain, pointed, HTML) too: a recording stopped on a page without the
+  elements comes back to a panel with no shot to take, and the task says those. Voice records a take here (`voice.start()`),
   its time and the mic's live waveform beside the button, and its clip goes in the tray; a take going as the task is
   sent, as Record leaves, or as the popup closes, is kept first. `Op.recordings` attaches each one's JSON (and its
   voice clips, which the JSON names), and a label says where it replays. Its tool in the tool panel (T, last, with a

@@ -12,7 +12,8 @@ import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Point, Re
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
-import { div, nameOf, reduced } from './dom.ts';
+import { named, tell } from './component.ts';
+import { ATTRIBUTE, div, nameOf, reduced, sameAs, targetOf } from './dom.ts';
 import { openLightbox } from './lightbox.ts';
 import { CLEAR, type Lighting, spotlight, spotOf } from './lighting.ts';
 import { STYLE } from './style.ts';
@@ -22,6 +23,7 @@ import { tray } from './tray.ts';
 
 // For a plugin's page half that records the mic, or shows a clip: the waveforms the lightbox draws.
 export { drawBars, liveWaveform, peaksOf, type Colors } from './waveform.ts';
+export { targetOf } from './dom.ts';
 
 export interface StartOptions {
   /** The dev server's base URL, ending in `/`. */
@@ -45,7 +47,6 @@ interface Tab {
   mount: Mount;
 }
 
-const ATTRIBUTE = 'data-deictic';
 /** An arrow pointing up and out: the link leaves the page for the editor. */
 const OUT = icon('M7 17 17 7M8 7h9v9', 2.25);
 // Drawn, as the arrows and the cross of a system's font differ in size and weight from one to the next.
@@ -57,15 +58,6 @@ const LAST = 'deictic:tab';
 /** How long a read may take, in milliseconds, before the popup says it's reading. */
 const SLOW = 200;
 const STARTED = Symbol.for('deictic');
-
-export function targetOf(el: Element): Target | undefined {
-  const at = el.getAttribute(ATTRIBUTE);
-  const match = at === null ? null : /^(.*):(\d+):(\d+)$/.exec(at);
-  if (match === null) return undefined;
-  return { loc: { file: match[1]!, line: Number(match[2]), column: Number(match[3]) }, tag: el.localName };
-}
-
-const sameAs = (el: Element) => [...document.querySelectorAll(`[${ATTRIBUTE}="${CSS.escape(el.getAttribute(ATTRIBUTE) ?? '')}"]`)];
 
 /** The nearest marked element around `el`, out through shadow roots to their hosts. */
 function markedAround(el: Element): Element | undefined {
@@ -553,8 +545,8 @@ function openPanel({
   where.className = 'where';
   const file = document.createElement('span');
   file.textContent = `${target.loc.file}:${target.loc.line}`;
-  // The tag too: the caption that said it while pointing is gone once the popup is open.
-  const tag = Object.assign(document.createElement('span'), { className: 'tag', textContent: `<${target.tag}>` });
+  // What it is too, as the caption said it while pointing, which is gone once the popup is open.
+  const tag = Object.assign(document.createElement('span'), { className: 'tag', textContent: tell(named(element)) });
   // An arrow out, as it leaves the page for the editor; its title is the overlay's tooltip (`tooltip.ts`).
   where.append(tag, file);
   where.insertAdjacentHTML('beforeend', OUT);
@@ -745,10 +737,10 @@ function openPanel({
       elements: sameAs(element),
       target,
       model,
-      apply: async (op) => {
+      apply: async (op, on = target) => {
         say('Writing…');
         try {
-          const result = await post<{ model: unknown }>('apply', { plugin: plugin.name, target, op });
+          const result = await post<{ model: unknown }>('apply', { plugin: plugin.name, target: on, op });
           say('');
           void steps();
           return result.model;

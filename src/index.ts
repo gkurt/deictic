@@ -285,8 +285,11 @@ export interface PanelContext<Model, Op> extends ClientContext {
   elements: Element[];
   target: Target;
   model: Model;
-  /** Applies an op on disk, and reads the model again. Rejects with the server's reason, which the panel also shows. */
-  apply(op: Op): Promise<Model>;
+  /**
+   * Applies an op on disk, and reads the model again. Rejects with the server's reason, which the panel also shows.
+   * On another element with `on`, whose model is then the one answered: for an op that's about that one.
+   */
+  apply(op: Op, on?: Target): Promise<Model>;
   close: () => void;
   /**
    * Says there's something here that leaving would lose (words typed, a change tried on the page), and the button

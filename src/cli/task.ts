@@ -49,6 +49,7 @@ export function run(id: string, values: { out?: string }): void {
     const line = value === undefined ? undefined : say(value);
     if (line !== undefined) console.log(line);
   }
+  if (at === undefined) console.log('About the page as a whole: no element was attached');
   for (const line of drawn(root)) console.log(line);
   // A task added before these were labels says them after its words.
   const told = (pointed ? where.slice(0, pointed.index) : where).trim();
@@ -89,6 +90,11 @@ function drawn({ labels, attachments }: Message): string[] {
     lines.push(
       `${name}: the element at x,y ${position}, ${labels[`${shot}.size`] ?? '?'} (CSS pixels from its top left)${said.length === 0 ? '' : `; notes drawn on it: ${said.join(', ')}`}`,
     );
+  }
+  // The others it's about, after the one it names first: the Nth element's HTML is `element.N.html`.
+  for (const [i, other] of numbered('deictic.also').entries()) {
+    const html = attachments.some((a) => a.name === `element.${i + 2}.html`) ? ` (its HTML is in element.${i + 2}.html)` : '';
+    lines.push(`Also about ${other}${html}`);
   }
   const onPage = notes('deictic');
   if (onPage.length > 0) lines.push(`Notes drawn on the page: ${onPage.join(', ')}`);

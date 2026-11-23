@@ -146,6 +146,16 @@ export interface Op {
   /** How many elements on the page come from the same place in the source. */
   count: number;
   /**
+   * The other elements it's about, after the one it's sent on, in the order they were attached: each one's place,
+   * its tag, and its HTML as it rendered, where that's attached.
+   */
+  also?: { at: string; tag: string; html?: string }[];
+  /**
+   * No element is attached: it's about the page, and the element it's sent on is only where the popup was. It has
+   * no place then, so no element's tab lists it and nothing pins it.
+   */
+  detached?: boolean;
+  /**
    * The source it rendered through, after its own place, nearest first: where the one before it is used. With
    * React in development, the components that wrote it, `Field (src/Field.tsx:20)` or a name alone; without, the
    * files around it, each a `file:line`. A shared component's line says nothing of which use of it this is, and
@@ -410,6 +420,11 @@ export function tasks(options: TasksOptions = {}) {
     if (html !== undefined) files.push({ data: new TextEncoder().encode(html.slice(0, HTML)), name: 'element.html', type: 'text/html' });
     else if (op.pointed !== undefined)
       files.push({ data: new TextEncoder().encode(op.pointed.html.slice(0, HTML)), name: 'pointed.html', type: 'text/html' });
+    // The others': the Nth element's is `element.N.html`, the first being the one it's sent on.
+    for (const [i, other] of (op.also ?? []).entries()) {
+      if (typeof other.html !== 'string' || other.html === '') continue;
+      files.push({ data: new TextEncoder().encode(other.html.slice(0, HTML)), name: `element.${i + 2}.html`, type: 'text/html' });
+    }
     const kept: Op = {
       ...op,
       ...(op.screenshots === undefined ? {} : { screenshots }),
@@ -596,6 +611,7 @@ function attachedLabels(op: Op, dropped: Kind[]): Record<string, string> {
     set(`${n}.size`, `${width}x${height}`);
   }
   for (const [j, note] of (op.annotations?.notes ?? []).entries()) set(`note.${j + 1}`, note);
+  for (const [i, { at, tag }] of (op.also ?? []).entries()) set(`also.${i + 1}`, `${at} <${tag}>`);
   // Not cut: half a URL leads nowhere.
   for (const [i, { replay }] of (op.recordings ?? []).entries()) if (replay.length <= LABEL) set(`recording.${i + 1}.replay`, replay);
   for (const [i, kind] of dropped.entries()) set(`dropped.${i + 1}`, kind);
@@ -644,15 +660,20 @@ function nameOf(root: string): string | undefined {
  * `deictic.url` is the page's whole URL, where a label holds it; `deictic.page` is its path.
  */
 function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<string, string> {
+  const page = {
+    'deictic.page': clip(new URL(op.page).pathname, LABEL),
+    ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
+    'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
+  };
+  // With no element attached it's the page's alone: nothing of the one the popup happened to be on.
+  if (op.detached === true) return page;
   return {
     [AT]: atOf(target),
     [FILE]: clip(target.loc.file, LABEL),
     'deictic.tag': target.tag,
     // Not where the file has no such element: the task is the page's, and goes without.
     ...(source instanceof Refusal ? {} : { 'deictic.line': clip(lineOf(source), LABEL) }),
-    'deictic.page': clip(new URL(op.page).pathname, LABEL),
-    ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
-    'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
+    ...page,
     'deictic.count': String(op.count),
     ...(op.point === undefined ? {} : { [POINT]: `${Math.round(op.point.x)},${Math.round(op.point.y)}` }),
     ...sourceOf(op.chain ?? []),

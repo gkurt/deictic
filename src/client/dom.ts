@@ -1,4 +1,19 @@
 /** The little the overlay's parts all draw with. */
+import type { Target } from '#src/index.ts';
+
+/** The attribute the transform marks an element with: `file:line:column`. */
+export const ATTRIBUTE = 'data-deictic';
+
+/** An element's place in the source, as its mark has it, or nothing for one with none. */
+export function targetOf(el: Element): Target | undefined {
+  const at = el.getAttribute(ATTRIBUTE);
+  const match = at === null ? null : /^(.*):(\d+):(\d+)$/.exec(at);
+  if (match === null) return undefined;
+  return { loc: { file: match[1]!, line: Number(match[2]), column: Number(match[3]) }, tag: el.localName };
+}
+
+/** Every element on the page from the same place in the source as `el`. */
+export const sameAs = (el: Element) => [...document.querySelectorAll(`[${ATTRIBUTE}="${CSS.escape(el.getAttribute(ATTRIBUTE) ?? '')}"]`)];
 
 export function div(className: string): HTMLDivElement {
   const el = document.createElement('div');

@@ -9,6 +9,7 @@
  */
 import type { Point, Target } from '#src/index.ts';
 
+import { named } from './component.ts';
 import { div, nameOf, place, reduced } from './dom.ts';
 
 /** What's pointed at while a shortcut's keys are held. */
@@ -156,12 +157,21 @@ export function spotlight(root: ShadowRoot): Lighting {
         ...(count > 1 ? [`×${count}`] : []),
         ...(pointed === undefined ? [] : [`› ${nameOf(pointed)}`]),
       ];
-      const texts = { tag: `<${target.tag}>`, from: `${target.loc.file}:${target.loc.line}`, opens: names.join(' / ') };
+      // By the component that wrote it, where the page says which: its name alone for its only element, and with
+      // the tag for one of several.
+      const { component, sole } = named(el);
+      const texts = {
+        tag: `<${component ?? target.tag}>`,
+        inside: component === undefined || sole ? '' : `<${target.tag}>`,
+        from: `${target.loc.file}:${target.loc.line}`,
+        opens: names.join(' / '),
+      };
       const saying = JSON.stringify([texts, dim]);
       if (saying !== said) {
         said = saying;
         caption.replaceChildren(
           part('tag', texts.tag),
+          ...(texts.inside === '' ? [] : [part('dim', texts.inside)]),
           part('', texts.from),
           ...dim.map((text) => part('dim', text)),
           ...(names.length === 0 ? [] : [part('opens', texts.opens)]),
