@@ -31,7 +31,11 @@ export function run(id: string, values: { out?: string }): void {
     ['deictic.project', (v) => `Project ${v}`],
     ['deictic.at', (v) => `${v} <${label('deictic.tag') ?? '?'}>`],
     // From its own line out: before the label, tasks said it in their text, which is printed below as it is.
-    ['deictic.source', (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v}`],
+    // The first is often a shared component (`ui/label.tsx`), which the task isn't about changing everywhere.
+    [
+      'deictic.source',
+      (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v} (where the first is a shared component, the change is usually at the next)`,
+    ],
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
     ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
@@ -49,7 +53,8 @@ export function run(id: string, values: { out?: string }): void {
     const line = value === undefined ? undefined : say(value);
     if (line !== undefined) console.log(line);
   }
-  if (at === undefined) console.log('About the page as a whole: no element was attached');
+  if (at === undefined)
+    console.log("About the page as a whole: no element was attached, so find it from the words, the page's URL and the screenshot");
   for (const line of drawn(root)) console.log(line);
   // A task added before these were labels says them after its words.
   const told = (pointed ? where.slice(0, pointed.index) : where).trim();
@@ -58,7 +63,10 @@ export function run(id: string, values: { out?: string }): void {
   const path = label('deictic.pointed');
   if (path !== undefined) {
     const file = root.attachments.some((a) => a.name === 'pointed.html') ? 'pointed.html' : 'element.html';
-    console.log(`\nPointed at, inside it: ${path} (its HTML is in ${file})`);
+    // Markup no line marks, a dependency's.
+    console.log(
+      `\nPointed at, inside it: ${path} (its HTML is in ${file}): what they mean, though no line marks it; find it by its classes`,
+    );
   }
 
   if (at !== undefined) placeOf(at, label('deictic.line'));

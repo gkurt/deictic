@@ -6,7 +6,7 @@
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { clock } from './board.ts';
+import { clock, ME } from './board.ts';
 import { ffmpeg, voiceClips } from './find.ts';
 
 export async function run(ref: string, values: { noise: string; gap: string; wav?: string; json?: boolean }): Promise<void> {
@@ -47,4 +47,9 @@ export async function run(ref: string, values: { noise: string; gap: string; wav
     for (const s of r.speech) console.log(`  ${clock(s.from).padStart(6)} – ${clock(s.to).padStart(6)}  speech`);
     if (wav !== undefined) console.log(`  wav: ${join(wav, `${r.id}.wav`)}`);
   }
+  // Speech in a recording points at the page: "this one" is what was on screen as it was said.
+  if (!results.some((r) => r.recording !== undefined && r.speech.length > 0)) return;
+  console.log(
+    `\nWhat was on screen as they spoke is what they mean: ${ME} frame ${ref} --at <seconds>. The words: ${ME} transcribe ${ref}.`,
+  );
 }
