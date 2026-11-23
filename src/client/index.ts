@@ -17,7 +17,7 @@ import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 import { dropAway, keepAway, keptAway } from './away.ts';
 import { div, nameOf, reduced } from './dom.ts';
 import { openLightbox } from './lightbox.ts';
-import { type Lighting, outlines, ROOM, spotlight } from './lighting.ts';
+import { CLEAR, type Lighting, outlines, spotlight } from './lighting.ts';
 import { STYLE } from './style.ts';
 import { tooltips } from './tooltip.ts';
 
@@ -809,7 +809,7 @@ const MARGIN = 8;
 // Under this much room on either side, the panel overlaps the element rather than shrink to a sliver beside it.
 const LEAST = 160;
 /** How far from the element the popup is in the spotlight view, in pixels: room for the line between them. */
-const APART = 28;
+const APART = 32;
 
 /** How far a press on the head moves, in pixels, before it's a drag: a click there leaves the popup following. */
 const SLACK = 3;
@@ -863,7 +863,7 @@ function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, 
         const room = Math.max(0, height - 2 * MARGIN);
         Object.assign(panel.style, {
           left: `${right >= 0 ? r.right + gap : r.left - gap - panel.offsetWidth}px`,
-          top: `${Math.max(MARGIN, Math.min(r.top - ROOM, height - MARGIN - Math.min(wanted, room)))}px`,
+          top: `${Math.max(MARGIN, Math.min(r.top - CLEAR, height - MARGIN - Math.min(wanted, room)))}px`,
           maxHeight: `${room}px`,
           // It grows out of the side the element is on, as it opens.
           transformOrigin: right >= 0 ? '0 24px' : '100% 24px',

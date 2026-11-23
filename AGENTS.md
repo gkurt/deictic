@@ -138,7 +138,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `spotlight` dims the page around the element with one shadow (`.veil`, under annotations' marks), and draws a ring,
   guides from its edges across the window and a caption (`.aim`); the light glides from one element to the next, by
   CSS transitions that only `.glide` turns on. Held, the ring and the line to the popup are SVG strokes (`.lit`,
-  followed each frame; a light goes round once and the line is drawn out, both CSS, once), with wide faint strokes
+  followed each frame; `CLEAR` pixels off the element, more than the popup view's dashes, so a border tried on it shows apart from the ring; the line is drawn out with a light along it, CSS, once), with wide faint strokes
   for a glow and no filter; the veil is `.lifted` once the pointer has been out of the overlay for `LINGER`. Its
   classes share the root with every plugin's: name a new one that no plugin's styles have (`.chip` and `.stage` are theirs).
 - `src/client/lightbox.ts`: `openLightbox(root, items, { at, from })`, offered to panels as `context.lightbox`: an

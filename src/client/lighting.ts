@@ -35,9 +35,14 @@ export interface Lighting {
 }
 
 /** How far from the element its mark is drawn while the popup is open, in pixels. */
-export const ROOM = 4;
+const ROOM = 4;
+/**
+ * How far from the element the spotlight's ring is, in pixels: farther than the popup view's dashes, as the ring
+ * glows, and a border, an outline or a ring tried on the element has to show apart from it.
+ */
+export const CLEAR = 8;
 
-const grown = (r: DOMRect) => new DOMRect(r.left - ROOM, r.top - ROOM, r.width + 2 * ROOM, r.height + 2 * ROOM);
+const grown = (r: DOMRect, by = ROOM) => new DOMRect(r.left - by, r.top - by, r.width + 2 * by, r.height + 2 * by);
 
 export function outlines(root: ShadowRoot): Lighting {
   const box = div('box');
@@ -96,11 +101,11 @@ const GLIDE = 240;
 /** How far from a corner the line to the popup starts and ends, in pixels. */
 const INSET = 22;
 
-// The ring and the line, drawn as strokes: a dash can run along a stroke (the light that goes round once as the
-// popup opens), which no border can. Wide faint strokes under them are the glow, as a filter over the whole
-// window would be drawn again with every frame of it.
+// The ring and the line, drawn as strokes: a dash can run along a stroke (the line is drawn out to the popup, and
+// a light goes along it, once), which no border can. Wide faint strokes under them are the glow, as a filter over
+// the whole window would be drawn again with every frame of it.
 const LIT = `<svg aria-hidden="true">
-<rect class="halo"/><rect class="lock"/><rect class="comet" pathLength="100"/>
+<rect class="halo"/><rect class="lock"/>
 <path class="halo" pathLength="1"/><path class="tether" pathLength="1"/><path class="flow" pathLength="1"/>
 <circle r="3"/><circle r="3"/></svg>`;
 
@@ -112,7 +117,7 @@ function radiusOf(el: Element, r: DOMRect): number {
   const [first = '0px'] = getComputedStyle(el).borderTopLeftRadius.split(' ');
   const n = Number.parseFloat(first);
   const least = Math.min(r.width, r.height);
-  return Math.min(first.endsWith('%') ? (n / 100) * least : n + ROOM, least / 2);
+  return Math.min(first.endsWith('%') ? (n / 100) * least : n + CLEAR, least / 2);
 }
 
 /**
@@ -172,7 +177,7 @@ export function spotlight(root: ShadowRoot): Lighting {
     point({ el, pointed, target, names, count }, glide = true) {
       pointing = true;
       const box = el.getBoundingClientRect();
-      const r = grown(box);
+      const r = grown(box, CLEAR);
       const radius = radiusOf(el, r);
       aim.classList.toggle('glide', glide && aim.classList.contains('shown'));
       place(ring, r);
@@ -238,7 +243,7 @@ export function spotlight(root: ShadowRoot): Lighting {
       const follow = () => {
         frame = requestAnimationFrame(follow);
         const on = element.isConnected;
-        const e = grown(element.getBoundingClientRect());
+        const e = grown(element.getBoundingClientRect(), CLEAR);
         const p = panel.getBoundingClientRect();
         const now = on ? [e.left, e.top, e.width, e.height, p.left, p.top, p.width, p.height].join() : '';
         if (now === was) return;

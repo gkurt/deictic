@@ -170,7 +170,7 @@ export const STYLE = `
 .lit svg { display: block; width: 100%; height: 100%; fill: none; stroke: var(--deictic-accent); stroke-linecap: round; }
 .lit .halo { stroke-width: 7; opacity: 0.16; }
 .lit .lock, .lit .tether { stroke-width: 1.5; }
-.lit .comet, .lit .flow { stroke: #eafff3; stroke-width: 2; opacity: 0; }
+.lit .flow { stroke: #eafff3; stroke-width: 2; opacity: 0; }
 .lit circle { fill: var(--deictic-accent); stroke: none; }
 .lit:not(.tied) path, .lit:not(.tied) circle { display: none; }
 .pulse {
@@ -223,19 +223,13 @@ export const STYLE = `
   }
   .aim.glide .guide { transition: translate 0.24s cubic-bezier(0.3, 0.7, 0.2, 1); }
   .panel.spot:not(.pinned) { animation: deictic-rise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards; }
-  /* Once, as the popup opens: a light round the ring, and the line drawn out to the popup with one along it. */
-  .lit .comet { stroke-dasharray: 16 84; animation: deictic-orbit 1.4s 0.05s cubic-bezier(0.4, 0, 0.2, 1); }
+  /* Once, as the popup opens: the line drawn out to the popup, with a light along it. */
   .lit .tether, .lit path.halo { stroke-dasharray: 1; animation: deictic-draw 0.4s 0.1s ease-out backwards; }
   .lit .flow { stroke-dasharray: 0.14 1; animation: deictic-flow 0.8s 0.45s ease-out; }
   .lit circle:last-of-type { animation: deictic-in 0.2s 0.45s backwards; }
 }
 @keyframes deictic-rise {
   from { opacity: 0; scale: 0.94; filter: blur(6px); }
-}
-@keyframes deictic-orbit {
-  from { stroke-dashoffset: 100; opacity: 1; }
-  70% { opacity: 1; }
-  to { stroke-dashoffset: 0; opacity: 0; }
 }
 @keyframes deictic-draw {
   from { stroke-dashoffset: 1; }
