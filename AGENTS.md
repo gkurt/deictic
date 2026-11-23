@@ -418,7 +418,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   the channel and who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none).
-  A task that's added reloads the store, and the tab says it's in the drawer. Its composer is `composer.ts`'s. With
+  A task that's added reloads the store and closes the popup (open, saying so, where it went without something attached). Its composer is `composer.ts`'s. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is

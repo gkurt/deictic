@@ -250,7 +250,7 @@ The Task tab is for a new task. The ones there are, are in the drawer. In the ta
   opens it, and its × leaves it out.
 - A picture pasted in (`Ctrl+V`, `⌘V`) or dropped on the composer is attached as a screenshot, to draw on from its
   chip. A reply's composer takes them too.
-- A task that's added is in the drawer at once. Undo takes it back.
+- A task that's added is in the drawer at once, and the popup closes. Undo takes it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
   now is taken up. It knows of an agent watching with the skill from the project's folder, and of one holding a
   claim on a task of the channel's; with a board that isn't this machine's own it says nothing where it knows of

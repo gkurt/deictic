@@ -330,7 +330,13 @@ export default defineClientPlugin<Model, Op>({
           first === undefined
             ? 'Added, about the page: it is in the drawer'
             : `Added${added === undefined ? '' : ` #${added.id}`}: it is in the drawer`;
-        if (added?.dropped !== undefined) composer.problem.textContent = `Sent without ${added.dropped}: it wasn't kept any more`;
+        if (added?.dropped !== undefined) {
+          // Open, to say so: the task went without something that was attached.
+          composer.problem.textContent = `Sent without ${added.dropped}: it wasn't kept any more`;
+          return true;
+        }
+        // Its pin and the drawer have it now. Once the composer has emptied (the tray, the page's marks), which it does as this answers.
+        setTimeout(context.close);
         return true;
       },
     });
