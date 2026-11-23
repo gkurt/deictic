@@ -8,7 +8,18 @@
  * Everything drawn sits in one shadow root, so neither the page's styles nor ours cross over. A
  * panel's undo and redo are its tab's on its element: the latest change that plugin made there.
  */
-import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Point, Resumed, Spot, Standalone, Target } from '#src/index.ts';
+import type {
+  ClientContext,
+  ClientPlugin,
+  LightboxItem,
+  PanelContext,
+  Point,
+  Problem,
+  Resumed,
+  Spot,
+  Standalone,
+  Target,
+} from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
@@ -216,6 +227,13 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   const apis = new Map<string, unknown>();
   const send: Send =
     server === undefined ? (url, init) => fetch(url, init) : async (url, init) => server(new Request(new URL(url, location.href), init));
+  // To the dev server, which says it and hands it on (to the board, with tasks). Whether it got there is no one's to
+  // know in the page: it's said in the console too.
+  const report = (problem: Problem) => {
+    console.error(`deictic${problem.plugin === undefined ? '' : `/${problem.plugin}`}: ${problem.message}`);
+    const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(problem) };
+    send(`${base}__deictic/problem`, init).catch(() => {});
+  };
   const optionsOf = new Map(given.map(({ plugin, options }) => [plugin.name, options]));
   const contextOf = (name: string): ClientContext => ({
     base,
@@ -223,6 +241,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     options: optionsOf.get(name),
     use: (other) => apis.get(other) as never,
     request: (route, init) => send(`${base}__deictic/plugins/${name}/${route}`, init),
+    report: (problem) => report({ ...problem, plugin: name }),
     // Not from under something unsaved, which a press on the page wouldn't close either: its button shakes.
     open: (plugin, element, at) => panel?.guard() !== true && openAt(plugin, element, at),
     lightbox: (items, options) => openLightbox(root, items, options),
@@ -240,7 +259,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       apis.set(plugin.name, plugin.setup(contextOf(plugin.name)));
     } catch (e) {
       // One plugin's failure is no reason to take the others down with it.
-      console.error(`deictic: ${plugin.name} failed to set up`, e);
+      report(failed(plugin.name, 'set up in the page, so it does nothing there until the page loads again', e));
     }
   }
   const tabs: Tab[] = given.flatMap(({ plugin }) => (plugin.mount === undefined ? [] : [{ plugin, mount: plugin.mount }]));
@@ -317,7 +336,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
           try {
             return plugin.pointing === undefined ? [] : [plugin.pointing(contextOf(plugin.name))];
           } catch (e) {
-            console.error(`deictic: ${plugin.name} failed to show what it has on the page`, e);
+            report(failed(plugin.name, 'show what it has on the page as it was pointed at', e));
             return [];
           }
         });
@@ -735,46 +754,51 @@ function openPanel({
     say('');
     const back = current === first ? resumed : undefined;
     resumed = undefined;
-    cleanup = mount(body, {
-      ...contextOf(plugin.name),
-      ...(back === undefined ? {} : { resumed: back }),
-      away: (state, task) => {
-        const tab = current;
-        done(true);
-        // For the tab's next page too, should this one go before the task is done. Not one a page pinned: that's the page's own.
-        if (!pinned) keepAway({ tab: tab.plugin.name, target, state, ...(spot === undefined ? {} : { at: spot }) });
-        const back = (resumed: Resumed) => {
-          if (!pinned) dropAway();
-          reopen(tab, element, resumed);
-        };
-        void task().then(
-          (result) => back({ state, result }),
-          (e: unknown) => back({ state, problem: messageOf(e) }),
-        );
-      },
-      element,
-      ...(pointed === undefined ? {} : { pointed }),
-      ...(spot === undefined ? {} : { at: spot }),
-      elements: sameAs(element),
-      target,
-      model,
-      apply: async (op, on = target) => {
-        say('Writing…');
-        try {
-          const result = await post<{ model: unknown }>('apply', { plugin: plugin.name, target: on, op });
-          say('');
-          void steps();
-          return result.model;
-        } catch (e) {
-          say(messageOf(e), true);
-          throw e;
-        }
-      },
-      close: () => done(),
-      unsaved: (action) => {
-        if (read === reads) holding = action;
-      },
-    });
+    try {
+      cleanup = mount(body, {
+        ...contextOf(plugin.name),
+        ...(back === undefined ? {} : { resumed: back }),
+        away: (state, task) => {
+          const tab = current;
+          done(true);
+          // For the tab's next page too, should this one go before the task is done. Not one a page pinned: that's the page's own.
+          if (!pinned) keepAway({ tab: tab.plugin.name, target, state, ...(spot === undefined ? {} : { at: spot }) });
+          const back = (resumed: Resumed) => {
+            if (!pinned) dropAway();
+            reopen(tab, element, resumed);
+          };
+          void task().then(
+            (result) => back({ state, result }),
+            (e: unknown) => back({ state, problem: messageOf(e) }),
+          );
+        },
+        element,
+        ...(pointed === undefined ? {} : { pointed }),
+        ...(spot === undefined ? {} : { at: spot }),
+        elements: sameAs(element),
+        target,
+        model,
+        apply: async (op, on = target) => {
+          say('Writing…');
+          try {
+            const result = await post<{ model: unknown }>('apply', { plugin: plugin.name, target: on, op });
+            say('');
+            void steps();
+            return result.model;
+          } catch (e) {
+            say(messageOf(e), true);
+            throw e;
+          }
+        },
+        close: () => done(),
+        unsaved: (action) => {
+          if (read === reads) holding = action;
+        },
+      });
+    } catch (e) {
+      say(messageOf(e), true);
+      contextOf(plugin.name).report(failed(plugin.name, 'show its panel', e));
+    }
   };
   const show = (tab: Tab) => {
     current = tab;
@@ -967,3 +991,12 @@ function button(text: string, title: string): HTMLButtonElement {
 }
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** A plugin's page half that threw: a bug of the plugin's, to report where it's made. Its key is the first line of what it threw. */
+const failed = (plugin: string, what: string, e: unknown): Problem => ({
+  key: `page:${plugin}:${what.split(' ', 1)[0]}:${messageOf(e).split('\n', 1)[0]!.slice(0, 200)}`,
+  kind: 'bug',
+  plugin,
+  message: `${plugin} failed to ${what}: ${messageOf(e)}`,
+  ...(e instanceof Error && e.stack !== undefined ? { details: e.stack } : {}),
+});

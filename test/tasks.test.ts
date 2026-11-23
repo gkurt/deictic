@@ -463,3 +463,60 @@ test('says who holds a task, while it is claimed', async () => {
   // A board's record of a task keeps no one for its end.
   expect(await listed()).toEqual([expect.not.objectContaining({ by: expect.anything() })]);
 });
+
+test("posts deictic's problems as tasks, one while it's open, which the drawer lists", async () => {
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { post, get } = setup('problems');
+    const problem = {
+      key: 'packages:rrweb',
+      kind: 'setup',
+      plugin: 'recordings',
+      message: 'install what recordings needs, then restart the dev server: npm install -D rrweb',
+      details: 'Cannot find module rrweb',
+    };
+    const posted = async (key = problem.key) => {
+      for (let tries = 0; tries < 50; tries++) {
+        const { tasks } = await team.tasks.list({ channel: 'problems', label: { 'deictic.problem': key }, state: 'all' });
+        if (tasks.length > 0) return tasks.map(({ message }) => message);
+        await Bun.sleep(20);
+      }
+      return [];
+    };
+    expect((await post('problem', problem)).status).toBe(200);
+    const [task] = await posted();
+    expect(task!.text).toBe(
+      'Install what recordings needs, then restart the dev server: npm install -D rrweb\n\n' +
+        "Reported by deictic's recordings plugin, about the project's setup: fix it as it says, then restart the dev server and check it's gone." +
+        '\n---\n```\nCannot find module rrweb\n```',
+    );
+    expect(task!.labels).toMatchObject({
+      team: 'web',
+      'deictic.problem': 'packages:rrweb',
+      'deictic.problem.kind': 'setup',
+      'deictic.problem.plugin': 'recordings',
+    });
+    const listed = (await get<{ tasks: Listed[] }>('plugins/tasks/page')).tasks;
+    expect(listed).toMatchObject([{ id: task!.id, problem: 'setup', text: expect.stringMatching(/check it's gone\.$/) }]);
+
+    // A dev server started again finds it again: still one task while it's open, and a new one once it's over.
+    const again = setup('problems');
+    await again.post('problem', problem);
+    await Bun.sleep(100);
+    expect(await posted()).toHaveLength(1);
+    await (await team.tasks.claim(task!.id)).complete('Installed');
+    await setup('problems').post('problem', problem);
+    await Bun.sleep(100);
+    expect(await posted()).toHaveLength(2);
+
+    // A bug says to report it, not to patch deictic where it's installed; `problems: false` posts none.
+    await post('problem', { key: 'error:read:boom', kind: 'bug', message: '/__deictic/read failed: boom' });
+    expect((await posted('error:read:boom'))[0]!.text).toContain("not in this project: don't change it where it's installed");
+    await setup('problems', { problems: false }).post('problem', { ...problem, key: 'quiet' });
+    await Bun.sleep(100);
+    expect(await posted('quiet')).toEqual([]);
+  } finally {
+    console.warn = warn;
+  }
+});

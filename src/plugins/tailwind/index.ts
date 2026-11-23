@@ -72,9 +72,10 @@ export function tailwind(options: TailwindOptions = {}) {
   const attribute = options.attribute ?? 'className';
   // Loaded on the first ask, as it takes a moment, and once: a project without Tailwind v4 has none.
   let loading: Promise<Catalog | undefined> | undefined;
-  const catalog = ({ root }: ServerContext) =>
+  const catalog = ({ root, report }: ServerContext) =>
     (loading ??= loadCatalog(root, options.css).catch((problem: unknown) => {
-      console.warn(`deictic/tailwind: no completions or class details, as ${problem instanceof Error ? problem.message : String(problem)}`);
+      const message = problem instanceof Error ? problem.message : String(problem);
+      report({ key: 'setup:tailwind', kind: 'setup', plugin: 'tailwind', message: `no completions or class details, as ${message}` });
       return undefined;
     }));
   const asked = async (request: Request): Promise<string[]> => {

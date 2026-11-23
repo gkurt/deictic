@@ -173,6 +173,7 @@ the transcription model, which is outside the project. With no terminal to ask o
 | `link`     | the local board's pages         | `(channel, task?) => url`, where the panel links a task to |
 | `html`     | `true`                          | Whether the Task tab offers to attach the element's HTML   |
 | `shortcut` | none                            | Opens the Task tab directly                                |
+| `problems` | `true`                          | Whether deictic's own problems become tasks                |
 
 With nothing set, the dev server starts a board on your machine: `http://127.0.0.1:4100/`, kept in `.deictic/board`.
 For another:
@@ -210,6 +211,17 @@ masked as screenshots are, for whoever can't open the page as you had it: a file
 Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the
 button has the element outlined in it, or the point circled; one you drew on is as you drew it, and one taken from
 the tool panel is the window as it was.
+
+### deictic's own problems
+
+What goes wrong in deictic itself is a task too, for whoever works the board: a package the project hasn't installed,
+a plugin that failed to set up (on the dev server or in the page), a request that broke. Each says what went wrong and
+what to do, its details (a stack) after a `---`, which the drawer leaves out and `deictic task` prints. A `setup` one
+is the project's to fix (`npm install -D rrweb`); a `bug` is deictic's, to report, not to patch where it's installed.
+There's one task per problem while it's open: `deictic.problem` is its key, `deictic.problem.kind` `setup` or `bug`,
+`deictic.problem.plugin` the plugin it's about. A dev server started again finds the same problem and adds nothing;
+once that task is over, the problem coming back is a new one. `problems: false` posts none: they're still said in the
+dev server's output.
 
 A task stays with its element as lines above it change, while the opening tag's first line is still the same and
 the file has it once.
@@ -385,7 +397,12 @@ export default defineClientPlugin<Model, Op>({
 
 - `routes` adds routes to the dev server, which the page half reaches with `request(route)`.
 - `packages` names what it imports that the project installs itself (its optional peers): as the dev server starts,
-  one that's missing is said, with the command that installs it.
+  one that's missing is reported, with the command that installs it.
+- `context.report(problem)`, on either half, reports a problem of the plugin's own (a `Problem`: a `key` that's the
+  same each time it happens, `setup` or `bug`, the message with its fix, and `details`): said in the dev server's
+  output, once per key, and handed to every plugin's `problem(problem)`, which is how tasks posts them. A `setup`
+  that throws, a page half that throws as it sets up, shows its panel or draws on the page, and a request that fails
+  with anything but a `Refusal` are reported for it.
 - `setup` answers an API for other plugins, which reach it with `context.use(name)`. That's how tasks attaches
   screenshots and recordings.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.

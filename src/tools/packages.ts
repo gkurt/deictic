@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import manifest from '#package.json' with { type: 'json' };
-import type { ServerPlugin } from '#src/index.ts';
+import type { Problem, ServerPlugin } from '#src/index.ts';
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
@@ -99,12 +99,20 @@ export function missing(root: string, plugins: readonly ServerPlugin[]): { plugi
   });
 }
 
-/** What to say as the dev server starts when plugins' packages are missing: which, and the command that installs them. */
-export function missingMessage(root: string, plugins: readonly ServerPlugin[]): string | undefined {
+/**
+ * What to report as the dev server starts when plugins' packages are missing: which, and the command that installs
+ * them. Its key names them, so a problem fixed and then another missing is a new one.
+ */
+export function missingProblem(root: string, plugins: readonly ServerPlugin[]): Problem | undefined {
   const gone = missing(root, plugins);
   if (gone.length === 0) return undefined;
   const names = [...new Set(gone.flatMap((g) => g.packages))];
   const which = gone.map((g) => g.plugin);
   const who = which.length === 1 ? which[0] : `${which.slice(0, -1).join(', ')} and ${which.at(-1)}`;
-  return `deictic: install what ${who} ${which.length === 1 ? 'needs' : 'need'}: ${installCommand(packageManager(root), names, root)}`;
+  const need = which.length === 1 ? 'needs' : 'need';
+  return {
+    key: `packages:${[...names].sort().join(',')}`,
+    kind: 'setup',
+    message: `install what ${who} ${need}, then restart the dev server: ${installCommand(packageManager(root), names, root)}`,
+  };
 }

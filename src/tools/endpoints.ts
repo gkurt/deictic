@@ -8,6 +8,8 @@
  *
  * Everything but `open` and `history` writes or may, so only the page itself may send it: a POST of
  * JSON from the same origin, which a form or a script on another site can't send without asking first.
+ * `problem` is the page's way to report one (`Problem`): it and the server's own, and any request that fails with
+ * something other than a `Refusal`, are said once and handed to the plugins that hear of them (`problems.ts`).
  *
  * Each plugin's own `routes` are under `plugins/<name>/`. A `GET` there reaches the plugin as it
  * comes; anything else only from the page's own origin, in whatever type it sends (an image, say).
@@ -18,8 +20,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { type Loc, Refusal, type ServerPlugin, type Source, type Target } from '#src/index.ts';
 
 import { History, type Scope } from './history.ts';
-import { missingMessage } from './packages.ts';
+import { missingProblem } from './packages.ts';
 import { setUp } from './plugins.ts';
+import { messageOf, problemIn, reporter, stackOf } from './problems.ts';
 import { applyEdits, resolveFile, sourceAt } from './source.ts';
 
 export interface EndpointOptions {
@@ -47,10 +50,12 @@ const scopeIn = ({ plugin, target }: Partial<Body>) =>
 export function endpoints({ root, plugins, base = '/', open, history = new History(root, { plugins }) }: EndpointOptions) {
   const byName = new Map(plugins.map((p) => [p.name, p]));
   const prefix = `${base}__deictic/`;
+  // What goes wrong that nothing in the page caused: said, and handed to the plugins that hear of it once set up.
+  const report = reporter(plugins, () => ready);
   // Started now, awaited by every request: a plugin's API is there before anything asks for it.
-  const ready = setUp(root, plugins);
-  const gone = missingMessage(root, plugins);
-  if (gone !== undefined) console.warn(gone);
+  const ready = setUp(root, plugins, report);
+  const gone = missingProblem(root, plugins);
+  if (gone !== undefined) report(gone);
 
   const pluginOf = (name: string) => {
     const plugin = byName.get(name);
@@ -105,10 +110,15 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
     const route = url.pathname.slice(prefix.length);
     const origin = req.headers.get('origin');
     const sameOrigin = origin !== null && new URL(origin).host === url.host;
+    // What failed, for a problem's key: a plugin's route by its first segment, not the IDs after it.
+    let where = route;
+    let plugin: string | undefined;
     try {
       const context = await ready;
       if (route.startsWith('plugins/')) {
         const [name = '', first = ''] = route.slice('plugins/'.length).split('/');
+        where = `plugins/${name}/${first}`;
+        plugin = name;
         const handle = byName.get(name)?.routes?.[first];
         if (handle === undefined) return new Response(`no endpoint ${url.pathname}`, { status: 404 });
         if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOrigin)
@@ -126,13 +136,29 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
       }
       if (route === 'open') return await open(resolveFile(root, loc.file), loc);
       const handler = routes[route];
-      if (handler === undefined) return new Response(`no endpoint ${url.pathname}`, { status: 404 });
+      if (handler === undefined && route !== 'problem') return new Response(`no endpoint ${url.pathname}`, { status: 404 });
       if (req.method !== 'POST' || !sameOrigin || req.headers.get('content-type')?.startsWith('application/json') !== true)
         return Response.json({ problem: 'edits come from the page, as JSON' }, { status: 403 });
+      if (handler === undefined) {
+        const problem = problemIn(await req.json());
+        if (problem === undefined) return Response.json({ problem: 'a problem has a key, a kind and a message' }, { status: 400 });
+        report(problem);
+        return Response.json({});
+      }
       const body = (await req.json()) as Body;
+      plugin = body.plugin;
       return Response.json(await (route === 'read' ? handler(body) : serially(() => handler(body))));
     } catch (e) {
       if (e instanceof Refusal) return Response.json({ problem: e.message }, { status: 422 });
+      // Not a refusal, which says what to do instead: something broke, which no one in the page can fix.
+      const message = messageOf(e);
+      report({
+        key: `error:${where}:${message.split('\n', 1)[0]!.slice(0, 200)}`,
+        kind: 'bug',
+        ...(plugin === undefined ? {} : { plugin }),
+        message: `${prefix}${where} failed: ${message}`,
+        ...stackOf(e),
+      });
       return Response.json({ problem: e instanceof Error ? (e.stack ?? e.message) : String(e) }, { status: 500 });
     }
   };

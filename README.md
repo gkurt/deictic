@@ -35,7 +35,8 @@ The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a tea
 - **No describing where.** "The second button in the header on the pricing page" becomes `src/Header.tsx:12:5`.
   Every task carries the element's place in the source, the page and the viewport.
 - **Show, don't type.** Draw on the page, record the bug as it happens, or just say it.
-- **Agents pick it up.** A bundled skill watches the board and works each task as it arrives.
+- **Agents pick it up.** A bundled skill watches the board and works each task as it arrives. When deictic itself
+  goes wrong (a package not installed, a plugin that broke), that's a task too, for the agent to fix or tell you of.
 - **Nothing in production.** It runs in your dev server only. A build has none of it.
 - **Any JSX.** Vite, Next.js, webpack, Rspack, Astro and Bun, server components too.
 

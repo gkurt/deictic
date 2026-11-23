@@ -45,7 +45,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   may be off the page (`isConnected` false): as it was left, or after a load an empty one of its tag and mark. `Refusal` is an op
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
-  record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
+  record, JSON, and hands it to the plugin's `undo` and `redo`. A `Problem` is deictic's own (`key`, the same each
+  time; `kind`, `setup` for the project to fix or `bug` to report; the message with its fix; `details`): both contexts'
+  `report(problem)` say one, and a server half's `problem(problem)` hears each. The parser is imported for its types only.
 - A `ClientPlugin` with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held, and answers
   what takes it away.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
@@ -55,7 +57,11 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   start, so a wrong one fails the dev server. `gestureOf` is what the overlay tests events with.
 - `src/tools/plugins.ts`: `checkPlugins(plugins, own)` (names lowercase and unique, `needs` loaded, a
   shortcut only with a `client`, shortcuts with deictic's own) as an integration starts; `setUp` runs every server `setup` at once and
-  answers the shared context, whose `use` reads lazily.
+  answers the shared context, whose `use` reads lazily: one that throws is reported (`setup:<name>`) and has no API, and
+  the rest go on.
+- `src/tools/problems.ts`: `reporter(plugins, ready)`, what `report` is: a problem said once per key in the dev server's
+  output and handed to each plugin's `problem` once they're set up (its own failure only said, never reported, so a
+  board that's down can't loop); `problemIn`, one the page sent, checked and cut short.
 - `src/tools/locate.ts`: the transform. Marks host elements (lowercase JSX tags) with
   `data-deictic="file:line:column"`, where the opening tag's `<` is, in UTF-16 columns from 1, in `.jsx`, `.tsx`
   and plain `.js` modules (`JSX`; `parse` reads JSX in `.js`, and a module with no `<tag` in it isn't parsed).
@@ -64,8 +70,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   is its frontmatter's) and its opening tag found by offset and tag, or else the only one of its tag on that line (the page may count columns in code a plugin changed before deictic's), or a `Refusal` saying what the line has; `resolveFile`, which refuses anything
   outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text.
 - `src/tools/packages.ts`: a plugin's `packages`, what it imports that the project installs (deictic's optional peers):
-  `missingMessage(root, plugins)`, found from the root as the bundler finds them, which `endpoints` warns as it starts,
-  with the install command; `packageManager(root)` (the `packageManager` field, the nearest lockfile, then the running
+  `missingProblem(root, plugins)`, found from the root as the bundler finds them, which `endpoints` reports as it
+  starts (`packages:<names>`, `setup`), with the install command; `packageManager(root)` (the `packageManager` field, the nearest lockfile, then the running
   one's `npm_config_user_agent`), `installCommand` (deictic's own peer ranges, quoted, from `package.json`, inlined by
   the build). The screenshots renderer has `packages` too.
 - `src/cli/init.ts`: `deictic init` (`--dry-run`, `--no-install`, `--skill`/`--no-skill`), one of the bin's commands
@@ -97,7 +103,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `read` reads `null` and isn't checked against the source; one without `apply` refuses ops. `read` and `apply` get
   the `Source`, or the `Refusal` `sourceAt` threw, for the plugin to throw where it needs it (Tailwind) or do without
   (tasks, which then leave out `deictic.line`): only text edits are refused for it.
-  Writes run one at a time, since a plugin's own change may wait on the network.
+  Writes run one at a time, since a plugin's own change may wait on the network. `problem` (a same-origin JSON POST)
+  is the page's `report`; a request that fails with anything but a `Refusal` is reported as a `bug`, keyed by its route
+  (a plugin's by its first segment, not the IDs after it) and the message's first line.
 - `src/vite.ts`: `enforce: 'pre'` and its transform `order: 'pre'` (before the React Compiler, also `pre`, compiles the JSX away), `apply: 'serve'`. In the browser each marked module appends
   `import "virtual:deictic/client"`, which starts the overlay with deictic's own shortcut and each plugin that
   has a `client`, and its checked shortcut where it has one. No plugins by default.
@@ -197,7 +205,8 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   (`aria-keyshortcuts`, `Control+Z`) are in its tip as keycaps after the words, and a tip of their own for a control
   whose text already names it: set that for a shortcut, never write it into the title.
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
-  first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
+  first (a failing one is reported, `failed`, and the rest go on; so is one whose `mount` or `pointing` throws).
+  `context.report` posts to `problem`, with the plugin's name, and says it in the console. Each plugin with a `mount` is a tab in the popup.
   Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), shows the tool panel
   meanwhile (`tools.ts`; it lights the page the same way while a tool picks a spot; on a pin or
   the tool panel, which take the pointer, the light stays where it was), and opens the popup on
@@ -235,7 +244,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   sets, ordered by size where it has one, written with the class's own variants and modifier, and `custom`
   to put a value in brackets) and `css` (for classes the page's build hasn't seen, in `@layer utilities`,
   `@property` lifted out). The routes of the same names answer the panel, and nothing without Tailwind v4
-  (one warning, a plain panel). In the panel the field completes its last word (↑ ↓, Enter or Tab; the list
+  (reported once, `setup:tailwind`, a plain panel). In the panel the field completes its last word (↑ ↓, Enter or Tab; the list
   is a `data-deictic-modal` while shown), a known class's chip shows a swatch or its value and opens the
   editor (also a modal; both are boxes in the overlay's root, fixed under what they're about and placed each
   frame, never in the popup's flow, which would resize it): its kind's classes, colours as rows of shades, and, behind its Custom button (open where the class
@@ -349,7 +358,11 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   (`link`, or `/c/<channel>` beside a local board's `/api/board`, from `discovery()`), each task with its own
   (`?thread=<id>` there, or `link(channel, id)`), its whole typed text and whether it's `open`. Undo cancels the task
   unless it's past `ready`/`waiting`/`blocked`; redo makes a new one. `apply` only adds a task (`Op`); the history's
-  older records of an edit or a removal are still undone and redone.
+  older records of an edit or a removal are still undone and redone. Its `problem` posts deictic's problems as tasks
+  about nothing on the page (`problemText`: the message, what to do for its kind, the details after `---`), labelled
+  `deictic.problem` (the key: none is posted while a task with it is open), `.kind`, `.plugin` and `deictic.version`;
+  `problems: false` posts none. The drawer says what they're about by kind, `deictic task` and `deictic watch` say
+  they're deictic's.
   The routes are the drawer's: `page` answers the channel's tasks as `Listed` (a `Task` with its `place`, `tag` and
   `page` where it has them, its `replies` count, its newest reply's ID as `last`, and what it came to as `said`): those
   still to do, oldest first, then the `OVER` (10) latest finished, completed or failed; `thread/<id>` a `Thread` (the

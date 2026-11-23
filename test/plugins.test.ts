@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { definePlugin } from '#src/index.ts';
+import { definePlugin, type Problem } from '#src/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 import { checkPlugins } from '#src/tools/plugins.ts';
 import { clientModule } from '#src/vite.ts';
@@ -97,4 +97,68 @@ test('starts the page with every half there, with a shortcut only for those with
   expect(code).toContain(
     `start({ base: "/", shortcut: {"modifiers":["Alt"],"button":"left"}, plugins: [{ plugin: p0, ...{} }, { plugin: p1, ...{"shortcut":{"modifiers":["Meta"],"button":"left"}} }] });`,
   );
+});
+
+test("reports deictic's problems to the plugins that hear of them, once each, and goes on without one that failed", async () => {
+  const heard: Problem[] = [];
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const p = project({ 'src/App.tsx': 'export const App = () => <div>x</div>;\n' });
+    const plugins = [
+      definePlugin({
+        name: 'broken',
+        setup: () => {
+          throw new Error('no config');
+        },
+      }),
+      definePlugin({
+        name: 'faulty',
+        routes: {
+          crash: () => {
+            throw new TypeError("cannot read properties of undefined (reading 'x')");
+          },
+        },
+      }),
+      definePlugin({ name: 'listener', problem: (problem) => void heard.push(problem), routes: { up: () => Response.json('up') } }),
+    ];
+    const handle = endpoints({ root: p.root, plugins, open: () => redirect('/') });
+    const ask = (path: string, init: RequestInit = {}) => handle(new Request(`${ORIGIN}/__deictic/${path}`, init)).then((r) => r!);
+    const report = (body: unknown) =>
+      ask('problem', { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+    // One plugin's failed setup doesn't take the others down.
+    expect(await (await ask('plugins/listener/up')).json()).toBe('up');
+    // A request that breaks is a bug, once per route and message, whatever its IDs.
+    expect((await ask('plugins/faulty/crash/1')).status).toBe(500);
+    expect((await ask('plugins/faulty/crash/2')).status).toBe(500);
+    // The page's, checked.
+    const page = {
+      key: 'page:x:set:boom',
+      kind: 'bug',
+      plugin: 'x',
+      message: 'x failed to set up in the page: boom',
+      details: 'at x.js:1',
+    };
+    expect((await report(page)).status).toBe(200);
+    expect((await report(page)).status).toBe(200);
+    expect((await report({ key: 'k', kind: 'oops', message: 'm' })).status).toBe(400);
+    expect((await report({ key: 'k', kind: 'bug', message: 'm' })).status).toBe(200);
+    // Only from the page itself, as JSON.
+    expect((await ask('problem')).status).toBe(403);
+    await Bun.sleep(10);
+
+    expect(heard.map(({ key, kind, plugin }) => ({ key, kind, plugin }))).toEqual([
+      { key: 'setup:broken', kind: 'bug', plugin: 'broken' },
+      { key: "error:plugins/faulty/crash:cannot read properties of undefined (reading 'x')", kind: 'bug', plugin: 'faulty' },
+      { key: 'page:x:set:boom', kind: 'bug', plugin: 'x' },
+      { key: 'k', kind: 'bug', plugin: undefined },
+    ]);
+    expect(heard[0]!.message).toBe('broken failed to set up, so it does nothing until the dev server restarts: no config');
+    expect(heard[0]!.details).toContain('Error: no config');
+    expect(heard[1]!.message).toBe("/__deictic/plugins/faulty/crash failed: cannot read properties of undefined (reading 'x')");
+    expect(heard[2]!.details).toBe('at x.js:1');
+  } finally {
+    console.warn = warn;
+  }
 });

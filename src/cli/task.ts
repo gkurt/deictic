@@ -50,12 +50,19 @@ export function run(id: string, values: { out?: string }): void {
     const line = value === undefined ? undefined : say(value);
     if (line !== undefined) console.log(line);
   }
-  if (at === undefined)
+  const problem = label('deictic.problem.kind');
+  if (problem !== undefined) {
+    const plugin = label('deictic.problem.plugin');
+    console.log(
+      `A problem deictic ${label('deictic.version') ?? ''} reported${plugin === undefined ? '' : ` in its ${plugin} plugin`}, not a person's ask`,
+    );
+  } else if (at === undefined) {
     console.log("About the page as a whole: no element was attached, so find it from the words, the page's URL and the screenshot");
+  }
   for (const line of drawn(root)) console.log(line);
-  // A task added before these were labels says them after its words.
+  // A task added before these were labels says them after its words; a problem, its details.
   const told = (pointed ? where.slice(0, pointed.index) : where).trim();
-  if (told !== '') console.log(told);
+  if (told !== '') console.log(problem === undefined ? told : `Details:\n${told}`);
   if (pointed) console.log(`\nPointed at, inside it: ${pointed[1]}\n  ${pointed[2]}`);
   const path = label('deictic.pointed');
   if (path !== undefined) {

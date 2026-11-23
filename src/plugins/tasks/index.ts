@@ -17,7 +17,17 @@ import { join, relative } from 'node:path';
 
 import type { Board } from '@vercel/board';
 
-import { definePlugin, type Point, Refusal, type ServerContext, type Shortcut, type Source, type Target } from '#src/index.ts';
+import manifest from '#package.json' with { type: 'json' };
+import {
+  definePlugin,
+  type Point,
+  type Problem,
+  Refusal,
+  type ServerContext,
+  type Shortcut,
+  type Source,
+  type Target,
+} from '#src/index.ts';
 // For `use('screenshots')`'s type: the plugin may not be loaded, and nothing of it runs here.
 import type { Recordings } from '#src/plugins/recordings/index.ts';
 import type { Box } from '#src/plugins/screenshots/index.ts';
@@ -65,6 +75,12 @@ export interface TasksOptions {
   html?: boolean;
   /** What opens its tab directly, beside deictic's own shortcut, which opens any: none by default. */
   shortcut?: Shortcut;
+  /**
+   * Whether deictic's own problems become tasks, for whoever works the board to fix: a package the project hasn't
+   * installed, a plugin that failed, a request that broke. One task per problem while it's open (`deictic.problem`
+   * is its key), about the project, not an element. True by default.
+   */
+  problems?: boolean;
 }
 
 export interface Task {
@@ -110,6 +126,8 @@ export interface Listed extends Task {
   last?: string;
   /** What the board says of where it stands: why it's blocked, what it came to, why it failed. */
   said?: string;
+  /** A problem of deictic's it tells of, not a person's ask: the project's setup to fix, or a bug of deictic's. */
+  problem?: Problem['kind'];
 }
 
 /** A task with a place, as its mark has it: what the page pins to the element there. */
@@ -301,6 +319,8 @@ const OVER = 10;
 /** How many tasks a page is asked about at most: past that it has more pins than anyone reads. */
 const PINNED = 500;
 const AT = 'deictic.at';
+/** A problem's key, on the task that tells of it: one task per problem while it's open. */
+const PROBLEM = 'deictic.problem';
 const FILE = 'deictic.file';
 /** `x,y`: the spot in the element a task is about, in CSS pixels from the element's top left. */
 const POINT = 'deictic.point';
@@ -363,7 +383,8 @@ export function tasks(options: TasksOptions = {}) {
    * nothing else on the board is its to change, nor a task someone has taken up.
    */
   /** One of deictic's: it has a place, or the page it's about where no element was attached. */
-  const ours = (message: Message) => message.labels[AT] !== undefined || message.labels['deictic.page'] !== undefined;
+  const ours = (message: Message) =>
+    message.labels[AT] !== undefined || message.labels['deictic.page'] !== undefined || message.labels[PROBLEM] !== undefined;
   const openTask = async (team: TaskBoard, id: string, verb: string) => {
     const { message } = await team.thread(id);
     if (message.channel !== channel || !ours(message))
@@ -432,6 +453,7 @@ export function tasks(options: TasksOptions = {}) {
   ): Listed => {
     const { task, labels } = message;
     const said = task?.blocked?.reason ?? task?.result ?? task?.reason ?? undefined;
+    const problem = labels[`${PROBLEM}.kind`];
     return {
       ...taskOf(message, actors, page),
       ...(labels[AT] === undefined ? {} : { place: labels[AT] }),
@@ -440,6 +462,7 @@ export function tasks(options: TasksOptions = {}) {
       replies,
       ...(last === null ? {} : { last: last.id }),
       ...(said === undefined || said === '' ? {} : { said: clip(said, 2000) }),
+      ...(problem === 'setup' || problem === 'bug' ? { problem } : {}),
     };
   };
   /**
@@ -532,7 +555,7 @@ export function tasks(options: TasksOptions = {}) {
     });
   };
 
-  // Kept from `setup`, to `use` another plugin when an op asks for it.  // Kept from `setup`, to `use` another plugin when an op asks for it.
+  // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
   let project = options.project;
   /**
@@ -741,7 +764,40 @@ export function tasks(options: TasksOptions = {}) {
         return record;
       }),
     describe: (op) => `task "${clip(wordsOf(op).split('\n', 1)[0]!, 60)}"`,
+    // A task, unless one is open for it already: a dev server started again finds the same problem again.
+    problem: async (problem) => {
+      if (options.problems === false) return;
+      const key = clip(problem.key, LABEL);
+      const team = await boardOf();
+      if ((await team.tasks.list({ channel, label: { [PROBLEM]: key }, limit: 1 })).tasks.length > 0) return;
+      await create({
+        channel,
+        text: clip(problemText(problem), 10_000),
+        labels: {
+          ...options.labels,
+          ...(project === undefined ? {} : { 'deictic.project': clip(project, LABEL) }),
+          [PROBLEM]: key,
+          [`${PROBLEM}.kind`]: problem.kind,
+          ...(problem.plugin === undefined ? {} : { [`${PROBLEM}.plugin`]: clip(problem.plugin, LABEL) }),
+          'deictic.version': manifest.version,
+        },
+      });
+    },
   });
+}
+
+/**
+ * A problem as a task says it: what went wrong and what to do, and after the `---` its details, which `deictic task`
+ * prints and the drawer leaves out.
+ */
+function problemText({ kind, message, details, plugin }: Problem): string {
+  const whose = plugin === undefined ? 'deictic' : `deictic's ${plugin} plugin`;
+  const todo =
+    kind === 'setup'
+      ? `Reported by ${whose}, about the project's setup: fix it as it says, then restart the dev server and check it's gone.`
+      : `A bug in ${whose} (${manifest.version}), not in this project: don't change it where it's installed. Tell the person, with the details, so they can report it (deictic's own at ${manifest.bugs.url}), and complete the task.`;
+  const more = details === undefined ? '' : `${REST}\`\`\`\n${details}\n\`\`\``;
+  return `${message[0]!.toUpperCase()}${message.slice(1)}\n\n${todo}${more}`;
 }
 
 /**

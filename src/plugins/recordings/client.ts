@@ -87,7 +87,7 @@ const clock = (ms: number) => {
 
 export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
-  setup: ({ base, root, options, use, request, tools, tray, drawer, lightbox }) => {
+  setup: ({ base, root, options, use, request, report, tools, tray, drawer, lightbox }) => {
     const { masking, canvas } = options as { masking: ResolvedMasking; canvas?: false | { fps: number } };
     let running: Promise<Recording | undefined> | undefined;
 
@@ -146,7 +146,13 @@ export default defineClientPlugin<never, never, Recorder>({
           // A page that carries a recording on made requests before this: those of its load are the recording's too.
           ?.plugin({ sinceLoad: from !== undefined })
           .catch((e: unknown) => {
-            console.warn(`deictic: this recording has no ${name}`, e);
+            const why = e instanceof Error ? e.message : String(e);
+            report({
+              key: `page:recordings:${name}:${why.split('\n', 1)[0]!.slice(0, 200)}`,
+              kind: 'setup',
+              message: `recordings go without ${name}, as it couldn't be loaded: install what it needs (\`deictic init\` does), then load the page again: ${why}`,
+              ...(e instanceof Error && e.stack !== undefined ? { details: e.stack } : {}),
+            });
             return undefined;
           });
       const [rrweb, id, ...extras] = await Promise.all([

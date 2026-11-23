@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { profileOf } from '#src/cli/board.ts';
 import type { Kept } from '#src/plugins/recordings/index.ts';
-import { type Model, tasks } from '#src/plugins/tasks/index.ts';
+import { type Listed, type Model, tasks } from '#src/plugins/tasks/index.ts';
 import { localBoard } from '#src/plugins/tasks/local.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
@@ -111,6 +111,31 @@ test("reads a task on the project's own board, and a watch says what's ready and
   expect(JSON.parse(deictic(p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: 'claude' });
   expect(JSON.parse(as({}, p.root, 'vb', 'whoami', '--json').out)).toMatchObject({ profile: null });
   expect(as({}, p.root, 'watch', 'cli', '--once').out).toContain('set BOARD_PROFILE=<your name>');
+
+  // A problem of deictic's, posted as a task: said as one, with its details.
+  await handle(
+    new Request(`${ORIGIN}/__deictic/problem`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: ORIGIN },
+      body: JSON.stringify({
+        key: 'page:x:set:boom',
+        kind: 'bug',
+        plugin: 'x',
+        message: 'x failed to set up in the page: boom',
+        details: 'at x.js:1',
+      }),
+    }),
+  );
+  let problem: Listed | undefined;
+  for (let tries = 0; problem === undefined && tries < 50; tries++) {
+    await Bun.sleep(50);
+    const page = await handle(new Request(`${ORIGIN}/__deictic/plugins/tasks/page`));
+    problem = ((await page!.json()) as { tasks: Listed[] }).tasks.find((t) => t.problem !== undefined);
+  }
+  const told = deictic(p.root, 'task', problem!.id).out;
+  expect(told).toContain('X failed to set up in the page: boom');
+  expect(told).toMatch(/A problem deictic [\d.]+ reported in its x plugin, not a person's ask/);
+  expect(told).toContain('Details:\n```\nat x.js:1\n```');
 }, 60_000);
 
 test('a watch on a fresh board waits for its first task, and a task not over says no result', async () => {

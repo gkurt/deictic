@@ -163,6 +163,7 @@ export function drawerOf(context: ClientContext): TasksDrawer {
     task.place === undefined ? null : document.querySelector(`[${ATTRIBUTE}="${CSS.escape(task.place)}"]`);
   /** What a task is about, as the caption says an element: by its component where the page has it, else its tag. */
   const about = (task: Listed) => {
+    if (task.problem !== undefined) return task.problem === 'setup' ? "deictic's setup" : 'a bug in deictic';
     if (task.place === undefined) return 'the page';
     const el = elementOf(task);
     if (el !== null) return tell(named(el));

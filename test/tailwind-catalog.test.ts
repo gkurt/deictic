@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 
+import type { Problem } from '#src/index.ts';
 import { loadCatalog } from '#src/plugins/tailwind/catalog.ts';
 import { tailwind } from '#src/plugins/tailwind/index.ts';
 
@@ -78,24 +79,19 @@ test('writes CSS a page can use before its build knows the classes', () => {
   expect(catalog.css(['my-own'])).toBe('');
 });
 
-test('a project without Tailwind answers nothing, and says so once', async () => {
+test('a project without Tailwind answers nothing, and reports it once', async () => {
   const p = project({ 'package.json': '{}' });
-  const warn = console.warn;
-  const said: string[] = [];
-  console.warn = (message: string) => said.push(message);
-  try {
-    const { routes } = tailwind();
-    const context = { root: p.root, use: () => undefined };
-    const info = await routes!.info!(
-      new Request('http://localhost/', { method: 'POST', body: JSON.stringify({ classes: ['flex'] }) }),
-      context,
-    );
-    expect(await info.json()).toEqual({ available: false, items: [] });
-    const complete = await routes!.complete!(new Request('http://localhost/?q=fle'), context);
-    expect(await complete.json()).toEqual({ items: [] });
-  } finally {
-    console.warn = warn;
-  }
+  const said: Problem[] = [];
+  const { routes } = tailwind();
+  const context = { root: p.root, use: () => undefined, report: (problem: Problem) => said.push(problem) };
+  const info = await routes!.info!(
+    new Request('http://localhost/', { method: 'POST', body: JSON.stringify({ classes: ['flex'] }) }),
+    context,
+  );
+  expect(await info.json()).toEqual({ available: false, items: [] });
+  const complete = await routes!.complete!(new Request('http://localhost/?q=fle'), context);
+  expect(await complete.json()).toEqual({ items: [] });
   expect(said).toHaveLength(1);
-  expect(said[0]).toContain('no Tailwind v4');
+  expect(said[0]).toMatchObject({ key: 'setup:tailwind', kind: 'setup', plugin: 'tailwind' });
+  expect(said[0]!.message).toContain('no Tailwind v4');
 });

@@ -104,7 +104,9 @@ export function run(channel: string, values: { idle: string; once?: boolean; lab
     const at = label('deictic.at');
     const page = label('deictic.page');
     const project = label('deictic.project');
-    return `"${first(text)}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`;
+    const problem = label('deictic.problem.kind');
+    const what = problem === undefined ? '' : `deictic's own ${problem === 'bug' ? 'bug' : 'setup problem'}, `;
+    return `${what}"${first(text)}"${at ? ` at ${at}` : ''}${page ? ` on ${page}` : ''}${project ? ` in ${project}` : ''}`;
   };
 
   // A board nothing has posted to yet has no channel, and won't list or follow one it hasn't: made here, as the first

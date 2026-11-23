@@ -82,6 +82,30 @@ export interface Done<Record = unknown> {
 type Maybe<T> = T | Promise<T>;
 
 /**
+ * Something of deictic's that went wrong, which nothing a person did in the page caused: a package the project
+ * hasn't installed, a plugin that failed. The dev server says it, and hands it to each plugin with a `problem`
+ * (tasks posts it to the board, for an agent to fix).
+ */
+export interface Problem {
+  /**
+   * What tells it apart, and the same problem again from a new one: `packages:rrweb`, `setup:tailwind`. Never a
+   * time or an ID, so a problem that comes back is known.
+   */
+  key: string;
+  /**
+   * `setup`: the project's to fix, as `message` says (install a package, configure a plugin). `bug`: deictic's own, or
+   * a plugin's, to report where it's made, not to patch where it's installed.
+   */
+  kind: 'setup' | 'bug';
+  /** What went wrong, and the fix where there is one, as any problem message says it. */
+  message: string;
+  /** What more there is to look into: a stack. */
+  details?: string;
+  /** The plugin it's about, where it's one's: none for deictic's own. */
+  plugin?: string;
+}
+
+/**
  * Each plugin's API to the others on the server, by name. A plugin adds its own, so `use` knows its type:
  * `declare module 'deictic' { interface ServerApis { screenshots: Screenshots } }`.
  */
@@ -99,10 +123,12 @@ export interface ServerContext {
   /** The project's root, as an absolute path. */
   root: string;
   /**
-   * Another plugin's API, as its `setup` answered it, or nothing when it isn't loaded. One the plugin
-   * `needs` always is; any other may not be, so check.
+   * Another plugin's API, as its `setup` answered it, or nothing when it isn't loaded (or its `setup` failed,
+   * which is reported). One the plugin `needs` always is loaded; any other may not be, so check.
    */
   use: <Name extends string>(name: Name) => ApiOf<ServerApis, Name> | undefined;
+  /** Says a problem of the plugin's own, as deictic says its own: in the dev server's output, and to each plugin's `problem`. */
+  report: (problem: Problem) => void;
 }
 
 /**
@@ -148,6 +174,11 @@ export interface ServerPlugin<Model = unknown, Op = unknown, Record = unknown, A
   redo?(record: Record): Maybe<Record>;
   /** Says what an op does, for the history: `className: px-2 → px-4`. */
   describe?(op: Op, before: Model): string;
+  /**
+   * Hears each problem deictic or a plugin reports, on the server or in the page, after every `setup` has run: once
+   * per `key` while the dev server runs. Its own failure is only said, never reported again.
+   */
+  problem?(problem: Problem): Maybe<void>;
 }
 
 export const definePlugin = <Model, Op, Record = unknown, Api = unknown>(
@@ -249,6 +280,8 @@ export interface ClientContext {
   use: <Name extends string>(name: Name) => ApiOf<ClientApis, Name> | undefined;
   /** Asks one of this plugin's own routes, from the page: `request('shots', { method: 'POST', body: blob })`. */
   request: (route: string, init?: RequestInit) => Promise<Response>;
+  /** Says a problem of the plugin's own to the dev server, as the server half's `report` does: its `plugin` is this one. */
+  report: (problem: Problem) => void;
   /**
    * Opens the popup on an element at a plugin's tab, as its shortcut would, or with `at` on a spot in it: the
    * popup is then beside the spot, which is what's lit, and the tab's context has it. An element rendered again

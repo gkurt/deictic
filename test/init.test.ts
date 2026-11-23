@@ -6,7 +6,7 @@ import { addToConfig, bundlerOf, init, packagesFor } from '#src/cli/init.ts';
 import { definePlugin } from '#src/index.ts';
 import { recommended } from '#src/plugins/recommended/index.ts';
 import { dom, screenshots } from '#src/plugins/screenshots/index.ts';
-import { installCommand, missing, missingMessage, packageManager, specOf } from '#src/tools/packages.ts';
+import { installCommand, missing, missingProblem, packageManager, specOf } from '#src/tools/packages.ts';
 
 import { project } from './fixture.ts';
 
@@ -43,10 +43,12 @@ test("says which plugins' packages aren't installed, and the command that instal
     { plugin: 'one', packages: ['deictic-nothing-here'] },
     { plugin: 'two', packages: ['deictic-nothing-here', 'deictic-nor-here'] },
   ]);
-  expect(missingMessage(root, plugins)).toBe(
-    'deictic: install what one and two need: npm install -D deictic-nothing-here deictic-nor-here',
-  );
-  expect(missingMessage(root, plugins.slice(2))).toBeUndefined();
+  expect(missingProblem(root, plugins)).toEqual({
+    key: 'packages:deictic-nor-here,deictic-nothing-here',
+    kind: 'setup',
+    message: 'install what one and two need, then restart the dev server: npm install -D deictic-nothing-here deictic-nor-here',
+  });
+  expect(missingProblem(root, plugins.slice(2))).toBeUndefined();
 });
 
 test("each recommended plugin names what it imports, and screenshots its renderer's", () => {
