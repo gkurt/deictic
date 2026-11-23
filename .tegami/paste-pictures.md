@@ -12,7 +12,8 @@ chip's lightbox offers to draw on.
 
 Screenshot, Record, the mic and Task sit side by side at the end of the tool panel, after the drawing tools. A plugin
 puts its group in a section with `tools.add(group, { section })`: groups of one section sit together, with no line
-between them, after the groups of none, and `last` puts one at its section's end. The gap after Record is gone.
+between them, after the groups of none, and `last` puts one at its section's end. The gap after Record is gone, and
+while a recording goes its controls are the only ones in that section.
 
 ### Attachments keep one size
 

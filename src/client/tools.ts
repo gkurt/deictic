@@ -127,6 +127,8 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
     const plain = added.filter((a) => a.section === undefined);
     const sections = [...new Set(added.flatMap((a) => a.section ?? []))].map((name) => {
       const of = added.filter((a) => a.section === name);
+      // Named on each, for a plugin's styles to tell its section's other groups by (a recording hides them).
+      for (const a of of) a.group.dataset.section = name;
       return [...of.filter((a) => !a.last), ...of.filter((a) => a.last)].map((a) => a.group);
     });
     const blocks = [

@@ -139,6 +139,8 @@ keys work while the shortcut's are held, and while a tool has the page:
 | `T`                                | A task about a point: the next press on the page opens the Task tab there |
 
 A recording, the mic and a drawing tool keep the panel up: stop them (`R`, `K`, `Esc`) and it goes with the keys.
+While a recording goes, Screenshot, the mic and Task step aside for its own controls: its time, its mic, Stop and
+Discard.
 What the tools make (shots, recordings, voice notes) waits for the next task, whichever element it's about: the Task
 tool counts them, and the Task tab lists each as a chip, to open or to leave out, and the drawer has them meanwhile. Marks stay on the
 page until a task takes them.

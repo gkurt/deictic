@@ -149,7 +149,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   and goes `LINGER` after. Plugins `add(group)` their controls from `setup`, and `order()` places them all again each
   time: groups of no section, then each `section` (its groups side by side, with no `.sep` between them, its `last`
   ones at its end), then those of none that are `last`. Screenshots', recordings', voice's and tasks' (`last`) are
-  `capture`, so the bar is the pointer, the drawing tools, then Screenshot, Record, the mic and Task. Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
+  `capture`, so the bar is the pointer, the drawing tools, then Screenshot, Record, the mic and Task. Each group of a
+  section has it as `data-section`: while a recording goes (`.recorder.going`), the rest of `capture` is hidden. Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
   page, while the keys are held or a tool holds: a control's `aria-keyshortcuts` is its key, which clicks it (a key
   alone, whatever is held while pointing; never one typed in a field of ours, or of the page's while only pointing),
   and Esc gives the page back. Not while a `data-deictic-modal` is in the root: the keys are the modal's. So a tool never listens for keys itself. `pick()` answers the next press on the page

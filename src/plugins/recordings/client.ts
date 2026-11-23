@@ -62,6 +62,8 @@ const STYLE = `
 .recorder .going { display: flex; align-items: center; gap: 4px; }
 /* Away while nothing records: laid out empty, it would still count in the group's gap. */
 .recorder .going[hidden] { display: none; }
+/* While one goes, its controls are its section's alone: the other tools that capture (a shot, the mic, a task) wait. */
+.tool-panel:has(.recorder.going) .tool-group[data-section='capture']:not(.recorder) { display: none; }
 .tool-panel.vertical .recorder .going { flex-direction: column; }
 .recorder .live { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px; font: 12px ui-monospace, monospace; }
 .tool-panel.vertical .recorder .live { flex-direction: column; gap: 2px; padding: 4px 0; }
