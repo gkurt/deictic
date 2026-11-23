@@ -57,7 +57,7 @@ In the config `init` wrote, each plugin takes its options under its name, and `f
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt
-  view: 'spotlight', // dim the page around the element, in place of the popup's outline
+  view: 'spotlight', // dim the page around the element, and pin its tasks where they are
   plugins: recommended({
     tasks: { channel: 'ui', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },

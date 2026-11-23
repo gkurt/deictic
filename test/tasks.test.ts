@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { board } from '@vercel/board';
 import { local } from '@vercel/board/backend-local';
 
-import { type Model, tasks, type TasksOptions } from '#src/plugins/tasks/index.ts';
+import { type Model, type Placed, tasks, type TasksOptions } from '#src/plugins/tasks/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
 import { project } from './fixture.ts';
@@ -40,7 +40,8 @@ function setup(channel: string, options: TasksOptions = {}, files: Record<string
     ))!;
     return { status: res.status, json: (await res.json()) as T & { problem?: string } };
   };
-  return { p, post, target: p.target('src/App.tsx', 'h1') };
+  const get = async <T>(route: string) => (await (await handle(new Request(`${ORIGIN}/__deictic/${route}`)))!.json()) as T;
+  return { p, post, get, target: p.target('src/App.tsx', 'h1') };
 }
 
 test('adds a task saying what and where, and lists it on the element', async () => {
@@ -184,6 +185,31 @@ test("lists the file's other tasks apart, and keeps an element's own as it moves
   // A row's line is there twice, so its task can't be told to be either's; the old one, with no file, is found at its place only.
   expect(after.elsewhere.map((t) => t.title)).toEqual(['The first row']);
   expect((await read('li')).tasks).toEqual([]);
+});
+
+test('answers the page every task still to do with its place, for its pins', async () => {
+  const { p, post, get } = setup(
+    'pins',
+    {},
+    { 'src/App.tsx': 'export const App = () => (\n  <main>\n    <h1 className="text-4xl">Pricing</h1>\n    <li>One</li>\n  </main>\n);\n' },
+  );
+  const add = async (tag: string, text: string) =>
+    (
+      await post<{ model: Model }>('apply', { plugin: 'tasks', target: p.target('src/App.tsx', tag), op: { ...op, text } })
+    ).json.model.tasks.at(-1)!.id;
+  const placed = async () => (await get<{ tasks: Placed[] }>('plugins/tasks/page')).tasks;
+  await add('h1', 'The headline');
+  const row = await add('li', 'The first row');
+  // Neither is a pin: one that's over, and one of the channel's that's about no element.
+  await (await team.tasks.claim(await add('li', 'Done already'))).complete('done');
+  await team.tasks.create('pins', 'Not about an element');
+
+  expect((await placed()).map((t) => [t.title, t.place, t.state])).toEqual([
+    ['The headline', 'src/App.tsx:3:5', 'ready'],
+    ['The first row', 'src/App.tsx:4:5', 'ready'],
+  ]);
+  await team.as('codex').tasks.claim(row);
+  expect((await placed())[1]).toMatchObject({ id: row, state: 'claimed', by: 'codex', open: false });
 });
 
 test('undo cancels the task and redo adds it again, as a new one', async () => {

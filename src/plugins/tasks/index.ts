@@ -96,6 +96,12 @@ export interface Place {
   tag: string;
 }
 
+/** A task that's still to do, with the place it's about, as its mark has it: what the page pins to the element there. */
+export interface Placed extends Task {
+  /** `file:line:column`, as the element's mark. */
+  place: string;
+}
+
 export interface Model {
   channel: string;
   /** The channel's page, when there's one to link to. */
@@ -215,6 +221,11 @@ export interface Removed extends Added {
 /** What the history keeps of a change: a task added has no `kind`, as it had none before there were others. */
 export type Kept = Added | Edited | Removed;
 
+/** A task as a board lists it: its root message. */
+type Message = Awaited<ReturnType<TaskBoard['thread']>>['message'];
+
+/** How many tasks a page is asked about at most: past that it has more pins than anyone reads. */
+const PINNED = 500;
 const AT = 'deictic.at';
 const FILE = 'deictic.file';
 /** What parts what was typed from the rest of a task's text. */
@@ -314,6 +325,46 @@ export function tasks(options: TasksOptions = {}) {
     return { ...record, id: task.id };
   };
 
+  /** A board's task as the panel lists it: its words, its state, who has it, and its page there. */
+  const taskOf = (message: Message, actors: Awaited<ReturnType<typeof actorsOf>>, page: string | undefined): Task => {
+    const state = message.task?.state ?? 'ready';
+    const by = actors.get(message.task?.claim?.actor ?? '')?.name;
+    const text = message.text.split(REST, 1)[0]!;
+    const to = taskLink(page, message.id);
+    const missing = Object.entries(message.labels).flatMap(([key, value]) => (/^deictic\.dropped\.\d+$/.test(key) ? [value] : []));
+    const dropped = missing.length === 0 ? undefined : listOf(missing);
+    return {
+      id: message.id,
+      title: text.split('\n', 1)[0]!,
+      text,
+      state,
+      ...(by === undefined ? {} : { by }),
+      open: OPEN.has(state),
+      ...(to === undefined ? {} : { link: to }),
+      ...(dropped === undefined ? {} : { dropped }),
+    };
+  };
+  /** The channel's tasks still to do, each with its place: a page of the board's at a time, and no more than `PINNED`. */
+  const placed = async (): Promise<Placed[]> => {
+    const team = await boardOf();
+    const open: Message[] = [];
+    for (let after: string | undefined; open.length < PINNED;) {
+      const { tasks, cursor } = await team.tasks.list({ channel, ...(after === undefined ? {} : { after }) });
+      open.push(...tasks.map(({ message }) => message));
+      if (tasks.length === 0 || cursor === after) break;
+      after = cursor;
+    }
+    const about = open.filter((message) => message.labels[AT] !== undefined);
+    const [actors, page] = await Promise.all([
+      actorsOf(
+        team,
+        about.flatMap((message) => message.task?.claim?.actor ?? []),
+      ),
+      linkOf(),
+    ]);
+    return about.map((message) => ({ ...taskOf(message, actors, page), place: message.labels[AT]! }));
+  };
+
   // Kept from `setup`, to `use` another plugin when an op asks for it.
   let context: ServerContext | undefined;
   let project = options.project;
@@ -376,6 +427,10 @@ export function tasks(options: TasksOptions = {}) {
       // Not waited for: a failure is the first request's to tell.
       void boardOf().catch(() => {});
     },
+    routes: {
+      // Every task of the channel's still to do that has a place, for the page to pin where its elements are.
+      page: async () => Response.json({ tasks: await asked(placed) }),
+    },
     read: (source, target) =>
       asked(async () => {
         const team = await boardOf();
@@ -398,23 +453,8 @@ export function tasks(options: TasksOptions = {}) {
         const claims = held.tasks.flatMap(({ message }) => message.task?.claim ?? []);
         const actors = await actorsOf(team, [...about.flatMap(({ message }) => actorOf(message) ?? []), ...claims.map((c) => c.actor)]);
         for (const { message } of about) {
-          const state = message.task?.state ?? 'ready';
-          if (state === 'canceled') continue;
-          const by = actors.get(actorOf(message) ?? '')?.name;
-          const text = message.text.split(REST, 1)[0]!;
-          const to = taskLink(page, message.id);
-          const missing = Object.entries(message.labels).flatMap(([key, value]) => (/^deictic\.dropped\.\d+$/.test(key) ? [value] : []));
-          const dropped = missing.length === 0 ? undefined : listOf(missing);
-          const task = {
-            id: message.id,
-            title: text.split('\n', 1)[0]!,
-            text,
-            state,
-            ...(by === undefined ? {} : { by }),
-            open: OPEN.has(state),
-            ...(to === undefined ? {} : { link: to }),
-            ...(dropped === undefined ? {} : { dropped }),
-          };
+          if (message.task?.state === 'canceled') continue;
+          const task = taskOf(message, actors, page);
           const at = placeIn(message.labels);
           if (at === undefined || message.labels[AT] === atOf(target)) tasks.push(task);
           else if (line !== undefined && at.tag === target.tag && message.labels['deictic.line'] === line) tasks.push({ ...task, at });

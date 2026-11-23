@@ -183,7 +183,7 @@ export const STYLE = `
 }
 .panel.spot {
   --deictic-line: rgb(255 255 255 / 0.14);
-  width: min(400px, calc(100vw - 16px));
+  width: min(440px, calc(100vw - 16px));
   border-color: rgb(255 255 255 / 0.1);
   border-radius: 14px;
   background: linear-gradient(rgb(39 39 42 / 0.9), rgb(24 24 27 / 0.94));
@@ -191,7 +191,7 @@ export const STYLE = `
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55), 0 0 56px -12px rgb(18 179 88 / 0.35),
     inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
-.panel.spot.pinned { width: min(400px, 100%); }
+.panel.spot.pinned { width: min(440px, 100%); }
 .spot .head { align-items: center; padding: 8px 8px 6px; }
 .spot .head .tab { position: relative; padding: 4px 10px; border: 0; border-radius: 8px; }
 /* A pill behind the shown tab, in place of the line under it. */

@@ -32,6 +32,7 @@ import type { Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
 import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
+import { pinsIn } from './pins.ts';
 
 const STYLE = `
 /* The column is no wider than the panel: an \`auto\` one grows to a long title, which then never truncates. */
@@ -44,6 +45,8 @@ const STYLE = `
 .tasks .title { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Clicked, a task reads whole, as it was typed. */
 .tasks li.whole .title { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tasks .title .all, .tasks li.whole .title .first, .tasks .says { display: none; }
+.tasks li.whole .title .all { display: inline; }
 /* The state is a dot, named by its tooltip: a ring while no one has it, filled once someone does or it's over. */
 .tasks .state { flex: none; align-self: center; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
 /* Room for Edit and Delete, which would lie over the first line's end. */
@@ -99,6 +102,48 @@ textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-se
 .shot-problem { margin-top: 4px; font-size: 12px; color: var(--deictic-problem); }
 .shot-problem:empty { display: none; }
 .shot[hidden], .chips[hidden], label[hidden] { display: none; }
+/*
+ * The spotlight view has the window's height for the panel, so the tasks aren't five lines of a list: each is a card
+ * that says its state and reads whole, and they scroll over the field, which stays where it is.
+ */
+.spot .body:has(> .thread) { display: flex; flex-direction: column; }
+.spot .thread { flex: 0 1 auto; min-height: 0; margin: -12px -12px 0; padding: 12px 12px 0; overflow-y: auto; scrollbar-width: thin; }
+/* Never squeezed out by the field: a window too low for both scrolls the panel. */
+.spot .thread:has(li) { min-height: 84px; }
+.spot .compose { flex: none; }
+.spot .tasks { max-height: none; overflow: visible; gap: 8px; margin-bottom: 10px; }
+.spot .tasks:empty { margin: 0; }
+.spot .tasks li {
+  display: grid;
+  grid-template: 'state says place acts id' auto 'text text text text text' auto / auto minmax(0, 1fr) auto auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.04);
+}
+.spot .tasks li:hover, .spot .tasks li:focus-within { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
+.spot .tasks .state, .spot .tasks li.whole .state { grid-area: state; align-self: center; }
+.spot .tasks .says { grid-area: says; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--deictic-muted); }
+.spot .tasks .says.claimed { color: #60a5fa; }
+.spot .tasks .says.blocked { color: #fbbf24; }
+.spot .tasks .says.completed { color: #4ade80; }
+.spot .tasks .says.failed { color: var(--deictic-problem); }
+.spot .tasks li > a, .spot .tasks li > code { grid-area: id; color: var(--deictic-muted); }
+.spot .tasks .place { grid-area: place; }
+.spot .tasks .title, .spot .tasks li.whole:has(.acts) .title { grid-area: text; padding: 0; white-space: normal; overflow: visible; font-size: 13px; line-height: 1.45; }
+.spot .tasks .title .first { display: none; }
+/* A few lines of it, and all of it once clicked. */
+.spot .tasks .title .all { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.spot .tasks li.whole .title .all { display: block; }
+/* In the card's first line, where there's the room: there all along, and plain once the card is pointed at. */
+.spot .tasks .acts { grid-area: acts; position: static; display: flex; min-height: 0; padding: 0; background: none; opacity: 0; }
+.spot .tasks li:hover .acts, .spot .tasks li:focus-within .acts { opacity: 1; }
+.spot .tasks li.editing { grid-template: none / minmax(0, 1fr); }
+.spot .more { margin-bottom: 10px; }
+.spot .more .tasks { margin: 8px 0 0; }
+.spot textarea { min-height: 76px; }
 `;
 
 const ICON = (path: string) =>
@@ -341,6 +386,8 @@ export default defineClientPlugin<Model, Change>({
   label: 'Task',
   // All the panel leaves for is a recording, which a page load doesn't end.
   resume: ({ use }) => use('recordings')?.going(),
+  // The page's tasks, where they are, while the spotlight view points.
+  pointing: (context) => pinsIn(context).glance(),
   mount: (panel, context) => {
     const style = element('style', { textContent: STYLE });
     const list = element('ul', { className: 'tasks' });
@@ -359,7 +406,15 @@ export default defineClientPlugin<Model, Change>({
     const closedCount = element('summary');
     const ended = element('ul', { className: 'tasks' });
     closed.append(closedCount, ended);
-    panel.append(style, list, closed, fold, text);
+    // What's there, and what's being added: apart, as the spotlight view scrolls the one over the other.
+    const thread = element('div', { className: 'thread' });
+    thread.append(list, closed, fold);
+    const compose = element('div', { className: 'compose' });
+    compose.append(text);
+    panel.append(style, thread, compose);
+    // The page's other tasks, pinned where they are (the spotlight view shows them): not for a popup a page shows in
+    // place, which is in a root of its own.
+    const around = panel.getRootNode() === context.root ? pinsIn(context).around(context.element) : undefined;
 
     const shots = context.use('screenshots');
     // Back from a recording that went on to a page without the element: there's nothing here to take a shot of.
@@ -389,15 +444,15 @@ export default defineClientPlugin<Model, Change>({
     const chipsEl = element('div', { className: 'chips' });
     const another = element('button', { type: 'button', textContent: 'Add another', title: 'Take another screenshot and draw on it' });
     const problem = element('div', { className: 'shot-problem' });
-    if (shots !== undefined || recorder !== undefined || voice !== undefined) panel.append(shot, chipsEl, problem);
+    if (shots !== undefined || recorder !== undefined || voice !== undefined) compose.append(shot, chipsEl, problem);
     // Its own line: the screenshot's gives way to the chips, and this is asked whatever else is attached.
     const withHtml = element('input', { type: 'checkbox', checked: true });
     const htmlToggle = element('label', { title: 'The element as the page has it now, as a file: element.html' });
     htmlToggle.append(withHtml, 'Attach HTML snapshot');
     const htmlRow = element('div', { className: 'shot' });
     htmlRow.append(htmlToggle);
-    if (sendsHtml) panel.append(htmlRow);
-    panel.append(row);
+    if (sendsHtml) compose.append(htmlRow);
+    compose.append(row);
 
     let chips: Chip[] = [];
     let recordings: Recording[] = [];
@@ -615,6 +670,7 @@ export default defineClientPlugin<Model, Change>({
       try {
         editing = undefined;
         render(await context.apply(op));
+        around?.refresh();
       } catch {
         render(shown);
       }
@@ -688,16 +744,23 @@ export default defineClientPlugin<Model, Change>({
       /** A task's row: its state, its ID, a link where it has a page, its title, and where it's from when that's said. */
       const rowOf = (t: Task, from?: HTMLElement) => {
         const item = element('li');
-        const state = element('span', { className: `state ${t.state}`, title: t.by === undefined ? t.state : `${t.state} by ${t.by}` });
+        const says = t.by === undefined ? t.state : `${t.state} by ${t.by}`;
+        const state = element('span', { className: `state ${t.state}`, title: says });
         state.role = 'img';
+        // The state in words, where a view has the room for them: the dot's tooltip says it in the other.
+        const said = element('span', { className: `says ${t.state}`, textContent: says, ariaHidden: 'true' });
         const id = element('code', { textContent: `#${t.id}` });
         const title = element('button', { type: 'button', className: 'title' });
+        // Its first line and all of it: the view shows one, and a click the whole.
+        title.append(
+          element('span', { className: 'first', textContent: t.title }),
+          element('span', { className: 'all', textContent: t.text }),
+        );
         // In place, not by drawing the list again: that would take a task's words being changed with it.
         const show = () => {
           const all = whole.has(t.id);
           item.classList.toggle('whole', all);
-          title.textContent = all ? t.text : t.title;
-          title.title = all ? 'Show its first line only' : 'Show all of it';
+          title.title = all ? 'Show less of it' : 'Show all of it';
           title.ariaExpanded = String(all);
         };
         title.addEventListener('click', () => {
@@ -710,7 +773,7 @@ export default defineClientPlugin<Model, Change>({
             ? id
             : element('a', { href: t.link, target: '_blank', rel: 'noreferrer', title: 'Open the task on the board' });
         if (to !== id) to.append(id);
-        item.append(state, to, title, ...(from === undefined ? [] : [from]));
+        item.append(state, said, to, title, ...(from === undefined ? [] : [from]));
         return item;
       };
       const { file } = context.target.loc;
@@ -769,6 +832,8 @@ export default defineClientPlugin<Model, Change>({
         }),
       );
       if (grew) list.scrollTop = list.scrollHeight;
+      // In the spotlight view it's the thread that scrolls, the list in it as long as it is.
+      if (grew) thread.scrollTop = thread.scrollHeight;
       able();
       mark();
     };
@@ -864,6 +929,7 @@ export default defineClientPlugin<Model, Change>({
         };
         const model = await context.apply(op);
         render(model);
+        around?.refresh();
         announce(
           model,
           op,
@@ -907,6 +973,7 @@ export default defineClientPlugin<Model, Change>({
     render(context.model);
     text.focus();
     return () => {
+      around?.release();
       aborts.abort();
       take?.cancel();
       clearInterval(ticking);

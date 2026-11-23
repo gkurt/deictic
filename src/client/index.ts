@@ -224,9 +224,12 @@ export function start({ base, shortcut: own, plugins: given, server, view: wante
   }
   const lightings: { [V in View]?: Lighting } = {};
   const lighting = (of = view) => (lightings[of] ??= of === 'spotlight' ? spotlight(root) : outlines(root));
+  // Said on the host, for a plugin's styles to tell the views apart: `:host([data-view='spotlight']) …`.
+  host.dataset['view'] = view;
   const switched = (to: View) => {
     lighting().hide();
     view = to;
+    host.dataset['view'] = to;
     try {
       localStorage.setItem(VIEW, to);
     } catch {
@@ -250,7 +253,8 @@ export function start({ base, shortcut: own, plugins: given, server, view: wante
     options: optionsOf.get(name),
     use: (other) => apis.get(other) as never,
     request: (route, init) => send(`${base}__deictic/plugins/${name}/${route}`, init),
-    open: (plugin, element) => openAt(plugin, element),
+    // Not from under something unsaved, which a press on the page wouldn't close either: its button shakes.
+    open: (plugin, element) => panel?.guard() !== true && openAt(plugin, element),
     lightbox: (items, options) => openLightbox(root, items, options),
   });
   for (const { plugin } of given) {
@@ -303,7 +307,7 @@ export function start({ base, shortcut: own, plugins: given, server, view: wante
 
   let pointer: { x: number; y: number } | undefined;
   let frame = 0;
-  let panel: { close: () => void; unsaved: () => boolean } | undefined;
+  let panel: ReturnType<typeof openPanel> | undefined;
 
   /** The plugins whose keys are held: several, where they share keys and differ by button. */
   const heldBy = (e: MouseEvent | KeyboardEvent) => plugins.filter((p) => p.gesture.held(e));
@@ -325,8 +329,25 @@ export function start({ base, shortcut: own, plugins: given, server, view: wante
   };
   // The plugins whose keys are held now, as the last event said: what's pointed at is shown while there are any.
   let held: typeof plugins = [];
+  // What plugins show on the page while the spotlight view points (`pointing`), each with what takes it away.
+  let glanced: (() => void)[] | undefined;
+  const glance = (on: boolean) => {
+    if (on === (glanced !== undefined)) return;
+    for (const end of glanced ?? []) end();
+    glanced = !on
+      ? undefined
+      : given.flatMap(({ plugin }) => {
+          try {
+            return plugin.pointing === undefined ? [] : [plugin.pointing(contextOf(plugin.name))];
+          } catch (e) {
+            console.error(`deictic: ${plugin.name} failed to show what it has on the page`, e);
+            return [];
+          }
+        });
+  };
   const hide = () => {
     held = [];
+    glance(false);
     lighting().hide();
   };
   const show = (glide: boolean) => {
@@ -349,6 +370,7 @@ export function start({ base, shortcut: own, plugins: given, server, view: wante
   const update = (e: MouseEvent | KeyboardEvent) => {
     held = heldBy(e);
     if (held.length === 0) return hide();
+    glance(view === 'spotlight');
     if (frame === 0) frame = requestAnimationFrame(() => show(true));
   };
 
@@ -502,7 +524,12 @@ function openPanel({
   onClose,
   resumed: coming,
   reopen,
-}: PanelOptions): { close: () => void; unsaved: () => boolean } {
+}: PanelOptions): {
+  close: () => void;
+  unsaved: () => boolean;
+  /** Whether it holds something unsaved, whose button it then shakes: what asks before opening another over it. */
+  guard: () => boolean;
+} {
   const pinned = over === undefined;
   let view = opened;
   // Given to the first tab's first mount only: another tab, or a remount after an undo, starts afresh.
@@ -764,7 +791,11 @@ function openPanel({
     void load();
   };
   show(first);
-  return { close: done, unsaved: () => holding !== undefined };
+  const guard = () => {
+    if (holding !== undefined) shake(holding);
+    return holding !== undefined;
+  };
+  return { close: done, unsaved: () => holding !== undefined, guard };
 }
 
 /** Shakes a panel's button, in view: what a press outside does where closing would lose something. A blink where motion is reduced. */

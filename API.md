@@ -91,6 +91,11 @@ to it by a line, and the page gets its light back once the pointer has been out 
 takes the pointer from the page. A button in the popup's head switches between them, and the browser keeps what a
 person picked there over the option.
 
+The spotlight view shows the tasks on the page, too. While the shortcut's keys are held, every element with a task
+still to do has a pin on its corner: how many, in the colour of the furthest along. With the Task tab open, a pin
+under the pointer reads its tasks, and a click opens them. The tab itself has the window's height there: each task
+is a card that says its state and reads whole, and they scroll over the field.
+
 `recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
 network, which put the page's console and its requests in a recording. Each takes its
 options under its name, and `false` leaves it out (`recommended({ logs: false, network: false })`). Other plugins, your own included, go beside it:
@@ -319,6 +324,12 @@ export default defineClientPlugin<Model, Op>({
   tasks do. Text edits without it are refused.
 - `page: true` on the page half says its tab works on the page as a whole, as annotations' does: while it's shown,
   nothing marks the element, and the spotlight view leaves the page its light.
+- `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held in the
+  spotlight view, and answers what takes it away: tasks pins each task where its element is. The overlay's host says
+  the view, so a plugin's styles tell them apart: `:host([data-view='spotlight']) .mine { … }`, and `.spot` is on the
+  popup in that view.
+- `context.open(plugin, element)` opens the popup on another element. Not while the open one holds something
+  `unsaved`: its button shakes, and it answers false.
 - A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.
   Where the task outlasts a page load, as a recording does, the page half's `resume` answers it on the next page, and
   the popup comes back there: on the element, or without it (`element.isConnected` is false) where that page has none.

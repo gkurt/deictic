@@ -45,6 +45,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `View` (`src/index.ts`), `'popup'` or `'spotlight'`: how the overlay shows itself, `deictic({ view })`, `'popup'` by
   default. `prepare` refuses any other, and `clientModule` and `writeClient` hand it to `start`. A `ClientPlugin` with
   `page: true` (annotations) has a tab that works on the page, not the element: while it's shown, nothing marks the element.
+  One with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held in the spotlight view, and
+  answers what takes it away. The overlay's host says the view (`data-view`), for a plugin's styles: `:host([data-view='spotlight'])`.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -297,6 +299,15 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `{ edit: id, text }` (the words before the `---`, with the message's revision, undone by writing the old text back
   unless it was edited since) or `{ remove: id }` (canceled, which a board never reopens, so the record keeps the task
   whole and undo adds it again under a new ID). Both only for an open task of the channel's with `deictic.at`.
+  `pins.ts` is the page's tasks where they are, the spotlight view's only (`pinsIn(context)`, one set per overlay
+  root): the `page` route answers every task still to do with its `place` (`Placed`), and each place with an element
+  on the page gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along), followed
+  each frame. `glance()` shows them while pointing (`pointing`), the pointer going through them; `around(element)`
+  while the Task tab is open over the page, without that element's, where a badge under the pointer shows a card of
+  its tasks and a click opens them (`context.open`, which a draft refuses). A pin has no layer to stack in: each is
+  fixed under the popup, and the one pointed at over it. In that view the tab's tasks are cards (`.spot .tasks li`:
+  the state in words, the text whole to four lines) in `.thread`, which scrolls over `.compose`, the field and what's
+  attached; the popup view has the same markup as five rows of a list.
   `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
   `data-deictic-modal` so Esc is its) and Delete, drawn over the row's end while it's pointed at or focused in. The list
   is five rows high and scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
@@ -378,7 +389,7 @@ repository would loop, as it holds the fixture).
 
 `site/` is the homepage (`src/pages/home.tsx`) and a playground (`example/`, `src/pages/example.tsx`), a Vite
 multi-page app running both plugins on itself, also from `dist`. Its build has deictic too (`standalone`), so Alt-click
-works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, a recording's parts and the voice clips in
+works on the deployed site: `src/standalone.ts` answers it in the page (tasks and shots kept there, the tasks' `page` route answered for the pins, a recording's parts and the voice clips in
 IndexedDB for a day, so a recording carries on to the site's next page, class edits
 on the element, no editor), and shots are `dom()`'s. A recording replays in `replay.html`, which `site/replay.ts`
 publishes in the build with `rrweb-player`'s files; it asks the page that made the recording for it, over a

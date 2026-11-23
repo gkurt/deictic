@@ -174,7 +174,8 @@ export interface ClientContext {
   /**
    * Opens the popup on an element at a plugin's tab, as its shortcut would: after a recording, say. An
    * element rendered again since stands in for one no longer on the page. False when there's no such tab
-   * or no such element any more. Not from `setup`, which runs before the popup can open.
+   * or no such element any more, and while the open popup holds something unsaved, whose button then shakes.
+   * Not from `setup`, which runs before the popup can open.
    */
   open: (plugin: string, element: Element) => boolean;
   /**
@@ -272,6 +273,12 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * nothing marks the element, and the spotlight view leaves the page its light.
    */
   page?: boolean;
+  /**
+   * What it shows on the page while a shortcut's keys are held in the spotlight view, whose page is dimmed to
+   * point on: the tasks plugin pins each task where its element is. Answers what takes it away. Not asked in the
+   * popup view, which draws on the page only what's pointed at.
+   */
+  pointing?(context: ClientContext): () => void;
   /** Draws into `panel`, inside deictic's shadow root. Returns what to undo on the page when the panel closes. */
   mount?: (panel: HTMLElement, context: PanelContext<Model, Op>) => (() => void) | void;
 }
