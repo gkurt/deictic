@@ -400,7 +400,8 @@ export default defineClientPlugin<Model, Op>({
   sends a task on the first element attached.
 - `context.tools` is the tool panel, for a page half's `setup`: `add(group)` puts a group of controls in it (buttons
   with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears; groups given one `section` sit
-  together, as the screenshots', recordings' and voice's do in `capture`), `hold(left)` takes the page for a
+  together after the others, as the screenshots', recordings', voice's and tasks' do in `capture`, and `last` puts a
+  group at the end of its section), `hold(left)` takes the page for a
   tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the
   next point pressed on the page, as a `Spot` (the element and the point in it).
 - `context.drawer` is the drawer, for a page half's `setup`: `add(section)` puts a section in it, which hides

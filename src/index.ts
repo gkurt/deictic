@@ -172,9 +172,9 @@ export interface Spot {
  */
 export interface ToolPanel {
   /**
-   * Adds a plugin's controls, as one group, in the order plugins are loaded; `last` puts it after the others'. Groups
-   * of one `section` sit together, with no line between them, where its first group went: the screenshots',
-   * recordings' and voice's are `capture`. Each control is a button named by its `title`; its `aria-keyshortcuts`
+   * Adds a plugin's controls, as one group, in the order plugins are loaded. Groups of one `section` sit together,
+   * with no line between them, after the groups of none: the screenshots', recordings', voice's and tasks' are
+   * `capture`. `last` puts a group at the end of its section, or after all the others for one of none. Each control is a button named by its `title`; its `aria-keyshortcuts`
    * (`B`, `Control+Z`) is the key the panel hears for it, alone or with the keys held to point, and what its tooltip
    * shows.
    */

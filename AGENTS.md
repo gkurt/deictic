@@ -146,9 +146,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   centre first), dragged by its grip to the nearest of the four. It shows while a shortcut's keys are held (`point`,
   which the overlay calls), the pointer is on it, something keeps it (`keep()`: a recording, a take, a shot being
   made) or a tool has the page (`hold(left)`, one at a time: the next holder's `hold` calls the last one's `left`),
-  and goes `LINGER` after. Plugins `add(group)` their controls from `setup` (`{ last: true }` for tasks', after the
-  others'; `{ section }` puts groups of one section side by side, with no `.sep` between them, where its first went:
-  screenshots', recordings' and voice's are `capture`). Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
+  and goes `LINGER` after. Plugins `add(group)` their controls from `setup`, and `order()` places them all again each
+  time: groups of no section, then each `section` (its groups side by side, with no `.sep` between them, its `last`
+  ones at its end), then those of none that are `last`. Screenshots', recordings', voice's and tasks' (`last`) are
+  `capture`, so the bar is the pointer, the drawing tools, then Screenshot, Record, the mic and Task. Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
   page, while the keys are held or a tool holds: a control's `aria-keyshortcuts` is its key, which clicks it (a key
   alone, whatever is held while pointing; never one typed in a field of ours, or of the page's while only pointing),
   and Esc gives the page back. Not while a `data-deictic-modal` is in the root: the keys are the modal's. So a tool never listens for keys itself. `pick()` answers the next press on the page
@@ -322,7 +323,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   query and fragment, headers and JSON or form bodies, cuts bodies, and drops deictic's own requests (a recording
   sends itself each second) and the `ignore`d. `test/network.test.ts` covers it. (`logs` is un-ignored in `.gitignore`.)
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
-  recordings and voice, in their tools' order in the tool panel (tasks' is last there), then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
+  recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where

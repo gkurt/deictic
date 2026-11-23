@@ -115,10 +115,28 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
   pointer.setAttribute('aria-label', 'Pointer');
   pointer.setAttribute('aria-keyshortcuts', 'V');
   bar.append(grip, pointer);
-  // After every plugin's own, whichever adds first: what takes the rest (a task).
-  const last: HTMLElement[] = [];
-  // Each section's last group, by name: the next of it goes after that one, with no line between them.
-  const sections = new Map<string, HTMLElement>();
+  // Each plugin's group as it was added: where each goes is worked out from all of them (`order`), as a later one
+  // may belong before an earlier one.
+  const added: { group: HTMLElement; section?: string; last: boolean }[] = [];
+  /**
+   * The groups in their places: those of no section, then each section (in the order its first group came, its groups
+   * side by side), then those of none that asked to be `last`. Within a section, its `last` ones are at its end. A
+   * line between each.
+   */
+  const order = () => {
+    const plain = added.filter((a) => a.section === undefined);
+    const sections = [...new Set(added.flatMap((a) => a.section ?? []))].map((name) => {
+      const of = added.filter((a) => a.section === name);
+      return [...of.filter((a) => !a.last), ...of.filter((a) => a.last)].map((a) => a.group);
+    });
+    const blocks = [
+      ...plain.filter((a) => !a.last).map((a) => [a.group]),
+      ...sections,
+      ...plain.filter((a) => a.last).map((a) => [a.group]),
+    ];
+    for (const sep of bar.querySelectorAll(':scope > .sep')) sep.remove();
+    for (const block of blocks) bar.append(Object.assign(document.createElement('span'), { className: 'sep' }), ...block);
+  };
   root.append(bar);
 
   let dock = storedDock();
@@ -216,21 +234,8 @@ export function toolPanel(root: ShadowRoot, { spotAt, aim }: ToolsOptions): Tool
 
   return {
     add: (group, options) => {
-      const joined = options?.section === undefined ? undefined : sections.get(options.section);
-      if (options?.section !== undefined) sections.set(options.section, group);
-      if (joined !== undefined) {
-        joined.after(group);
-        return;
-      }
-      const sep = Object.assign(document.createElement('span'), { className: 'sep' });
-      if (options?.last === true) {
-        last.push(sep, group);
-        bar.append(sep, group);
-      } else if (last[0] === undefined) {
-        bar.append(sep, group);
-      } else {
-        last[0].before(sep, group);
-      }
+      added.push({ group, ...(options?.section === undefined ? {} : { section: options.section }), last: options?.last === true });
+      order();
     },
     hold,
     keep: () => {

@@ -230,6 +230,9 @@ export const STYLE = `
 .tool-panel.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
 .tool-panel.vertical, .tool-panel.vertical .tool-group { flex-direction: column; }
 .tool-panel .tool-group { display: flex; align-items: center; gap: 4px; }
+/* Groups of one section side by side, as close as the tools in a group are: the bar's gap is for between sections. */
+.tool-panel .tool-group + .tool-group { margin-left: -2px; }
+.tool-panel.vertical .tool-group + .tool-group { margin: -2px 0 0; }
 .tool-panel .grip { display: inline-flex; padding: 2px; color: var(--deictic-muted); cursor: grab; touch-action: none; }
 .tool-panel .grip:active { cursor: grabbing; }
 .tool-panel .grip svg { width: 16px; height: 16px; }

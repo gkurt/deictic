@@ -202,7 +202,8 @@ export default defineClientPlugin<Model, Op>({
     counted();
     button.append(count);
     group.append(element('style', { textContent: TOOL_STYLE }), button);
-    tools.add(group, { last: true });
+    // After the other tools that capture the page, as it takes what they made.
+    tools.add(group, { section: 'capture', last: true });
   },
   // What the page before this left the tab for: a recording, where it carries on here.
   resume: ({ use }) => use('recordings')?.going(),
