@@ -100,10 +100,21 @@ export interface Task {
   dropped?: string;
   /** The spot in the element it's about, where it's about one: CSS pixels from the element's top left. */
   point?: Point;
+  /** Which of the elements from its place it's about, where the page had more than one. */
+  which?: Which;
   /**
    * Where it was added, where that isn't the element's place: where the element was before it moved.
    */
   at?: Place;
+}
+
+/**
+ * One of several elements from the same place in the source (a list's items): its place among them on the page, from 1,
+ * and its text where it has any, which still finds it once the list is in another order.
+ */
+export interface Which {
+  nth: number;
+  text?: string;
 }
 
 /** A place in the element's file: a line and a column, from 1, and the tag there as the task saw it. */
@@ -212,6 +223,8 @@ export interface Op {
   pointed?: { path: string; html: string };
   /** How many elements on the page come from the same place in the source. */
   count: number;
+  /** Which of them it is, where there's more than one: what the page tells it from the others by. */
+  which?: Which;
   /**
    * The other elements it's about, after the one it's sent on, in the order they were attached: each one's place,
    * its tag, and its HTML as it rendered, where that's attached.
@@ -324,6 +337,9 @@ const PROBLEM = 'deictic.problem';
 const FILE = 'deictic.file';
 /** `x,y`: the spot in the element a task is about, in CSS pixels from the element's top left. */
 const POINT = 'deictic.point';
+/** Which of several elements from one place it's about: `deictic.nth` from 1, `deictic.text` its text. */
+const NTH = 'deictic.nth';
+const TEXT = 'deictic.text';
 /** What parts what was typed from the rest of a task's text. */
 const REST = '\n---\n';
 /** A file for the board, as the plugins that keep them read it. */
@@ -434,6 +450,9 @@ export function tasks(options: TasksOptions = {}) {
     const dropped = missing.length === 0 ? undefined : listOf(missing);
     const [, x, y] = /^(-?\d+),(-?\d+)$/.exec(message.labels[POINT] ?? '') ?? [];
     const point = x === undefined || y === undefined ? undefined : { x: Number(x), y: Number(y) };
+    const nth = Number(message.labels[NTH]);
+    const said = message.labels[TEXT];
+    const which = Number.isInteger(nth) && nth > 0 ? { nth, ...(said === undefined ? {} : { text: said }) } : undefined;
     return {
       id: message.id,
       title: text.split('\n', 1)[0]!,
@@ -444,6 +463,7 @@ export function tasks(options: TasksOptions = {}) {
       ...(to === undefined ? {} : { link: to }),
       ...(dropped === undefined ? {} : { dropped }),
       ...(point === undefined ? {} : { point }),
+      ...(which === undefined ? {} : { which }),
     };
   };
   const listedOf = (
@@ -928,6 +948,8 @@ function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<stri
     ...page,
     'deictic.count': String(op.count),
     ...(op.point === undefined ? {} : { [POINT]: `${Math.round(op.point.x)},${Math.round(op.point.y)}` }),
+    ...(op.which === undefined ? {} : { [NTH]: String(op.which.nth) }),
+    ...(op.which?.text === undefined ? {} : { [TEXT]: clip(op.which.text, LABEL) }),
     ...sourceOf(op.chain ?? []),
   };
 }

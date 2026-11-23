@@ -112,7 +112,8 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
       if (doc === null) throw new Error('screenshots: the snapshot was rebuilt where it cannot be read');
       await doc.fonts.ready;
       await Promise.all([...doc.images].map((img) => img.decode().catch(() => {})));
-      iframe.contentWindow?.scrollTo(scroll.x, scroll.y);
+      // At once: a page with `scroll-behavior: smooth` would glide there, and be shot on its way.
+      iframe.contentWindow?.scrollTo({ left: scroll.x, top: scroll.y, behavior: 'instant' });
       // rrweb scrolled each element as it built it, before the fonts and images gave its content its height:
       // one that couldn't scroll that far yet is scrolled again now.
       // By its kind: the iframe's elements aren't instances of this page's `Element`.
@@ -122,8 +123,12 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
         const meta = node === null ? null : mirror.getMeta(node);
         if (!isElement(node) || meta === null || !('attributes' in meta)) continue;
         const { rr_scrollTop: top, rr_scrollLeft: left } = meta.attributes;
-        if (typeof top === 'number') node.scrollTop = top;
-        if (typeof left === 'number') node.scrollLeft = left;
+        if (typeof top !== 'number' && typeof left !== 'number') continue;
+        node.scrollTo({
+          top: typeof top === 'number' ? top : node.scrollTop,
+          left: typeof left === 'number' ? left : node.scrollLeft,
+          behavior: 'instant',
+        });
       }
       const node = element === undefined ? null : mirror.getNode(element);
       // The iframe fills the page from its top left, so a box in it is one in the shot.

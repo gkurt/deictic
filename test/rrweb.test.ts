@@ -19,6 +19,8 @@ const server = Bun.serve({
   fetch: () =>
     new Response(
       `<!doctype html><html><head><style>
+        /* A page that glides where it scrolls, which a shot must not catch on its way. */
+        html { scroll-behavior: smooth; }
         body { margin: 24px; font: 16px system-ui, sans-serif; }
         code { display: inline-block; padding: 8px 12px; border: 1px solid #ddd; font: 14px ui-monospace, monospace; }
         .tall { height: 1600px; }
@@ -49,7 +51,7 @@ async function open(): Promise<{ page: Page; snapshot: (scroll?: number, element
   await page.goto(server.url.href);
   await page.addScriptTag({ path: bundle });
   const snapshot = async (scroll = 0, element?: string) => {
-    await page.evaluate((y) => scrollTo(0, y), scroll);
+    await page.evaluate((y) => scrollTo({ top: y, behavior: 'instant' }), scroll);
     // As the page half takes it: masked as rrweb masks, without deictic's overlay.
     const { taken, id } = await page.evaluate((selector) => {
       const { snapshot, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot;

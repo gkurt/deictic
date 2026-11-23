@@ -35,7 +35,16 @@ export function run(id: string, values: { out?: string }): void {
     ['deictic.source', (v) => `Source: ${at?.replace(/:\d+$/, '') ?? '?'} ← ${v} (a shared component's change is usually at the next)`],
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
-    ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
+    [
+      'deictic.count',
+      (v) => {
+        if (v === '1') return undefined;
+        const nth = label('deictic.nth');
+        const text = label('deictic.text');
+        const which = nth === undefined ? '' : `: it's number ${nth}${text === undefined ? '' : `, saying "${text}"`}`;
+        return `${v} elements on the page come from that line${which}`;
+      },
+    ],
     [
       'deictic.point',
       // Circled only in a shot taken as the task went, which no label tells from one drawn on before.

@@ -162,6 +162,18 @@ test('says what was pointed at inside the element, where nothing marked it', asy
   expect(attachments).toEqual([expect.objectContaining({ name: 'pointed.html', size: pointed.html.length })]);
 });
 
+test('says which of several elements from one place it is about, and lists it as that one', async () => {
+  const { post, get, target } = setup('which');
+  const which = { nth: 4, text: 'AI' };
+  const { json } = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, count: 10, which } });
+  const { message } = await team.thread(json.model.tasks[0]!.id);
+  expect(message.labels['deictic.nth']).toBe('4');
+  expect(message.labels['deictic.text']).toBe('AI');
+  expect(json.model.tasks[0]!.which).toEqual(which);
+  const { tasks: listed } = await get<{ tasks: Listed[] }>('plugins/tasks/page');
+  expect(listed.find((t) => t.id === message.id)?.which).toEqual(which);
+});
+
 test('says the source it rendered through, and attaches its HTML as it rendered', async () => {
   const { post, target } = setup('around');
   // A component with no element of its own around this one has only its name; past the third is the app's shell.

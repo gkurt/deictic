@@ -57,7 +57,7 @@ function changeTasks(at: string, change: TaskOp): Step {
   // With no element attached it's the page's, whatever element it was sent on.
   const place = change.detached === true ? '' : at;
   const before = tasks.get(place) ?? [];
-  const { point } = change;
+  const { point, which } = change;
   const task: Task = {
     id: `demo-${++added}`,
     title: change.text.split('\n')[0] ?? '',
@@ -65,6 +65,7 @@ function changeTasks(at: string, change: TaskOp): Step {
     state: 'ready',
     open: true,
     ...(point === undefined ? {} : { point }),
+    ...(which === undefined ? {} : { which }),
   };
   files.set(task.id, attachedOf(change));
   const put = (list: Task[]) => () => void tasks.set(place, list);

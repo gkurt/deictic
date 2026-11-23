@@ -19,6 +19,7 @@ import { drawerOf } from './drawer.ts';
 import type { Model, Op, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
 import { storeOf } from './store.ts';
+import { whichOf } from './which.ts';
 
 const STYLE = `
 .compose { flex: none; }
@@ -235,13 +236,16 @@ export default defineClientPlugin<Model, Op>({
       if (el === undefined) return a.seen;
       const chain = chainOf(el, a.target.loc.file);
       const { pointed, at } = context;
+      const masked = shots?.masked(el) ?? el;
+      const alike = sameAs(el);
       return {
         // What was pointed at, and the spot, are the popup's own element's.
         ...(a.own && at !== undefined ? { point: at } : {}),
         ...(a.own && pointed !== undefined ? { pointed: { path: pathTo(pointed, el), html: pointed.outerHTML.slice(0, 4000) } } : {}),
-        count: sameAs(el).length,
+        count: alike.length,
+        ...(alike.length > 1 ? { which: whichOf(el, alike, masked) } : {}),
         ...(chain.length === 0 ? {} : { chain }),
-        html: (shots?.masked(el) ?? el).outerHTML.slice(0, HTML),
+        html: masked.outerHTML.slice(0, HTML),
       };
     };
     /** The page the task is about: this one, or the one the panel left where none of its elements is on this one. */

@@ -202,6 +202,8 @@ are where the element is in the first PNG attached, where that's a shot taken of
 it; `deictic.note.1` is a note drawn on the page; `deictic.recording.1.replay` is where the first recording plays back; `deictic.pointed` is the path to
 what was pointed at inside the element; `deictic.dropped.1` is something attached that wasn't kept any more.
 `deictic.point` is the spot a task about a point is on, `x,y` in CSS pixels from the element's top left.
+Where one line renders several elements (`deictic.count`), `deictic.nth` is which of them, from 1 in the page's
+order, and `deictic.text` its text: the pins find it by its text, then by its place among them.
 `deictic.also.1` is the next element a task about several is about, as `src/Nav.tsx:4:7 <a>`, its HTML attached as
 `element.2.html`; a task with no element attached has no `deictic.at`, and is about the page.
 `deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared

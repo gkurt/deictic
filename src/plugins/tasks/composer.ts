@@ -131,7 +131,7 @@ type Pictured = Shot & { drawn?: { shot: Shot; marks: Annotation[]; about: strin
 export type Sent = NonNullable<Op['screenshots']>[number] & { url: string };
 
 /** What a task says of an element that only the page with it on knows. */
-export interface Seen extends Pick<Op, 'point' | 'pointed' | 'count' | 'chain'> {
+export interface Seen extends Pick<Op, 'point' | 'pointed' | 'count' | 'which' | 'chain'> {
   /** The element's HTML, as it would be attached. */
   html: string;
 }

@@ -271,7 +271,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `box` as it's drawn there (measured in the rebuilt page, as the two can lay out a few pixels apart, and what the `Shot` then has; a `render` may answer `{ png, box }`): it rebuilds it in a sandboxed iframe on a blank page of
   the page's origin (Playwright answers it) in a browser launched once (Playwright's Chromium, then Chrome, then
   Edge), and screenshots it. The browser is the window's size and shows its scrollbars (media queries ask the window's
-  width, the layout has what the scrollbar leaves), and the shot is cut to the viewport. Masking options follow rrweb's names and defaults. Optional peers, each imported on
+  width, the layout has what the scrollbar leaves), and the shot is cut to the viewport, scrolled at once (never the page's `scroll-behavior: smooth`). Masking options follow rrweb's names and defaults. Optional peers, each imported on
   first use. `test/rrweb.test.ts` compares a render with the live page by brightness (the iframe's text has no
   colour fringes) and skips without a browser.
 - `src/plugins/annotations/`: marks on the page, page half only, no tab. `index.ts` is the types (`Shape`: box,
@@ -404,6 +404,9 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   nothing else is attached), `at`, `here`, `over`, `record` (what Record does), `submit` (answers whether it was taken,
   which empties it: the tray, the page's marks, the words) and `changed`. `attachedOf` is what's attached as an op or
   an `Answer` sends it. `draft`/`restore` are what's typed and asked for, over `away`.
+  `which.ts`: where one place renders several elements, the op says which (`Op.which`, labels `deictic.nth`, from 1,
+  and `deictic.text`, read back as `Task.which`), and `elementOf(task)` finds it again by its text, then its place
+  among them: what the pins and the drawer outline.
   `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
   root), from the store: each place with an element
   on the page and a task still to do gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along, a dot where one is unread), followed

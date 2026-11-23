@@ -7,12 +7,13 @@
  * which cancels it on the board.
  */
 import { named, tell } from '#src/client/component.ts';
-import { ATTRIBUTE, place } from '#src/client/dom.ts';
+import { place } from '#src/client/dom.ts';
 import type { ClientContext, LightboxItem } from '#src/index.ts';
 
 import { attachedOf, type Composer, COMPOSER_STYLE, composerIn, element, messageOf, PLAY } from './composer.ts';
 import type { Answer, Attached, Listed, Thread } from './index.ts';
 import { OVER, storeOf } from './store.ts';
+import { elementOf } from './which.ts';
 
 const STYLE = `
 .tasks-drawer h3 .unread { padding: 0 6px; border-radius: 8px; font-weight: 700; letter-spacing: 0; color: var(--deictic-on-accent); background: var(--deictic-accent); }
@@ -159,8 +160,6 @@ export function drawerOf(context: ClientContext): TasksDrawer {
   finished.append(finishedCount, finishedRows);
   section.append(element('style', { textContent: STYLE }), heading, rows, finished);
 
-  const elementOf = (task: Listed) =>
-    task.place === undefined ? null : document.querySelector(`[${ATTRIBUTE}="${CSS.escape(task.place)}"]`);
   /** What a task is about, as the caption says an element: by its component where the page has it, else its tag. */
   const about = (task: Listed) => {
     if (task.problem !== undefined) return task.problem === 'setup' ? "deictic's setup" : 'a bug in deictic';

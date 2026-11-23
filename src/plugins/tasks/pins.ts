@@ -8,12 +8,13 @@
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
 import { named, tell } from '#src/client/component.ts';
-import { div, place, reduced } from '#src/client/dom.ts';
+import { div, place, reduced, sameAs } from '#src/client/dom.ts';
 import type { ClientContext, Point } from '#src/index.ts';
 
 import { drawerOf } from './drawer.ts';
 import type { Placed } from './index.ts';
 import { OVER, storeOf } from './store.ts';
+import { elementOf } from './which.ts';
 
 const STYLE = `
 /* No box of its own, which its pins would stack in: each is under the popup, and the one pointed at over it, with its card. */
@@ -136,8 +137,6 @@ export function pinsIn(context: ClientContext): Pins {
   const pins = new Map<string, Pin>();
   let frames = 0;
 
-  const elementAt = (at: string) => document.querySelector(`[data-deictic="${CSS.escape(at)}"]`);
-
   const pinOf = (at: string, el: Element, spot: Point | undefined): Pin => {
     const box = div('pin');
     const badge = Object.assign(document.createElement('button'), { type: 'button', className: 'pin-badge' });
@@ -181,7 +180,12 @@ export function pinsIn(context: ClientContext): Pins {
     if (layer === undefined) return;
     const tasks = store.tasks().filter((t): t is Placed => t.place !== undefined && !OVER.has(t.state));
     // One for an element's tasks, and one of its own for each spot a task is about.
-    const keyOf = (t: Placed) => (t.point === undefined ? t.place : `${t.place}@${t.point.x},${t.point.y}`);
+    // And one for each of several elements from one place, as the page has them now.
+    const keyOf = (t: Placed) => {
+      const el = elementOf(t);
+      const of = el === null ? t.place : `${t.place}#${sameAs(el).indexOf(el)}`;
+      return t.point === undefined ? of : `${of}@${t.point.x},${t.point.y}`;
+    };
     const byPlace = new Map<string, Placed[]>();
     for (const t of tasks) byPlace.set(keyOf(t), [...(byPlace.get(keyOf(t)) ?? []), t]);
     for (const [at, pin] of pins) {
@@ -192,8 +196,9 @@ export function pinsIn(context: ClientContext): Pins {
     for (const [at, list] of byPlace) {
       let pin = pins.get(at);
       if (pin === undefined) {
-        const [{ place: where, point }] = list as [Placed, ...Placed[]];
-        const el = elementAt(where);
+        const [first] = list as [Placed, ...Placed[]];
+        const { place: where, point } = first;
+        const el = elementOf(first);
         if (el === null) continue;
         pin = pinOf(where, el, point);
         pins.set(at, pin);
@@ -211,7 +216,7 @@ export function pinsIn(context: ClientContext): Pins {
     // An element rendered again is another: looked for now and then, not every frame.
     const look = frames++ % 20 === 0;
     for (const pin of pins.values()) {
-      if (!pin.el.isConnected && look) pin.el = elementAt(pin.place) ?? pin.el;
+      if (!pin.el.isConnected && look && pin.tasks[0] !== undefined) pin.el = elementOf(pin.tasks[0]) ?? pin.el;
       const whole = pin.el.getBoundingClientRect();
       // A spot's is a box of no size at the spot: nothing to outline, and the badge's point is on it.
       const r = pin.at === undefined ? whole : new DOMRect(whole.left + pin.at.x, whole.top + pin.at.y, 0, 0);
