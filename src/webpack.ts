@@ -79,9 +79,7 @@ export class DeicticPlugin {
     if (compiler.options.mode !== 'development') return;
     this.#root = this.#options.root ?? compiler.context;
     const browser = forBrowser(compiler.options.target);
-    const client = browser
-      ? writeClient(this.#root, this.#plugins, this.#options.base ?? '/', this.#shortcut, this.#options.view)
-      : undefined;
+    const client = browser ? writeClient(this.#root, this.#plugins, this.#options.base ?? '/', this.#shortcut) : undefined;
     const options: LoaderOptions = { root: this.#root, ...(client === undefined ? {} : { client }) };
     // First, and `pre`, so it sees the source as written whatever the app's own rules do.
     compiler.options.module.rules.unshift({

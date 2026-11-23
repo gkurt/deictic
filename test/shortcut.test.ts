@@ -3,7 +3,6 @@ import { expect, test } from 'bun:test';
 import { tailwind } from '#src/plugins/tailwind/index.ts';
 import { tasks } from '#src/plugins/tasks/index.ts';
 import { checkShortcut, checkShortcuts, gestureOf } from '#src/shortcut.ts';
-import { prepare } from '#src/tools/integration.ts';
 import { checkPlugins } from '#src/tools/plugins.ts';
 import { clientModule } from '#src/vite.ts';
 
@@ -46,13 +45,4 @@ test('starts the overlay with deictic’s own shortcut, and each panel with its 
     `start({ base: "/", shortcut: {"modifiers":["Control"],"button":"right"}, plugins: [{ plugin: p0, ...{} }] });`,
   );
   expect(clientModule([tasks()], '/', false)).toContain(`start({ base: "/", shortcut: undefined, plugins: [{ plugin: p0, ...{} }] });`);
-});
-
-test('starts the overlay in the view the options name, and refuses one that is none', () => {
-  expect(clientModule([tasks()], '/', undefined, undefined, 'spotlight')).toContain(
-    `plugins: [{ plugin: p0, ...{} }], view: "spotlight" });`,
-  );
-  expect(prepare({ view: 'spotlight' }).view).toBe('spotlight');
-  expect(prepare({}).view).toBeUndefined();
-  expect(() => prepare({ view: 'stage' as never })).toThrow(`use 'popup' or 'spotlight'`);
 });

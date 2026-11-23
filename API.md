@@ -70,7 +70,6 @@ React Native isn't supported: there's no DOM to point at.
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt; `false` for none
-  view: 'spotlight', // the page dims around the element; `'popup'` by default
   plugins: recommended({
     tasks: { channel: 'ui', project: 'storefront', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },
@@ -79,22 +78,19 @@ deictic({
 });
 ```
 
-| Option     | What it is                                                                                     |
-| ---------- | ---------------------------------------------------------------------------------------------- |
-| `plugins`  | The plugins to load. None by default.                                                          |
-| `shortcut` | `{ modifiers, button }`: held to outline, pressed to open. Alt and the left button by default. |
-| `view`     | `'popup'`, the default, or `'spotlight'`: how deictic shows itself over the page.              |
+| Option     | What it is                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| `plugins`  | The plugins to load. None by default.                                                        |
+| `shortcut` | `{ modifiers, button }`: held to point, pressed to open. Alt and the left button by default. |
 
-In the `popup` view the element is outlined and the popup opens under it. In the `spotlight` view the page dims
-around the element, which stays lit, with guides from its edges across the window; the popup opens beside it, tied
-to it by a line, and the page gets its light back once the pointer has been out on it a moment. Nothing of either
-takes the pointer from the page. A button in the popup's head switches between them, and the browser keeps what a
-person picked there over the option.
+While the keys are held the page dims around the element pointed at, which stays lit, with guides from its edges
+across the window. The popup opens beside it, tied to it by a line, and the page gets its light back once the
+pointer has been out on it a moment. Nothing of it takes the pointer from the page.
 
-The spotlight view shows the tasks on the page, too. While the shortcut's keys are held, every element with a task
-still to do has a pin on its corner: how many, in the colour of the furthest along. With the Task tab open, a pin
-under the pointer reads its tasks, and a click opens them. The tab itself has the window's height there: each task
-is a card that says its state and reads whole, and they scroll over the field.
+The tasks are on the page, too. While the keys are held, every element with a task still to do has a pin on its
+corner: how many, in the colour of the furthest along. With the Task tab open, a pin under the pointer reads its
+tasks, and a click opens them. The tab has the window's height: each task is a card that says its state and reads
+whole, and they scroll over the field.
 
 `recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
 network, which put the page's console and its requests in a recording. Each takes its
@@ -323,11 +319,9 @@ export default defineClientPlugin<Model, Op>({
   or the page runs other code than the file has): throw it where the plugin needs the source, or go on without, as
   tasks do. Text edits without it are refused.
 - `page: true` on the page half says its tab works on the page as a whole, as annotations' does: while it's shown,
-  nothing marks the element, and the spotlight view leaves the page its light.
-- `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held in the
-  spotlight view, and answers what takes it away: tasks pins each task where its element is. The overlay's host says
-  the view, so a plugin's styles tell them apart: `:host([data-view='spotlight']) .mine { … }`, and `.spot` is on the
-  popup in that view.
+  the element isn't lit, and the page keeps its light.
+- `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held, and
+  answers what takes it away: tasks pins each task where its element is.
 - `context.open(plugin, element)` opens the popup on another element. Not while the open one holds something
   `unsaved`: its button shakes, and it answers false.
 - A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.

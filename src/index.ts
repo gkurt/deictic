@@ -25,12 +25,6 @@ import type { Shortcut } from './shortcut.ts';
 
 export type { Modifier, Shortcut } from './shortcut.ts';
 
-/**
- * How deictic shows itself over the page. `popup`: an outline on the element, and the popup under it. `spotlight`:
- * the page dims around the element, which stays lit, and the popup opens beside it, tied to it by a line.
- */
-export type View = 'popup' | 'spotlight';
-
 /** A place in the source: the file from the project's root, with `/`, and the line and column, from 1. */
 export interface Loc {
   file: string;
@@ -270,13 +264,12 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
   resume?(context: ClientContext): Promise<unknown> | undefined;
   /**
    * Its tab works on the page as a whole, not on the element (drawing on it, as annotations do): while it's shown,
-   * nothing marks the element, and the spotlight view leaves the page its light.
+   * the element isn't lit, and the page keeps its light.
    */
   page?: boolean;
   /**
-   * What it shows on the page while a shortcut's keys are held in the spotlight view, whose page is dimmed to
-   * point on: the tasks plugin pins each task where its element is. Answers what takes it away. Not asked in the
-   * popup view, which draws on the page only what's pointed at.
+   * What it shows on the page while a shortcut's keys are held, and the page is dimmed to point on: the tasks
+   * plugin pins each task where its element is. Answers what takes it away.
    */
   pointing?(context: ClientContext): () => void;
   /** Draws into `panel`, inside deictic's shadow root. Returns what to undo on the page when the panel closes. */

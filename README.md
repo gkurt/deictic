@@ -24,7 +24,7 @@
 
 ## What
 
-Hold **Alt** and point: the element is outlined with its tag and the file and line that rendered it. **Alt-click**,
+Hold **Alt** and point: the page dims around the element, lit with its tag and the file and line that rendered it. **Alt-click**,
 say what should change, and attach a screenshot to draw on, a screen recording or a voice note.
 
 The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a teammate or an agent to work.
@@ -57,7 +57,6 @@ In the config `init` wrote, each plugin takes its options under its name, and `f
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt
-  view: 'spotlight', // dim the page around the element, and pin its tasks where they are
   plugins: recommended({
     tasks: { channel: 'ui', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },

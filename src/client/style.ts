@@ -17,82 +17,77 @@ export const STYLE = `
 }
 /* The host takes no room in the page: everything in it is fixed, so nothing of deictic's moves or scrolls it. */
 :host(deictic-overlay) { display: contents; }
-.box {
+/* What's under the pointer inside the lit element, where that differs. */
+.inner {
   position: fixed;
   display: none;
   z-index: 2147483646;
   pointer-events: none;
   box-sizing: border-box;
-  outline: 2px solid var(--deictic-accent);
-  background: rgb(18 179 88 / 0.1);
+  outline: 1px dashed var(--deictic-accent);
 }
-.box.shown { display: block; }
-.box.inner { outline: 1px dashed var(--deictic-accent); background: none; }
-/* The element the popup is open on: dashed and off it a little, with no fill, so what's tried on it shows as it is. */
-.box.on { outline: 1px dashed var(--deictic-accent); border-radius: 4px; background: none; }
-.label {
-  position: absolute;
-  left: -2px;
-  bottom: 100%;
-  padding: 1px 6px;
-  font: 12px/1.5 ui-monospace, monospace;
-  white-space: nowrap;
-  color: var(--deictic-on-accent);
-  background: var(--deictic-accent);
-}
-.label.below { top: 100%; bottom: auto; }
+.inner.shown { display: block; }
+/* Glass, over a page that's dimmed around what it's about. */
 .panel {
+  --deictic-line: rgb(255 255 255 / 0.14);
   position: fixed;
   z-index: 2147483647;
-  width: min(360px, calc(100vw - 16px));
+  width: min(440px, calc(100vw - 16px));
   max-height: 60vh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  border: 1px solid var(--deictic-line);
-  border-radius: 8px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55), 0 0 56px -12px rgb(18 179 88 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
   font: 13px/1.4 system-ui, sans-serif;
   color: var(--deictic-fg);
-  background: var(--deictic-bg);
+  background: linear-gradient(rgb(39 39 42 / 0.9), rgb(24 24 27 / 0.94));
+  backdrop-filter: blur(24px) saturate(1.8);
 }
-.panel.pinned { position: relative; z-index: auto; max-height: none; }
-@media (prefers-reduced-motion: no-preference) {
-  .panel:not(.pinned) { animation: deictic-in 0.12s ease-out; }
-}
+.panel.pinned { position: relative; z-index: auto; width: min(440px, 100%); max-height: none; }
 @keyframes deictic-in {
   from { opacity: 0; translate: 0 4px; }
 }
 .head {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 2px;
-  padding: 4px 8px 0;
+  padding: 8px 8px 6px;
 }
 /* Over the page the head is what the popup is dragged by; no touch scrolling starts there. */
 .panel:not(.pinned) .head { cursor: grab; touch-action: none; user-select: none; }
 .panel.dragging .head, .panel.dragging .head button { cursor: grabbing; }
 .head .tab {
+  position: relative;
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 4px 8px;
+  border-radius: 8px;
+  padding: 4px 10px;
   font-weight: 600;
   color: var(--deictic-muted);
 }
 .head .tab:hover { color: var(--deictic-fg); }
 .head .tab[aria-selected='true'] { color: var(--deictic-fg); }
-/* Under the shown tab, and slid to the next one shown. */
-.head .thumb { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--deictic-accent); pointer-events: none; }
-.head .end { display: flex; gap: 2px; margin: 0 0 3px auto; }
+/* A pill behind the shown tab, slid to the next one shown. */
+.head .thumb {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 6px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  pointer-events: none;
+}
+.head .end { margin-left: auto; }
 .bar {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 8px;
-  border-top: 1px solid var(--deictic-line);
-  border-bottom: 1px solid var(--deictic-line);
+  padding: 0 10px 8px 12px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
 }
 .bar .where {
   display: inline-flex;
@@ -105,12 +100,12 @@ export const STYLE = `
   text-decoration: none;
 }
 .bar .where span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar .where .tag { display: none; }
+.bar .where .tag { flex: none; color: var(--deictic-accent); }
 .bar .where svg { flex: none; }
 .bar .where:hover, .bar .where:focus-visible { color: var(--deictic-fg); }
 .bar .where:hover span { text-decoration: underline; }
 .bar .absent { flex: none; margin-right: 6px; font-size: 12px; color: var(--deictic-muted); }
-/* The spotlight view (lighting.ts): the page dims around the element, by a shadow far wider than any window. */
+/* The page dims around the element (lighting.ts), by a shadow far wider than any window. */
 .veil {
   position: fixed;
   z-index: 2147483644;
@@ -181,35 +176,6 @@ export const STYLE = `
   outline: 2px solid var(--deictic-accent);
   animation: deictic-pulse 0.5s ease-out forwards;
 }
-.panel.spot {
-  --deictic-line: rgb(255 255 255 / 0.14);
-  width: min(440px, calc(100vw - 16px));
-  border-color: rgb(255 255 255 / 0.1);
-  border-radius: 14px;
-  background: linear-gradient(rgb(39 39 42 / 0.9), rgb(24 24 27 / 0.94));
-  backdrop-filter: blur(24px) saturate(1.8);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55), 0 0 56px -12px rgb(18 179 88 / 0.35),
-    inset 0 1px 0 rgb(255 255 255 / 0.08);
-}
-.panel.spot.pinned { width: min(440px, 100%); }
-.spot .head { align-items: center; padding: 8px 8px 6px; }
-.spot .head .tab { position: relative; padding: 4px 10px; border: 0; border-radius: 8px; }
-/* A pill behind the shown tab, in place of the line under it. */
-.spot .head .thumb {
-  top: 8px;
-  bottom: 6px;
-  height: auto;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 0.1);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-}
-.spot .head .end { margin-bottom: 0; }
-.spot .bar { padding: 0 10px 8px 12px; border-top: 0; border-bottom-color: rgb(255 255 255 / 0.08); }
-.spot .bar .where .tag { display: inline; flex: none; color: var(--deictic-accent); }
-.spot .body { padding: 12px; }
-.spot .status { padding: 0 12px 10px; }
-.spot input, .spot textarea { border-radius: 6px; background: rgb(0 0 0 / 0.35); }
-.spot button.primary { box-shadow: 0 4px 16px -4px rgb(18 179 88 / 0.6); }
 @media (prefers-reduced-motion: no-preference) {
   .head .thumb.moves { transition: left 0.22s cubic-bezier(0.3, 0.7, 0.2, 1), width 0.22s cubic-bezier(0.3, 0.7, 0.2, 1); }
   /* The light goes from one element to the next, not out and on again. */
@@ -222,7 +188,7 @@ export const STYLE = `
       width 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), height 0.24s cubic-bezier(0.3, 0.7, 0.2, 1), border-radius 0.24s;
   }
   .aim.glide .guide { transition: translate 0.24s cubic-bezier(0.3, 0.7, 0.2, 1); }
-  .panel.spot:not(.pinned) { animation: deictic-rise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards; }
+  .panel:not(.pinned) { animation: deictic-rise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards; }
   /* Once, as the popup opens: the line drawn out to the popup, with a light along it. */
   .lit .tether, .lit path.halo { stroke-dasharray: 1; animation: deictic-draw 0.4s 0.1s ease-out backwards; }
   .lit .flow { stroke-dasharray: 0.14 1; animation: deictic-flow 0.8s 0.45s ease-out; }
@@ -358,22 +324,27 @@ button.icon {
 }
 button.icon svg { width: 14px; height: 14px; }
 button.icon:hover:not(:disabled) { color: var(--deictic-fg); background: rgb(255 255 255 / 0.08); }
-button.primary { background: var(--deictic-accent); border-color: var(--deictic-accent); color: var(--deictic-on-accent); }
+button.primary {
+  background: var(--deictic-accent);
+  border-color: var(--deictic-accent);
+  color: var(--deictic-on-accent);
+  box-shadow: 0 4px 16px -4px rgb(18 179 88 / 0.6);
+}
 input, textarea {
   box-sizing: border-box;
   width: 100%;
   font: 12px ui-monospace, monospace;
   color: inherit;
-  background: #09090b;
+  background: rgb(0 0 0 / 0.35);
   border: 1px solid var(--deictic-line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 4px 6px;
 }
 input:focus, textarea:focus { outline: 1px solid var(--deictic-accent); }
 code { font: 12px ui-monospace, monospace; }
 /* Border-box, as the popup holds the body's height by its whole box while a tab reads. */
-.body { box-sizing: border-box; padding: 8px; overflow: auto; }
-.status { padding: 0 8px 6px; font-size: 12px; color: var(--deictic-muted); }
+.body { box-sizing: border-box; padding: 12px; overflow: auto; }
+.status { padding: 0 12px 10px; font-size: 12px; color: var(--deictic-muted); }
 .status:empty { display: none; }
 .status.problem { color: var(--deictic-problem); }
 `;

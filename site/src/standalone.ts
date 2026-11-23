@@ -208,7 +208,7 @@ const standalone: Standalone = async (request) => {
   const route = url.pathname.slice(url.pathname.indexOf(PREFIX) + PREFIX.length);
   // A plugin's own route: `plugins/<name>/<route>`, and what it's about after that.
   const [, of, asked, id] = /^plugins\/(\w+)\/(\w+)(?:\/([\w-]+))?$/.exec(route) ?? [];
-  // The tasks plugin's `page`: every task kept here with its place, for the spotlight view's pins.
+  // The tasks plugin's `page`: every task kept here with its place, for the pins.
   if (of === 'tasks' && asked === 'page')
     return Response.json({ tasks: [...tasks].flatMap(([place, list]) => list.map((task) => ({ ...task, place }))) });
   if (of === 'screenshots' && asked === 'add') return keepShot(request);

@@ -1,6 +1,6 @@
 /**
- * The page's tasks, each pinned where its element is: what the spotlight view shows of them on the page itself, where
- * the popup view has only its list. A pin is the element's outline, faint, and a badge on its corner with how many
+ * The page's tasks, each pinned where its element is: what's shown of them on the page itself, beside the Task
+ * tab's list of one element's. A pin is the element's outline, faint, and a badge on its corner with how many
  * tasks are still to do there, in the colour of the furthest along. They show while a shortcut's keys are held, to see
  * and no more (the pointer goes through them, to the element), and while the Task tab is open, where a pin under
  * the pointer reads its tasks and a click opens them.
@@ -15,8 +15,6 @@ import type { Placed } from './index.ts';
 const STYLE = `
 /* No box of its own, which its pins would stack in: each is under the popup, and the one pointed at over it, with its card. */
 .pins { display: contents; font: 12px/1.4 system-ui, sans-serif; color: var(--deictic-fg); }
-/* The popup view leaves the page as it is. */
-:host(:not([data-view='spotlight'])) .pins { display: none; }
 .pin { --pin: var(--deictic-accent); position: fixed; z-index: 2147483646; box-sizing: border-box; pointer-events: none; border: 1px solid color-mix(in srgb, var(--pin) 45%, transparent); border-radius: 6px; transition: border-color 0.15s, box-shadow 0.15s; }
 .pin.claimed { --pin: #60a5fa; }
 .pin.blocked { --pin: #fbbf24; }
@@ -140,9 +138,6 @@ export function pinsIn(context: ClientContext): Pins {
   let asked = 0;
   const pins = new Map<string, Pin>();
   let frames = 0;
-  // Only the spotlight view shows them: in the popup view nothing is asked or followed, until a switch.
-  const lit = () => context.root.host.getAttribute('data-view') === 'spotlight';
-  let was = false;
 
   const elementAt = (at: string) => document.querySelector(`[data-deictic="${CSS.escape(at)}"]`);
 
@@ -265,17 +260,11 @@ export function pinsIn(context: ClientContext): Pins {
       context.root.append(layer);
       frame = requestAnimationFrame(function each() {
         frame = requestAnimationFrame(each);
-        const now = lit();
-        if (now && !was) load();
-        was = now;
-        if (now) follow();
+        follow();
       });
     }
     layer.classList.toggle('passive', open === undefined);
-    was = lit();
-    if (was) load(again);
-    // A change made in the popup view is read when the pins next show.
-    else if (again) read = 0;
+    load(again);
   };
 
   const shown: Pins = {

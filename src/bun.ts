@@ -36,7 +36,7 @@ export type DeicticBunPlugin = BunPlugin & {
 
 export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
   // Now, so a wrong set of plugins stops the dev server as it starts, rather than the page.
-  const { plugins, shortcut, view } = prepare(options);
+  const { plugins, shortcut } = prepare(options);
   const root = resolve(options.root ?? process.cwd());
   let handle: ((req: Request) => Promise<Response | undefined>) | undefined;
   const route = async (req: Request) => {
@@ -63,7 +63,7 @@ export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
     setup(build) {
       // A build names its entry points; the dev server's bundler doesn't.
       if ('entrypoints' in build.config) return;
-      const client = writeClient(root, plugins, '/', shortcut, view);
+      const client = writeClient(root, plugins, '/', shortcut);
       // Bun names the side it loads a module for (undocumented, and not in Bun's types); the dev server's is the browser's.
       const forBrowser = (args: object) => !('side' in args) || args.side === 'client';
       build.onLoad({ filter: JSX }, async (args) => {

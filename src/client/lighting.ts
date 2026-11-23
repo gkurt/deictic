@@ -1,13 +1,11 @@
 /**
  * What the overlay draws on the page itself: the element under the pointer while a shortcut's keys are held, and
- * the one the popup is open on. One way for each view (`View`, in `src/index.ts`).
+ * the one the popup is open on.
  *
- * `outlines` is the popup's: a box with its label, and a dashed one while the popup is open.
- *
- * `spotlight` uses the whole page: it dims around the element, which stays lit in a ring, with guides from its
- * edges across the window and a caption saying what it is. The light glides from one element to the next. While the
- * popup is open the element stays lit, tied to the popup by a line that follows both. Nothing here takes the
- * pointer, and the page comes back to full light once the pointer has been out on it a moment.
+ * It uses the whole page: it dims around the element, which stays lit in a ring, with guides from its edges across
+ * the window and a caption saying what it is. The light glides from one element to the next. While the popup is
+ * open the element stays lit, tied to the popup by a line that follows both. Nothing here takes the pointer, and
+ * the page comes back to full light once the pointer has been out on it a moment.
  */
 import type { Target } from '#src/index.ts';
 
@@ -34,65 +32,13 @@ export interface Lighting {
   hold(element: Element, panel: HTMLElement): () => void;
 }
 
-/** How far from the element its mark is drawn while the popup is open, in pixels. */
-const ROOM = 4;
 /**
- * How far from the element the spotlight's ring is, in pixels: farther than the popup view's dashes, as the ring
- * glows, and a border, an outline or a ring tried on the element has to show apart from it.
+ * How far from the element its ring is, in pixels: the ring glows, and a border, an outline or a ring tried on the
+ * element has to show apart from it.
  */
 export const CLEAR = 8;
 
-const grown = (r: DOMRect, by = ROOM) => new DOMRect(r.left - by, r.top - by, r.width + 2 * by, r.height + 2 * by);
-
-export function outlines(root: ShadowRoot): Lighting {
-  const box = div('box');
-  const label = div('label');
-  box.append(label);
-  // What's under the pointer, outlined inside the marked element around it when they differ.
-  const inner = div('box inner');
-  root.append(box, inner);
-  return {
-    point({ el, pointed, target, names, count }) {
-      const r = el.getBoundingClientRect();
-      place(box, r);
-      inner.classList.toggle('shown', pointed !== undefined);
-      if (pointed !== undefined) place(inner, pointed.getBoundingClientRect());
-      const within = pointed === undefined ? '' : ` › ${nameOf(pointed)}`;
-      label.textContent = `${names.join(' / ')} · <${target.tag}> ${target.loc.file}:${target.loc.line}${count > 1 ? ` · ×${count}` : ''}${within}`;
-      label.classList.toggle('below', r.top < 24);
-      box.classList.add('shown');
-    },
-    hide() {
-      box.classList.remove('shown');
-      inner.classList.remove('shown');
-    },
-    /**
-     * Dashed, with no fill and a little room around the element, so nothing of it is drawn on: a border, a ring or
-     * a colour tried on it shows as it is. Read each frame, as the element moves with the page's scrolling, its
-     * layout and what a panel previews on it.
-     */
-    hold(element) {
-      const on = div('box on');
-      root.append(on);
-      let frame = 0;
-      let was = '';
-      const follow = () => {
-        frame = requestAnimationFrame(follow);
-        const r = element.getBoundingClientRect();
-        const now = element.isConnected ? `${r.left},${r.top},${r.width},${r.height}` : '';
-        if (now === was) return;
-        was = now;
-        on.classList.toggle('shown', now !== '');
-        place(on, grown(r));
-      };
-      follow();
-      return () => {
-        cancelAnimationFrame(frame);
-        on.remove();
-      };
-    },
-  };
-}
+const grown = (r: DOMRect) => new DOMRect(r.left - CLEAR, r.top - CLEAR, r.width + 2 * CLEAR, r.height + 2 * CLEAR);
 
 /** How long the pointer is out on the page, in milliseconds, before the page gets its light back. */
 const LINGER = 700;
@@ -152,7 +98,7 @@ export function spotlight(root: ShadowRoot): Lighting {
   const caption = div('caption');
   ring.append(caption);
   const guides = { left: div('guide gx'), right: div('guide gx'), top: div('guide gy'), bottom: div('guide gy') };
-  const inner = div('box inner');
+  const inner = div('inner');
   aim.append(...Object.values(guides), ring);
   root.append(veil, aim, inner);
 
@@ -177,7 +123,7 @@ export function spotlight(root: ShadowRoot): Lighting {
     point({ el, pointed, target, names, count }, glide = true) {
       pointing = true;
       const box = el.getBoundingClientRect();
-      const r = grown(box, CLEAR);
+      const r = grown(box);
       const radius = radiusOf(el, r);
       aim.classList.toggle('glide', glide && aim.classList.contains('shown'));
       place(ring, r);
@@ -243,7 +189,7 @@ export function spotlight(root: ShadowRoot): Lighting {
       const follow = () => {
         frame = requestAnimationFrame(follow);
         const on = element.isConnected;
-        const e = grown(element.getBoundingClientRect(), CLEAR);
+        const e = grown(element.getBoundingClientRect());
         const p = panel.getBoundingClientRect();
         const now = on ? [e.left, e.top, e.width, e.height, p.left, p.top, p.width, p.height].join() : '';
         if (now === was) return;

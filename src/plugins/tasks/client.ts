@@ -35,47 +35,65 @@ import type { Change, Marks, Model, Op, Task, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
 
 const STYLE = `
-/* The column is no wider than the panel: an \`auto\` one grows to a long title, which then never truncates. */
-.tasks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-/* Five rows, and the rest scrolled to: the field stays where it is however many there are. */
-.tasks { max-height: 112px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--deictic-line) transparent; }
-/* A task's words being changed need the room. */
-.tasks:has(.editing) { max-height: none; }
-.tasks li { position: relative; display: flex; gap: 6px; align-items: baseline; }
-.tasks .title { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Clicked, a task reads whole, as it was typed. */
-.tasks li.whole .title { white-space: pre-wrap; overflow-wrap: anywhere; }
-.tasks .title .all, .tasks li.whole .title .first, .tasks .says { display: none; }
-.tasks li.whole .title .all { display: inline; }
-/* The state is a dot, named by its tooltip: a ring while no one has it, filled once someone does or it's over. */
-.tasks .state { flex: none; align-self: center; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
-/* Room for Edit and Delete, which would lie over the first line's end. */
-.tasks li.whole:has(.acts) .title { padding-right: 40px; }
-.tasks li.whole .state { align-self: baseline; }
+/*
+ * The panel has the window's height, so the tasks aren't a few lines of a list: each is a card that says its state
+ * and reads whole, and they scroll over the field, which stays where it is.
+ */
+.body:has(> .thread) { display: flex; flex-direction: column; }
+.thread { flex: 0 1 auto; min-height: 0; margin: -12px -12px 0; padding: 12px 12px 0; overflow-y: auto; scrollbar-width: thin; }
+/* Never squeezed out by the field: a window too low for both scrolls the panel. */
+.thread:has(> .tasks li, .more[open] li) { min-height: 84px; }
+.compose { flex: none; }
+/* The column is no wider than the panel: an \`auto\` one grows to a long word, which then never wraps. */
+.tasks { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.tasks:empty { margin: 0; }
+.tasks li {
+  display: grid;
+  grid-template: 'state says place acts id' auto 'text text text text text' auto / auto minmax(0, 1fr) auto auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.04);
+}
+.tasks li:hover, .tasks li:focus-within { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
+/* The state is a dot and its name: a ring while no one has it, filled once someone does or it's over. */
+.tasks .state { grid-area: state; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--deictic-muted); }
 .tasks .state.waiting { border-style: dotted; }
 .tasks .state.claimed { border-color: #60a5fa; background: #60a5fa; }
 .tasks .state.blocked { border-color: #fbbf24; background: #fbbf24; }
 .tasks .state.completed { border-color: #4ade80; background: #4ade80; }
 .tasks .state.failed { border-color: var(--deictic-problem); background: var(--deictic-problem); }
+.tasks .says { grid-area: says; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--deictic-muted); }
+.tasks .says.claimed { color: #60a5fa; }
+.tasks .says.blocked { color: #fbbf24; }
+.tasks .says.completed { color: #4ade80; }
+.tasks .says.failed { color: var(--deictic-problem); }
 .tasks a { color: inherit; text-decoration: none; }
 .tasks a:hover { text-decoration: underline; }
-/* Over the row's end, and only while the row is pointed at or focused in: the title keeps the width. */
-.tasks .acts { position: absolute; inset: 0 0 auto auto; min-height: 18px; display: none; align-items: center; padding-left: 14px; background: linear-gradient(to right, transparent, var(--deictic-bg) 12px); }
-.tasks li:hover .acts, .tasks li:focus-within .acts { display: flex; }
+.tasks li > a, .tasks li > code { grid-area: id; color: var(--deictic-muted); }
+.tasks .place { grid-area: place; padding: 0; border: 0; font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
+.tasks button.place:hover { color: var(--deictic-fg); text-decoration: underline; }
+.tasks .title { grid-area: text; padding: 0; border: 0; border-radius: 0; text-align: left; font-size: 13px; line-height: 1.45; }
+/* A few lines of it, as it was typed, and all of it once clicked. */
+.tasks .title span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tasks li.whole .title span { display: block; }
+/* In the card's first line: there all along, and plain once the card is pointed at or focused in. */
+.tasks .acts { grid-area: acts; display: flex; opacity: 0; }
+.tasks li:hover .acts, .tasks li:focus-within .acts { opacity: 1; }
 .tasks .act { display: inline-flex; padding: 2px; border: 0; color: var(--deictic-muted); }
 .tasks .act:hover { color: var(--deictic-fg); }
 .tasks .act svg { width: 12px; height: 12px; }
-.tasks .place { flex: none; padding: 0; border: 0; font: 11px ui-monospace, monospace; color: var(--deictic-muted); }
-.tasks button.place:hover { color: var(--deictic-fg); text-decoration: underline; }
-.more { margin: 0 0 8px; }
+.more { margin: 0 0 10px; }
 .more[hidden] { display: none; }
 .more summary { cursor: pointer; font-size: 12px; color: var(--deictic-muted); }
 .more summary:hover { color: var(--deictic-fg); }
-.more .tasks { margin: 4px 0 0; }
-.tasks li.editing { display: grid; }
+.more .tasks { margin: 8px 0 0; }
+.tasks li.editing { grid-template: none / minmax(0, 1fr); }
 .tasks li.editing .row { margin-top: 0; }
 .tasks li.editing .actions { display: flex; gap: 6px; }
-textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-serif; }
+textarea { min-height: 76px; resize: vertical; font: 13px/1.4 system-ui, sans-serif; }
 .row { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; align-items: center; }
 /* Cut short before it pushes Add out: a channel's name and its watchers' may be long. */
 .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--deictic-muted); font-size: 12px; }
@@ -102,48 +120,6 @@ textarea { min-height: 64px; resize: vertical; font: 13px/1.4 system-ui, sans-se
 .shot-problem { margin-top: 4px; font-size: 12px; color: var(--deictic-problem); }
 .shot-problem:empty { display: none; }
 .shot[hidden], .chips[hidden], label[hidden] { display: none; }
-/*
- * The spotlight view has the window's height for the panel, so the tasks aren't five lines of a list: each is a card
- * that says its state and reads whole, and they scroll over the field, which stays where it is.
- */
-.spot .body:has(> .thread) { display: flex; flex-direction: column; }
-.spot .thread { flex: 0 1 auto; min-height: 0; margin: -12px -12px 0; padding: 12px 12px 0; overflow-y: auto; scrollbar-width: thin; }
-/* Never squeezed out by the field: a window too low for both scrolls the panel. */
-.spot .thread:has(li) { min-height: 84px; }
-.spot .compose { flex: none; }
-.spot .tasks { max-height: none; overflow: visible; gap: 8px; margin-bottom: 10px; }
-.spot .tasks:empty { margin: 0; }
-.spot .tasks li {
-  display: grid;
-  grid-template: 'state says place acts id' auto 'text text text text text' auto / auto minmax(0, 1fr) auto auto auto;
-  gap: 6px 8px;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 0.04);
-}
-.spot .tasks li:hover, .spot .tasks li:focus-within { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
-.spot .tasks .state, .spot .tasks li.whole .state { grid-area: state; align-self: center; }
-.spot .tasks .says { grid-area: says; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--deictic-muted); }
-.spot .tasks .says.claimed { color: #60a5fa; }
-.spot .tasks .says.blocked { color: #fbbf24; }
-.spot .tasks .says.completed { color: #4ade80; }
-.spot .tasks .says.failed { color: var(--deictic-problem); }
-.spot .tasks li > a, .spot .tasks li > code { grid-area: id; color: var(--deictic-muted); }
-.spot .tasks .place { grid-area: place; }
-.spot .tasks .title, .spot .tasks li.whole:has(.acts) .title { grid-area: text; padding: 0; white-space: normal; overflow: visible; font-size: 13px; line-height: 1.45; }
-.spot .tasks .title .first { display: none; }
-/* A few lines of it, and all of it once clicked. */
-.spot .tasks .title .all { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
-.spot .tasks li.whole .title .all { display: block; }
-/* In the card's first line, where there's the room: there all along, and plain once the card is pointed at. */
-.spot .tasks .acts { grid-area: acts; position: static; display: flex; min-height: 0; padding: 0; background: none; opacity: 0; }
-.spot .tasks li:hover .acts, .spot .tasks li:focus-within .acts { opacity: 1; }
-.spot .tasks li.editing { grid-template: none / minmax(0, 1fr); }
-.spot .more { margin-bottom: 10px; }
-.spot .more .tasks { margin: 8px 0 0; }
-.spot textarea { min-height: 76px; }
 `;
 
 const ICON = (path: string) =>
@@ -318,7 +294,7 @@ function chainOf(el: Element, file: string): NonNullable<Op['chain']> {
 /** What's sent of the element's HTML at most, in characters: the server attaches it as a file. */
 const HTML = 100_000;
 
-/** The overlay's own green, as its outline of the element while the popup is open. */
+/** The overlay's own green, as its ring on the element while the popup is open. */
 const OUTLINE = '#12b358';
 /** CSS pixels between the element and its outline, so the dashes are on nothing of the element's. */
 const ROOM = 3;
@@ -386,7 +362,7 @@ export default defineClientPlugin<Model, Change>({
   label: 'Task',
   // All the panel leaves for is a recording, which a page load doesn't end.
   resume: ({ use }) => use('recordings')?.going(),
-  // The page's tasks, where they are, while the spotlight view points.
+  // The page's tasks, where they are, while it's pointed on.
   pointing: (context) => pinsIn(context).glance(),
   mount: (panel, context) => {
     const style = element('style', { textContent: STYLE });
@@ -406,14 +382,14 @@ export default defineClientPlugin<Model, Change>({
     const closedCount = element('summary');
     const ended = element('ul', { className: 'tasks' });
     closed.append(closedCount, ended);
-    // What's there, and what's being added: apart, as the spotlight view scrolls the one over the other.
+    // What's there, and what's being added: apart, as the one scrolls over the other.
     const thread = element('div', { className: 'thread' });
     thread.append(list, closed, fold);
     const compose = element('div', { className: 'compose' });
     compose.append(text);
     panel.append(style, thread, compose);
-    // The page's other tasks, pinned where they are (the spotlight view shows them): not for a popup a page shows in
-    // place, which is in a root of its own.
+    // The page's other tasks, pinned where they are: not for a popup a page shows in place, which is in a root of
+    // its own.
     const around = panel.getRootNode() === context.root ? pinsIn(context).around(context.element) : undefined;
 
     const shots = context.use('screenshots');
@@ -741,21 +717,17 @@ export default defineClientPlugin<Model, Change>({
         });
         hint.append(' · ', who);
       }
-      /** A task's row: its state, its ID, a link where it has a page, its title, and where it's from when that's said. */
+      /** A task's card: its state, its ID, a link where it has a page, its words, and where it's from when that's said. */
       const rowOf = (t: Task, from?: HTMLElement) => {
         const item = element('li');
         const says = t.by === undefined ? t.state : `${t.state} by ${t.by}`;
-        const state = element('span', { className: `state ${t.state}`, title: says });
-        state.role = 'img';
-        // The state in words, where a view has the room for them: the dot's tooltip says it in the other.
-        const said = element('span', { className: `says ${t.state}`, textContent: says, ariaHidden: 'true' });
+        // The dot is the words beside it again, in a colour: nothing to read out.
+        const state = element('span', { className: `state ${t.state}`, ariaHidden: 'true' });
+        const said = element('span', { className: `says ${t.state}`, textContent: says });
         const id = element('code', { textContent: `#${t.id}` });
         const title = element('button', { type: 'button', className: 'title' });
-        // Its first line and all of it: the view shows one, and a click the whole.
-        title.append(
-          element('span', { className: 'first', textContent: t.title }),
-          element('span', { className: 'all', textContent: t.text }),
-        );
+        // In a box of its own: a button's doesn't cut its lines short.
+        title.append(element('span', { textContent: t.text }));
         // In place, not by drawing the list again: that would take a task's words being changed with it.
         const show = () => {
           const all = whole.has(t.id);
@@ -831,8 +803,6 @@ export default defineClientPlugin<Model, Change>({
           return item;
         }),
       );
-      if (grew) list.scrollTop = list.scrollHeight;
-      // In the spotlight view it's the thread that scrolls, the list in it as long as it is.
       if (grew) thread.scrollTop = thread.scrollHeight;
       able();
       mark();

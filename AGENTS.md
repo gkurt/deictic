@@ -42,11 +42,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
   record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
-- `View` (`src/index.ts`), `'popup'` or `'spotlight'`: how the overlay shows itself, `deictic({ view })`, `'popup'` by
-  default. `prepare` refuses any other, and `clientModule` and `writeClient` hand it to `start`. A `ClientPlugin` with
-  `page: true` (annotations) has a tab that works on the page, not the element: while it's shown, nothing marks the element.
-  One with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held in the spotlight view, and
-  answers what takes it away. The overlay's host says the view (`data-view`), for a plugin's styles: `:host([data-view='spotlight'])`.
+- A `ClientPlugin` with `page: true` (annotations) has a tab that works on the page, not the element: while it's
+  shown, the element isn't lit and the page keeps its light. One with `pointing(context)` (tasks) draws on the page
+  while a shortcut's keys are held, and answers what takes it away.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -132,13 +130,14 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
 - `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with.
-- `src/client/lighting.ts`: what's drawn on the page itself, one `Lighting` per view: `point` (what's under the pointer
-  while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel)` (the
-  popup's element, for as long as it's open). `outlines` is the popup view's: the box and its label, and `.box.on`.
-  `spotlight` dims the page around the element with one shadow (`.veil`, under annotations' marks), and draws a ring,
-  guides from its edges across the window and a caption (`.aim`); the light glides from one element to the next, by
-  CSS transitions that only `.glide` turns on. Held, the ring and the line to the popup are SVG strokes (`.lit`,
-  followed each frame; `CLEAR` pixels off the element, more than the popup view's dashes, so a border tried on it shows apart from the ring; the line is drawn out with a light along it, CSS, once), with wide faint strokes
+- `src/client/lighting.ts`: what's drawn on the page itself, `spotlight(root)`, a `Lighting`: `point` (what's under
+  the pointer while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel)`
+  (the popup's element, for as long as it's open). It dims the page around the element with one shadow (`.veil`, under
+  annotations' marks), and draws a ring, guides from its edges across the window and a caption (`.aim`); what's under
+  the pointer inside the element, where it differs, is dashed (`.inner`). The light glides from one element to the
+  next, by CSS transitions that only `.glide` turns on. Held, the ring and the line to the popup are SVG strokes (`.lit`,
+  followed each frame; `CLEAR` pixels off the element, so a border tried on it shows apart from the ring; the line is
+  drawn out with a light along it, CSS, once), with wide faint strokes
   for a glow and no filter; the veil is `.lifted` once the pointer has been out of the overlay for `LINGER`. Its
   classes share the root with every plugin's: name a new one that no plugin's styles have (`.chip` and `.stage` are theirs).
 - `src/client/lightbox.ts`: `openLightbox(root, items, { at, from })`, offered to panels as `context.lightbox`: an
@@ -156,10 +155,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   under the control, kept on screen. Set `title`, never draw a tooltip of a panel's own.
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
   first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
-  Outlines the marked element under the pointer while a shortcut's keys are held, and opens the popup on
+  Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
   tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. While it's open over the page its element
-  stays outlined (`.box.on`: dashed, `ROOM` pixels off it and with no fill, so nothing is drawn on the element; followed each frame), keys typed in it stop at the host, so the page's own
+  stays lit (nothing is drawn on the element itself; followed each frame), keys typed in it stop at the host, so the page's own
   shortcuts don't run on them, and its Esc is kept from the page. It follows its element as the page moves it
   (`keepInView`, read each frame) until it's dragged by its head, and then stays where it's put, in the window. A press on the page outside it closes it, unless the shown panel
   said `unsaved`: then its button shakes, the popup stays, and no shortcut or `openPopup` opens another over it
@@ -170,12 +169,10 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   shadow roots (not the overlay's): the target is the nearest marked element around what's under the pointer,
   out through hosts, and what's under it, where it differs, is dashed and given to the panel as `pointed`
   (a task names its path and HTML). On an element that's not on the page (back from `away`, where the page moved on or
-  another loaded) it opens in the middle, nothing outlined, its bar saying `not on this page`. The view (`start`'s
-  `view`, or the one kept in `localStorage` `deictic:view`) picks the `Lighting` and the popup's skin (`.panel.spot`:
-  glass, wider, its tabs pills, the tag in its bar); in the spotlight view `keepInView` puts it to the element's right
-  or left where there's room (`APART` from it, level with its top), else below or above. The head's view button switches
-  in place: the tab, its draft and where the popup was dragged are kept, and the element is held by the other `Lighting`.
-  The shown tab is marked by `.thumb`, slid to the next: a line under it, a pill behind it in the spotlight. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
+  another loaded) it opens in the middle, nothing lit, its bar saying `not on this page`. The popup is
+  glass, its tabs pills, the tag in its bar; `keepInView` puts it to the element's right or left where there's room
+  (`APART` from it, level with its top, as tall as the window lets it be), else below or above.
+  The shown tab is marked by `.thumb`, a pill behind it, slid to the next. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
   homepage demo's plain click). As it opens over the page and as it closes, the page hears `deictic:open`
   (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
   `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a
@@ -299,21 +296,21 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `{ edit: id, text }` (the words before the `---`, with the message's revision, undone by writing the old text back
   unless it was edited since) or `{ remove: id }` (canceled, which a board never reopens, so the record keeps the task
   whole and undo adds it again under a new ID). Both only for an open task of the channel's with `deictic.at`.
-  `pins.ts` is the page's tasks where they are, the spotlight view's only (`pinsIn(context)`, one set per overlay
+  `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
   root): the `page` route answers every task still to do with its `place` (`Placed`), and each place with an element
   on the page gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along), followed
   each frame. `glance()` shows them while pointing (`pointing`), the pointer going through them; `around(element)`
   while the Task tab is open over the page, without that element's, where a badge under the pointer shows a card of
   its tasks and a click opens them (`context.open`, which a draft refuses). A pin has no layer to stack in: each is
-  fixed under the popup, and the one pointed at over it. In that view the tab's tasks are cards (`.spot .tasks li`:
-  the state in words, the text whole to four lines) in `.thread`, which scrolls over `.compose`, the field and what's
-  attached; the popup view has the same markup as five rows of a list.
+  fixed under the popup, and the one pointed at over it. The tab's own tasks are cards (`.tasks li`:
+  the state as a dot and in words, the text whole to four lines and all of it once clicked) in `.thread`, which scrolls
+  over `.compose`, the field and what's attached.
   `client.ts` is the Task tab: each listed task's ID is a link, and an open one has Edit (a field in its place, a
-  `data-deictic-modal` so Esc is its) and Delete, drawn over the row's end while it's pointed at or focused in. The list
-  is five rows high and scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
+  `data-deictic-modal` so Esc is its) and Delete, in its card's first line, plain while the card is pointed at or focused in. The thread
+  scrolls, at its latest; beside the channel, who watches it (`Model.watching`, a dot and `claude watching`, or `no agent watching`:
   `watchers.ts` writes (`watcherAt`, for `deictic watch`) and reads the files a watch keeps under `.deictic/watchers` while it runs, a name, channel and time
   each, written again every 20s and dropped a minute old, as a board can't say who listens, and `agentsOf` adds whoever holds a claim on a task of the channel's that isn't a person, named by the board's `actors()`, so `TaskBoard` has it; empty only for a board of this machine's own, left out for another with none); completed and failed tasks are folded under "N closed". A row starts with its
-  state as a dot (a ring while no one has it, filled once claimed, blocked or over; named by its tooltip, with who holds it while it's claimed, `claimed by claude`: `Task.by`), and its title is a
+  state as a dot (a ring while no one has it, filled once claimed, blocked or over; and the state in words beside it, with who holds it while it's claimed, `claimed by claude`: `Task.by`), and its words are a
   button that shows the task's whole text in place. With
   screenshots loaded it attaches a shot: the op names it, `apply` uploads it to the board
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
