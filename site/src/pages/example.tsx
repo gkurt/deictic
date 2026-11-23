@@ -1,5 +1,4 @@
-import type { TaskAdded } from 'deictic/tasks';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { cn } from '#src/cn.ts';
 
@@ -51,62 +50,12 @@ function Plan({ name, price, perks, chosen, onChoose }: (typeof plans)[number] &
 
 function Guide() {
   return (
-    <aside className="rounded-xl border border-signal/30 bg-signal/10 p-5 text-sm">
+    <aside className="rounded-xl border border-signal/30 bg-signal/10 px-5 py-4 text-sm">
       <h2 className="font-semibold">Try it on this page</h2>
-      <p className="mt-3">
-        <Kbd>Alt</Kbd> + click to add a task, with annotations, recordings and voice notes.
+      <p className="mt-2">
+        <Kbd>Alt</Kbd> + click to add a task, with annotations, recordings and voice notes. Hold <Kbd>Alt</Kbd> for the tasks you added.
       </p>
     </aside>
-  );
-}
-
-/** Tasks added on this page, newest first, as a board shows them. The Task tab tells of each on `window`. */
-function Board() {
-  const [tasks, setTasks] = useState<TaskAdded[]>([]);
-  useEffect(function hearTasks() {
-    // `deictic:task`: a string, not deictic's constant, which would bring the Task tab's code into a build.
-    const heard = (e: Event) => setTasks((all) => [(e as CustomEvent<TaskAdded>).detail, ...all]);
-    window.addEventListener('deictic:task', heard);
-    return () => window.removeEventListener('deictic:task', heard);
-  }, []);
-  return (
-    <section className="text-sm">
-      <h2 className="flex items-baseline justify-between font-mono text-xs text-muted">
-        <span>board · {tasks[0]?.channel ?? 'deictic'}</span>
-        <span>{tasks.length}</span>
-      </h2>
-      {tasks.length === 0 ? (
-        <p className="mt-2 rounded-xl border border-dashed border-line p-4 text-muted">Tasks you add show here.</p>
-      ) : (
-        <ul className="mt-2 space-y-3">
-          {tasks.map((task) => (
-            <li key={task.id} className="space-y-2 rounded-xl border border-line bg-surface p-3">
-              {task.screenshots.map((url) => (
-                <img key={url} src={url} alt="" className="w-full rounded-md border border-line bg-surface" />
-              ))}
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-medium">{task.title}</p>
-                <span className="shrink-0 rounded-full bg-signal/15 px-2 py-0.5 font-mono text-[11px] text-signal-text">{task.state}</span>
-              </div>
-              <p className="truncate font-mono text-xs text-muted">
-                #{task.id} · {task.target.loc.file}:{task.target.loc.line} · &lt;{task.target.tag}&gt;
-              </p>
-              {(task.attached.recordings > 0 || task.attached.voice > 0 || task.attached.marks > 0) && (
-                <p className="flex flex-wrap gap-1.5 font-mono text-[11px] text-muted">
-                  {task.attached.recordings > 0 && <span className="rounded border border-line px-1.5">▶ recording</span>}
-                  {task.attached.voice > 0 && <span className="rounded border border-line px-1.5">voice note</span>}
-                  {task.attached.marks > 0 && (
-                    <span className="rounded border border-line px-1.5">
-                      {task.attached.marks} mark{task.attached.marks === 1 ? '' : 's'}
-                    </span>
-                  )}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 
@@ -114,7 +63,8 @@ export function Example() {
   const [chosen, setChosen] = useState('Pro');
   return (
     <Shell>
-      <div className="grid gap-8 py-10 lg:grid-cols-[1fr_320px]">
+      <div className="space-y-8 py-10">
+        <Guide />
         <div className="relative space-y-10 rounded-2xl border-2 border-dashed border-zinc-300 p-6 dark:border-zinc-700">
           <p className="absolute -top-3 left-4 bg-bg px-2 text-xs font-medium tracking-wide text-zinc-500 uppercase">
             Sample UI to try deictic on · not a real product
@@ -156,10 +106,6 @@ export function Example() {
             </span>
             <span className="rr-block rounded-md bg-amber-100 px-3 py-1 text-amber-900">Private note</span>
           </section>
-        </div>
-        <div className="space-y-6 self-start">
-          <Guide />
-          <Board />
         </div>
       </div>
     </Shell>
