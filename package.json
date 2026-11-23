@@ -250,6 +250,7 @@
     "build": "tsdown",
     "prepack": "tsdown --clean",
     "example": "tsdown && bun run --cwd examples/vite dev",
+    "slop": "tsdown && bun run --cwd examples/slop dev",
     "prepare": "git config core.hooksPath .githooks || true",
     "staged": "bun scripts/staged.ts",
     "tegami": "bun scripts/tegami.mts"

@@ -488,7 +488,10 @@ have no hash in their names (`hash: false`; they go in `dist/shared/`, where non
 `--clean`), so rebuilding under a running dev server doesn't break its imports;
 restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`: `deictic watch` waits for the board and follows it again). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
-integrations, also from `dist`; `test/integrations.test.ts` covers each integration, Rspack with a real compile.
+integrations, also from `dist`. `examples/slop` (5184, `bun run slop`) is a landing page full of AI slop and bad
+design, with `recommended()` and Tailwind's plugin, to unslop with an agent for testing and demos: its README lists
+what's planted, so keep that list true when the page changes, and never fix the page itself outside a demo;
+`test/integrations.test.ts` covers each integration, Rspack with a real compile.
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic
 in their output, each scan first shown to find it in a build where deictic runs. With the React Compiler on, marking
 must still see JSX as written: `integrations.test.ts` covers Vite (`react({ compiler: true })`) and Rspack (`babel-loader`

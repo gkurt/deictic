@@ -6,6 +6,12 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["dev"],
       "port": 5180
+    },
+    {
+      "name": "slop",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "slop"],
+      "port": 5184
     }
   ]
 }
