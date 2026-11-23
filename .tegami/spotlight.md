@@ -13,10 +13,6 @@ It shows the tasks on the page: while the keys are held, each element with a tas
 corner, and with the Task tab open a pin reads its tasks under the pointer and opens them with a click. The tab's own
 tasks are cards, read whole, with the window's height to scroll in.
 
-### A plugin's tab can say it works on the page, not the element: `page: true`
-
-While it's shown the element isn't lit, as in annotate mode.
-
 ### A plugin can draw on the page while it's pointed on: `pointing(context)`
 
 It answers what takes it away again.

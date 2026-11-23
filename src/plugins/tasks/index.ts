@@ -17,7 +17,7 @@ import { join, relative } from 'node:path';
 
 import type { Board } from '@vercel/board';
 
-import { definePlugin, Refusal, type ServerContext, type Shortcut, type Source, type Target } from '#src/index.ts';
+import { definePlugin, type Point, Refusal, type ServerContext, type Shortcut, type Source, type Target } from '#src/index.ts';
 // For `use('screenshots')`'s type: the plugin may not be loaded, and nothing of it runs here.
 import type { Recordings } from '#src/plugins/recordings/index.ts';
 import type { Box } from '#src/plugins/screenshots/index.ts';
@@ -82,6 +82,8 @@ export interface Task {
   link?: string;
   /** What was attached to it but not kept by the time it was sent, so it went without: `a screenshot`. */
   dropped?: string;
+  /** The spot in the element it's about, where it's about one: CSS pixels from the element's top left. */
+  point?: Point;
   /**
    * Where it was added, where that isn't the element's place: for one of `tasks`, where the element was before
    * it moved; for one of `elsewhere`, the element it's about.
@@ -132,6 +134,11 @@ export interface Op {
   page: string;
   viewport: { width: number; height: number };
   /**
+   * The spot it's about, where it was added on one (the tool panel's task tool) and not on the element as a whole:
+   * CSS pixels from the element's top left, and outside its box where the element is only the nearest to the spot.
+   */
+  point?: Point;
+  /**
    * What was under the pointer inside the element, where nothing marked it (a dependency's markup, or a
    * shadow root's): its path from the element, and its HTML, cut short.
    */
@@ -148,11 +155,11 @@ export interface Op {
   /** The element's HTML as it rendered, to attach: cut short, and masked where the screenshots plugin is loaded. */
   html?: string;
   /**
-   * Shots the screenshots plugin took of it, to attach, where that plugin is loaded: each with where the
-   * element is in it, whether it's `outlined` there (dashes drawn around it, in the PNG), and the marks drawn
-   * on it in the panel, where there are any.
+   * Shots the screenshots plugin took, to attach, where that plugin is loaded: each with where the element is in
+   * it (`box`, for one taken of the element; one taken of the window from the tool panel has none), and whether
+   * it's `outlined` there (dashes drawn around it, or around the spot, in the PNG).
    */
-  screenshots?: { id: string; box: Box; outlined?: boolean; marks?: Marks }[];
+  screenshots?: { id: string; box?: Box; outlined?: boolean }[];
   /**
    * Recordings the recordings plugin made, to attach, where that plugin is loaded: how long each ran,
    * where it plays back, and the voice plugin's clips of the mic in it, attached too.
@@ -228,6 +235,8 @@ type Message = Awaited<ReturnType<TaskBoard['thread']>>['message'];
 const PINNED = 500;
 const AT = 'deictic.at';
 const FILE = 'deictic.file';
+/** `x,y`: the spot in the element a task is about, in CSS pixels from the element's top left. */
+const POINT = 'deictic.point';
 /** What parts what was typed from the rest of a task's text. */
 const REST = '\n---\n';
 /** A file for the board, as the plugins that keep them read it. */
@@ -333,6 +342,8 @@ export function tasks(options: TasksOptions = {}) {
     const to = taskLink(page, message.id);
     const missing = Object.entries(message.labels).flatMap(([key, value]) => (/^deictic\.dropped\.\d+$/.test(key) ? [value] : []));
     const dropped = missing.length === 0 ? undefined : listOf(missing);
+    const [, x, y] = /^(-?\d+),(-?\d+)$/.exec(message.labels[POINT] ?? '') ?? [];
+    const point = x === undefined || y === undefined ? undefined : { x: Number(x), y: Number(y) };
     return {
       id: message.id,
       title: text.split('\n', 1)[0]!,
@@ -342,6 +353,7 @@ export function tasks(options: TasksOptions = {}) {
       open: OPEN.has(state),
       ...(to === undefined ? {} : { link: to }),
       ...(dropped === undefined ? {} : { dropped }),
+      ...(point === undefined ? {} : { point }),
     };
   };
   /** The channel's tasks still to do, each with its place: a page of the board's at a time, and no more than `PINNED`. */
@@ -563,7 +575,7 @@ type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
 /**
  * What the attached files don't say, as labels numbered from 1, so each value is short and none is read out of the
  * text. `deictic.screenshot.N` is the Nth PNG attached: its `.position` and `.size` where the element is in it (CSS
- * pixels from its top left), `.note.M` a note drawn on it. `deictic.recording.N.replay` is where the Nth recording
+ * pixels from its top left), for one taken of the element. `deictic.recording.N.replay` is where the Nth recording
  * plays back; `deictic.note.M` a note drawn on the page; `deictic.dropped.N` what wasn't kept any more;
  * `deictic.pointed` the path to what was pointed at inside the element. A note past a label is cut.
  */
@@ -573,12 +585,13 @@ function attachedLabels(op: Op, dropped: Kind[]): Record<string, string> {
   const set = (key: string, value: string) => {
     labels[`deictic.${key}`] = clip(value.replace(/\p{Cc}+/gu, ' '), LABEL);
   };
-  for (const [i, { box, marks }] of (op.screenshots ?? []).entries()) {
+  for (const [i, { box }] of (op.screenshots ?? []).entries()) {
+    // One of the window, from the tool panel, says nothing of the element: it may not be in it.
+    if (box === undefined) continue;
     const n = `screenshot.${i + 1}`;
     const [x, y, width, height] = boxOf(box);
     set(`${n}.position`, `${x},${y}`);
     set(`${n}.size`, `${width}x${height}`);
-    for (const [j, note] of (marks?.notes ?? []).entries()) set(`${n}.note.${j + 1}`, note);
   }
   for (const [j, note] of (op.annotations?.notes ?? []).entries()) set(`note.${j + 1}`, note);
   // Not cut: half a URL leads nowhere.
@@ -639,6 +652,7 @@ function labelsOf(source: Source | Refusal, target: Target, op: Op): Record<stri
     ...(op.page.length <= LABEL ? { 'deictic.url': op.page } : {}),
     'deictic.viewport': `${op.viewport.width}x${op.viewport.height}`,
     'deictic.count': String(op.count),
+    ...(op.point === undefined ? {} : { [POINT]: `${Math.round(op.point.x)},${Math.round(op.point.y)}` }),
     ...sourceOf(op.chain ?? []),
   };
 }

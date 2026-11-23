@@ -8,7 +8,7 @@
  * In a layer of the overlay's root, which the tab's own styles don't reach once it's closed: so its styles are its own.
  */
 import { div, place, reduced } from '#src/client/dom.ts';
-import type { ClientContext } from '#src/index.ts';
+import type { ClientContext, Point } from '#src/index.ts';
 
 import type { Placed } from './index.ts';
 
@@ -19,6 +19,7 @@ const STYLE = `
 .pin.claimed { --pin: #60a5fa; }
 .pin.blocked { --pin: #fbbf24; }
 .pin[hidden] { display: none; }
+.pin.spot, .pin.spot:has(.pin-badge:hover, .pin-badge:focus-visible) { border: 0; box-shadow: none; }
 .pin:has(.pin-badge:hover, .pin-badge:focus-visible) { z-index: 2147483647; border-color: var(--pin); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pin) 18%, transparent), 0 0 28px color-mix(in srgb, var(--pin) 45%, transparent); }
 /* A drop, its point on the element's corner. */
 .pin-badge {
@@ -113,6 +114,8 @@ export interface Pins {
 
 interface Pin {
   place: string;
+  /** The spot in the element it's on, for a task about one: the pin is there, and has no outline. */
+  at?: Point;
   el: Element;
   box: HTMLElement;
   badge: HTMLButtonElement;
@@ -141,7 +144,7 @@ export function pinsIn(context: ClientContext): Pins {
 
   const elementAt = (at: string) => document.querySelector(`[data-deictic="${CSS.escape(at)}"]`);
 
-  const pinOf = (at: string, el: Element): Pin => {
+  const pinOf = (at: string, el: Element, spot: Point | undefined): Pin => {
     const box = div('pin');
     const badge = Object.assign(document.createElement('button'), { type: 'button', className: 'pin-badge' });
     const count = document.createElement('span');
@@ -150,15 +153,15 @@ export function pinsIn(context: ClientContext): Pins {
     box.append(badge);
     // One after another, as they come: where motion is reduced there's no animation to delay.
     if (!reduced()) box.style.animationDelay = `${Math.min(pins.size, 12) * 30}ms`;
-    const pin = { place: at, el, box, badge, count, card };
-    badge.addEventListener('click', () => void context.open('tasks', pin.el));
+    const pin: Pin = { place: at, ...(spot === undefined ? {} : { at: spot }), el, box, badge, count, card };
+    badge.addEventListener('click', () => void context.open('tasks', pin.el, pin.at));
     return pin;
   };
 
   /** A pin as its tasks are now: how many, the colour of the furthest along, and its card. */
   const fill = (pin: Pin, list: Placed[]) => {
     const state = ALONG.find((s) => list.some((t) => t.state === s)) ?? 'ready';
-    pin.box.className = `pin ${state}`;
+    pin.box.className = `pin ${state}${pin.at === undefined ? '' : ' spot'}`;
     pin.count.textContent = String(list.length);
     const [, file = '', line = ''] = /^(.*):(\d+):\d+$/.exec(pin.place) ?? [];
     const tag = `<${pin.el.localName}>`;
@@ -181,8 +184,10 @@ export function pinsIn(context: ClientContext): Pins {
   const draw = () => {
     if (layer === undefined) return;
     const mine = open?.getAttribute('data-deictic');
+    // One for an element's tasks, and one of its own for each spot a task is about.
+    const keyOf = (t: Placed) => (t.point === undefined ? t.place : `${t.place}@${t.point.x},${t.point.y}`);
     const byPlace = new Map<string, Placed[]>();
-    for (const t of tasks) if (t.place !== mine) byPlace.set(t.place, [...(byPlace.get(t.place) ?? []), t]);
+    for (const t of tasks) if (t.place !== mine) byPlace.set(keyOf(t), [...(byPlace.get(keyOf(t)) ?? []), t]);
     for (const [at, pin] of pins) {
       if (byPlace.has(at)) continue;
       pin.box.remove();
@@ -191,9 +196,10 @@ export function pinsIn(context: ClientContext): Pins {
     for (const [at, list] of byPlace) {
       let pin = pins.get(at);
       if (pin === undefined) {
-        const el = elementAt(at);
+        const [{ place: where, point }] = list as [Placed, ...Placed[]];
+        const el = elementAt(where);
         if (el === null) continue;
-        pin = pinOf(at, el);
+        pin = pinOf(where, el, point);
         pins.set(at, pin);
         layer.append(pin.box);
       }
@@ -210,16 +216,21 @@ export function pinsIn(context: ClientContext): Pins {
     const look = frames++ % 20 === 0;
     for (const pin of pins.values()) {
       if (!pin.el.isConnected && look) pin.el = elementAt(pin.place) ?? pin.el;
-      const r = pin.el.getBoundingClientRect();
-      const seen = pin.el.isConnected && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < height && r.right > 0 && r.left < width;
+      const whole = pin.el.getBoundingClientRect();
+      // A spot's is a box of no size at the spot: nothing to outline, and the badge's point is on it.
+      const r = pin.at === undefined ? whole : new DOMRect(whole.left + pin.at.x, whole.top + pin.at.y, 0, 0);
+      const seen =
+        pin.el.isConnected && whole.width > 0 && whole.height > 0 && r.bottom > 0 && r.top < height && r.right > 0 && r.left < width;
       pin.box.hidden = !seen;
       if (!seen) continue;
       place(pin.box, r);
-      // On the top right corner, and in the window where the corner isn't.
-      const x = Math.max(EDGE, Math.min(r.right - OUT, width - EDGE - pin.badge.offsetWidth));
-      const y = Math.max(EDGE, Math.min(r.top - BADGE + OUT, height - EDGE - BADGE));
-      // From the box's padding edge, which is inside its border.
-      Object.assign(pin.badge.style, { left: `${x - r.left - 1}px`, top: `${y - r.top - 1}px` });
+      // On the top right corner, or the badge's point on the spot, and in the window where that isn't.
+      const out = pin.at === undefined ? OUT : 0;
+      const x = Math.max(EDGE, Math.min(r.right - out, width - EDGE - pin.badge.offsetWidth));
+      const y = Math.max(EDGE, Math.min(r.top - BADGE + out, height - EDGE - BADGE));
+      // From the box's padding edge, which is inside its border, where it has one.
+      const edge = pin.at === undefined ? 1 : 0;
+      Object.assign(pin.badge.style, { left: `${x - r.left - edge}px`, top: `${y - r.top - edge}px` });
       // Its card opens toward the middle of the window.
       pin.box.classList.toggle('left', x > width / 2);
       pin.box.classList.toggle('up', y > height / 2);

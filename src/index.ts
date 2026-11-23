@@ -154,6 +154,68 @@ export const definePlugin = <Model, Op, Record = unknown, Api = unknown>(
   plugin: ServerPlugin<Model, Op, Record, Api>,
 ): ServerPlugin<Model, Op, Record, Api> => plugin;
 
+/** Where something is in an element, in CSS pixels from its top left. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** A spot on the page: a marked element, and a point in it (or beside it, for the nearest to a point no marked element is under). */
+export interface Spot {
+  element: Element;
+  at: Point;
+}
+
+/**
+ * The tool panel: a bar docked to an edge of the window, which shows while a shortcut's keys are held and stays
+ * while it's in use. A plugin adds its tools to it from its page half's `setup`.
+ */
+export interface ToolPanel {
+  /**
+   * Adds a plugin's controls, as one group, in the order plugins are loaded; `last` puts it after the others'. Each
+   * control is a button named by its `title`; its `aria-keyshortcuts` (`B`, `Control+Z`) is the key the panel
+   * hears for it, alone or with the keys held to point, and what its tooltip shows.
+   */
+  add: (group: HTMLElement, options?: { last?: boolean }) => void;
+  /**
+   * Takes the page for a tool that works on it (drawing, picking a point): the tool that had it lets go first, and
+   * the panel stays shown. `left` is called when another takes it, or Esc or the pointer tool gives the page back.
+   * Answers what lets go of it, for the tool to call when it's done on its own.
+   */
+  hold: (left: () => void) => () => void;
+  /** Keeps the panel shown while something goes on that its controls end (a recording). Answers what ends that. */
+  keep: () => () => void;
+  /**
+   * Takes the page until a point of it is pressed, lighting what's under the pointer as pointing does: answers the
+   * spot, the marked element there or the nearest to it, or nothing where the page was given back first.
+   */
+  pick: () => Promise<Spot | undefined>;
+}
+
+/** Something a plugin made on the page that nothing has taken yet: a shot, a recording, a voice clip. */
+export interface TrayItem {
+  /** The plugin that made it. */
+  plugin: string;
+  /** Its ID, as that plugin has it. */
+  id: string;
+  /** What that plugin says of it, as JSON: the screenshots plugin's `Shot`, a `Recording`, a `Clip`. */
+  value: unknown;
+}
+
+/**
+ * What plugins made on the page from the tool panel, until something takes it: a task attaches what's there and
+ * removes it. Kept for the tab's session, so it's there on the tab's next page too.
+ */
+export interface Tray {
+  /** What's kept, oldest first: all of it, or one plugin's. */
+  list: (plugin?: string) => TrayItem[];
+  add: (plugin: string, id: string, value: unknown) => void;
+  /** Takes one out, or all of a plugin's. */
+  remove: (plugin: string, id?: string) => void;
+  /** Hears every change from now on; answers what stops it. */
+  subscribe: (listener: () => void) => () => void;
+}
+
 export interface ClientContext {
   /** The dev server's base URL, ending in `/`. */
   base: string;
@@ -166,12 +228,17 @@ export interface ClientContext {
   /** Asks one of this plugin's own routes, from the page: `request('shots', { method: 'POST', body: blob })`. */
   request: (route: string, init?: RequestInit) => Promise<Response>;
   /**
-   * Opens the popup on an element at a plugin's tab, as its shortcut would: after a recording, say. An
-   * element rendered again since stands in for one no longer on the page. False when there's no such tab
-   * or no such element any more, and while the open popup holds something unsaved, whose button then shakes.
-   * Not from `setup`, which runs before the popup can open.
+   * Opens the popup on an element at a plugin's tab, as its shortcut would, or with `at` on a spot in it: the
+   * popup is then beside the spot, which is what's lit, and the tab's context has it. An element rendered again
+   * since stands in for one no longer on the page. False when there's no such tab or no such element any more, and
+   * while the open popup holds something unsaved, whose button then shakes. Not as `setup` runs, which is before the
+   * popup can open.
    */
-  open: (plugin: string, element: Element) => boolean;
+  open: (plugin: string, element: Element, at?: Point) => boolean;
+  /** The tool panel, to add this plugin's tools to. */
+  tools: ToolPanel;
+  /** What was made from the tool panel and not taken yet. */
+  tray: Tray;
   /**
    * Shows `items` in the lightbox over everything, at `at` (the first by default), stepping between them with
    * ← and →. With `from`, it grows out of that element (the chip clicked) and shrinks back into it on close.
@@ -212,6 +279,8 @@ export interface PanelContext<Model, Op> extends ClientContext {
    * dependency's, or in an open shadow root, as the popup's own on a page that shows it (`popupIn`).
    */
   pointed?: Element;
+  /** The spot in `element` the popup was opened on, where it was (the tool panel's task tool), not the element as a whole. */
+  at?: Point;
   /** Every element on the page from the same place in the source, the clicked one among them: the rows of a list. */
   elements: Element[];
   target: Target;
@@ -262,11 +331,6 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * done the popup opens at this tab with `resumed`, on the element where this page has it and without where not.
    */
   resume?(context: ClientContext): Promise<unknown> | undefined;
-  /**
-   * Its tab works on the page as a whole, not on the element (drawing on it, as annotations do): while it's shown,
-   * the element isn't lit, and the page keeps its light.
-   */
-  page?: boolean;
   /**
    * What it shows on the page while a shortcut's keys are held, and the page is dimmed to point on: the tasks
    * plugin pins each task where its element is. Answers what takes it away.

@@ -8,15 +8,17 @@
  * Everything drawn sits in one shadow root, so neither the page's styles nor ours cross over. A
  * panel's undo and redo are its tab's on its element: the latest change that plugin made there.
  */
-import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Resumed, Standalone, Target } from '#src/index.ts';
+import type { ClientContext, ClientPlugin, LightboxItem, PanelContext, Point, Resumed, Spot, Standalone, Target } from '#src/index.ts';
 import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
 import { div, nameOf, reduced } from './dom.ts';
 import { openLightbox } from './lightbox.ts';
-import { CLEAR, type Lighting, spotlight } from './lighting.ts';
+import { CLEAR, type Lighting, spotlight, spotOf } from './lighting.ts';
 import { STYLE } from './style.ts';
+import { toolPanel } from './tools.ts';
 import { tooltips } from './tooltip.ts';
+import { tray } from './tray.ts';
 
 // For a plugin's page half that records the mic, or shows a clip: the waveforms the lightbox draws.
 export { drawBars, liveWaveform, peaksOf, type Colors } from './waveform.ts';
@@ -198,6 +200,17 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   root.append(style);
   tooltips(root);
   const lighting = spotlight(root);
+  const kept = tray();
+  // A tool has the page to pick a point on (`pick`): what's under the pointer is lit as while the keys are held.
+  let picking = false;
+  const tools = toolPanel(root, {
+    spotAt: (x, y) => spotAt(x, y),
+    aim: (on) => {
+      picking = on;
+      if (on) glance(true);
+      else if (held.length === 0) hide();
+    },
+  });
   // What's typed in the popup is the popup's: the page hears a key from in here as one on the host, not in a field,
   // so its own shortcuts (a "/" to search, a "j" to step) would run on a task's words. Ours listen while capturing.
   for (const type of ['keydown', 'keypress', 'keyup'] as const) host.addEventListener(type, (e) => e.stopPropagation());
@@ -216,8 +229,10 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     use: (other) => apis.get(other) as never,
     request: (route, init) => send(`${base}__deictic/plugins/${name}/${route}`, init),
     // Not from under something unsaved, which a press on the page wouldn't close either: its button shakes.
-    open: (plugin, element) => panel?.guard() !== true && openAt(plugin, element),
+    open: (plugin, element, at) => panel?.guard() !== true && openAt(plugin, element, at),
     lightbox: (items, options) => openLightbox(root, items, options),
+    tools,
+    tray: kept,
   });
   for (const { plugin } of given) {
     if (plugin.setup === undefined) continue;
@@ -276,10 +291,11 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   const pressedBy = (e: MouseEvent) => plugins.find((p) => p.gesture.held(e) && e.button === p.gesture.button);
   /**
    * The marked element at a point, and what's under the pointer inside it where that differs: down through
-   * open shadow roots but the overlay's own, as a page showing the popup (`popupIn`) has it in one.
+   * open shadow roots but the overlay's own, as a page showing the popup (`popupIn`) has it in one. `through` the
+   * overlay, where it's the overlay that has the pointer: a tool's surface, while a point is picked.
    */
-  const hitAt = (x: number, y: number) => {
-    let under = document.elementFromPoint(x, y) ?? undefined;
+  const hitAt = (x: number, y: number, through = false) => {
+    let under = (through ? document.elementsFromPoint(x, y).find((el) => el !== host) : document.elementFromPoint(x, y)) ?? undefined;
     while (under !== undefined && under !== host && under.shadowRoot !== null) {
       const inside = under.shadowRoot.elementFromPoint(x, y);
       if (inside === null || inside === under) break;
@@ -308,12 +324,35 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   };
   const hide = () => {
     held = [];
+    tools.point(false);
     glance(false);
     lighting.hide();
   };
+  /** The marked element at a point of the window, or the nearest to it where none is under it, and the point in it. */
+  const spotAt = (x: number, y: number): Spot | undefined => {
+    const away = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return r.width === 0 || r.height === 0
+        ? Infinity
+        : Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+    };
+    const nearest = () => {
+      let found: { el: Element; far: number } | undefined;
+      for (const el of document.querySelectorAll(`[${ATTRIBUTE}]`)) {
+        const far = away(el);
+        // The later of two as near is the inner one, or the one drawn over.
+        if (far !== Infinity && (found === undefined || far <= found.far)) found = { el, far };
+      }
+      return found?.el;
+    };
+    const element = hitAt(x, y, true)?.el ?? nearest();
+    if (element === undefined) return undefined;
+    const r = element.getBoundingClientRect();
+    return { element, at: { x: Math.round(x - r.left), y: Math.round(y - r.top) } };
+  };
   const show = (glide: boolean) => {
     frame = 0;
-    const hit = pointer === undefined || held.length === 0 ? undefined : hitAt(pointer.x, pointer.y);
+    const hit = pointer === undefined || (held.length === 0 && !picking) ? undefined : hitAt(pointer.x, pointer.y, picking);
     const el = hit?.el;
     const target = el === undefined ? undefined : targetOf(el);
     if (el === undefined || target === undefined) return lighting.hide();
@@ -329,7 +368,8 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   };
   const update = (e: MouseEvent | KeyboardEvent) => {
     held = heldBy(e);
-    if (held.length === 0) return hide();
+    if (held.length === 0 && !picking) return hide();
+    tools.point(held.length > 0);
     glance(true);
     if (frame === 0) frame = requestAnimationFrame(() => show(true));
   };
@@ -349,7 +389,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   window.addEventListener(
     'scroll',
     () => {
-      if (held.length > 0 && frame === 0) frame = requestAnimationFrame(() => show(false));
+      if ((held.length > 0 || picking) && frame === 0) frame = requestAnimationFrame(() => show(false));
     },
     { capture: true, passive: true },
   );
@@ -382,7 +422,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     if (panel?.unsaved() === true) return;
     openTab(found.tab(), hit.el, target, undefined, hit.pointed);
   };
-  const openTab = (tab: Tab, el: Element, target: Target, resumed?: Resumed, pointed?: Element) => {
+  const openTab = (tab: Tab, el: Element, target: Target, resumed?: Resumed, pointed?: Element, at?: Point) => {
     hide();
     panel?.close();
     panel = openPanel({
@@ -395,6 +435,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       remember,
       element: el,
       ...(pointed === undefined ? {} : { pointed }),
+      ...(at === undefined ? {} : { at }),
       target,
       lighting,
       onClose: () => (panel = undefined),
@@ -426,12 +467,12 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       (e: unknown) => back({ state: away.state, problem: messageOf(e) }),
     );
   });
-  function openAt(name: string, given: Element): boolean {
+  function openAt(name: string, given: Element, at?: Point): boolean {
     const tab = tabs.find((t) => t.plugin.name === name);
     const el = given.isConnected ? given : (sameAs(given)[0] ?? undefined);
     const target = el === undefined ? undefined : targetOf(el);
     if (tab === undefined || el === undefined || target === undefined) return false;
-    openTab(tab, el, target);
+    openTab(tab, el, target, undefined, undefined, at);
     return true;
   }
   for (const type of ['click', 'auxclick', 'contextmenu'] as const) window.addEventListener(type, pressed, true);
@@ -450,6 +491,8 @@ interface PanelOptions {
   element: Element;
   /** What was under the pointer inside `element`, where that differs. */
   pointed?: Element;
+  /** The spot in `element` it's opened on, where it's one: what's lit, and what it's beside. */
+  at?: Point;
   target: Target;
   /**
    * Over the page, beside the element: what lights the element there. Without it the popup is shown where the
@@ -474,6 +517,7 @@ function openPanel({
   remember,
   element,
   pointed,
+  at: spot,
   target,
   lighting,
   onClose,
@@ -543,15 +587,9 @@ function openPanel({
   panel.append(head, bar, body, status);
   root.append(panel);
   if (pinned) panel.classList.add('pinned');
-  const release = pinned ? undefined : keepInView(panel, body, head, element);
-  // The element lit while the shown tab is about it: not one that works on the page, which keeps its light.
-  let unmark: (() => void) | undefined;
-  const mark = () => {
-    const lit = lighting !== undefined && current.plugin.page !== true;
-    if (lit === (unmark !== undefined)) return;
-    unmark?.();
-    unmark = lit ? lighting.hold(element, panel) : undefined;
-  };
+  const release = pinned ? undefined : keepInView(panel, body, head, element, spot);
+  // Its element, or the spot in it, lit for as long as it's open.
+  const unmark = lighting?.hold(element, panel, spot);
   if (!pinned) window.dispatchEvent(new CustomEvent<PopupOpened>(POPUP_OPENED, { detail: { element, tab: first.plugin.name } }));
 
   let cleanup: (() => void) | void;
@@ -691,6 +729,7 @@ function openPanel({
       },
       element,
       ...(pointed === undefined ? {} : { pointed }),
+      ...(spot === undefined ? {} : { at: spot }),
       elements: sameAs(element),
       target,
       model,
@@ -718,7 +757,6 @@ function openPanel({
       b.el.setAttribute('aria-selected', String(b.tab === tab));
       if (b.tab === tab) slide(b.el);
     }
-    mark();
     remember(tab);
     void steps();
     void load();
@@ -755,11 +793,13 @@ const SLACK = 3;
  * room for the line between them. Dragged by `handle`, it stays where it's put, in the window, and follows the
  * element no more. Fixed, so it never changes the page's own scrolling. Answers a release.
  */
-function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, element: Element): () => void {
+function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, element: Element, at?: Point): () => void {
   let frame = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // What it's beside: the element, or the spot in it.
+  const boxOf = () => (at === undefined ? element.getBoundingClientRect() : spotOf(element, at));
   // Where the element was last seen: one gone from the page leaves the popup where it was.
-  let r = element.getBoundingClientRect();
+  let r = boxOf();
   // An element that's not on the page (back from `away`, on another) has no place to be beside: as if dragged to the
   // middle, toward the top.
   let moved: { left: number; top: number } | undefined = element.isConnected
@@ -835,7 +875,7 @@ function keepInView(panel: HTMLElement, body: HTMLElement, handle: HTMLElement, 
     if (moved !== undefined) return;
     watching = requestAnimationFrame(watch);
     if (!element.isConnected) return;
-    const now = element.getBoundingClientRect();
+    const now = boxOf();
     if (now.left === r.left && now.top === r.top && now.width === r.width && now.height === r.height) return;
     r = now;
     fit();

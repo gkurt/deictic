@@ -32,8 +32,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `describe`; any of them may be async) and `ClientPlugin` (`label`, `setup` → its API, `mount`), tied by
   `name`, sharing a `Model` and an `Op`. `ServerContext`/`ClientContext` carry `use(name)`, another
   plugin's API on the same side, typed through the `ServerApis`/`ClientApis` interfaces plugins merge
-  into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes, and
-  `open(plugin, element)` to open the popup at a tab. A panel's context has `unsaved(action)`: the button that keeps
+  into; the page's also `root` (the overlay's shadow root), `request(route)` to the plugin's routes,
+  `open(plugin, element, at?)` to open the popup at a tab (on a `Point` of the element, with `at`, which the panel
+  gets as `context.at`), `tools` (the tool panel, a `ToolPanel`) and `tray` (a `Tray`). A panel's context has `unsaved(action)`: the button that keeps
   what leaving would lose, or `undefined`, and `away(state, task)`: close, run
   `task`, reopen at the same tab and element with `resumed` (`state`, and `task`'s `result` or `problem`). A page load
   doesn't lose it: the state is kept for the tab's next page (`src/client/away.ts`), whose overlay asks the plugin's
@@ -42,9 +43,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   a plugin won't make, its message the fix; the endpoints answer it with 422 and the panel shows it.
   `Done` (`{ done: record }`) is a change the plugin made itself, not to a file: the history keeps the
   record, JSON, and hands it to the plugin's `undo` and `redo`. The parser is imported for its types only.
-- A `ClientPlugin` with `page: true` (annotations) has a tab that works on the page, not the element: while it's
-  shown, the element isn't lit and the page keeps its light. One with `pointing(context)` (tasks) draws on the page
-  while a shortcut's keys are held, and answers what takes it away.
+- A `ClientPlugin` with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held, and answers
+  what takes it away. No plugin of ours uses `away` now (a recording is the tool panel's): it's there for others'.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -129,10 +129,25 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
-- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with.
+- `src/client/dom.ts`: `div`, `place`, `nameOf`, `reduced`, the little the overlay's parts all draw with, and
+  `toolButton(strokes, name, keys, run)`, a tool panel's icon button (`MOD` is Control, or Meta on a Mac).
+- `src/client/tools.ts`: `toolPanel(root, { spotAt, aim })`, the tool panel (`.tool-panel`; "panel" alone is a tab's
+  body, as in `PanelContext`), `context.tools`: a bar docked to an edge (`deictic:tools` in `localStorage`, bottom
+  centre first), dragged by its grip to the nearest of the four. It shows while a shortcut's keys are held (`point`,
+  which the overlay calls), the pointer is on it, something keeps it (`keep()`: a recording, a take, a shot being
+  made) or a tool has the page (`hold(left)`, one at a time: the next holder's `hold` calls the last one's `left`),
+  and goes `LINGER` after. Plugins `add(group)` their controls from `setup` (`{ last: true }` for tasks', after the
+  others'). Its own tool is the pointer (V), pressed while nothing holds. It hears the keys on `window`, before the
+  page, while the keys are held or a tool holds: a control's `aria-keyshortcuts` is its key, which clicks it (a key
+  alone, whatever is held while pointing; never one typed in a field of ours, or of the page's while only pointing),
+  and Esc gives the page back. So a tool never listens for keys itself. `pick()` answers the next press on the page
+  as a `Spot` (`spotAt`, in the overlay: the marked element under the point, through the overlay, or the nearest
+  one, and the point from its top left), over a `.tool-surface` that takes the press, the page lit as for pointing.
+- `src/client/tray.ts`: `tray()`, `context.tray`: what the tools made that no task has taken (`add(plugin, id,
+value)`, `list`, `remove`, `subscribe`), in session storage (`deictic:tray`), so it's the tab's over page loads.
 - `src/client/lighting.ts`: what's drawn on the page itself, `spotlight(root)`, a `Lighting`: `point` (what's under
-  the pointer while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel)`
-  (the popup's element, for as long as it's open). It dims the page around the element with one shadow (`.veil`, under
+  the pointer while a shortcut's keys are held; not `glide` where the page scrolled), `hide`, and `hold(element, panel, at?)`
+  (the popup's element, for as long as it's open, or with `at` a circle of `SPOT` around that point of it: `spotOf`). It dims the page around the element with one shadow (`.veil`, under
   annotations' marks), and draws a ring, guides from its edges across the window and a caption (`.aim`); what's under
   the pointer inside the element, where it differs, is dashed (`.inner`). The light glides from one element to the
   next, by CSS transitions that only `.glide` turns on. Held, the ring and the line to the popup are SVG strokes (`.lit`,
@@ -152,14 +167,16 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/client/tooltip.ts`: `tooltips(root)`, the one tooltip for a shadow root of ours (the overlay's, and
   `popupIn`'s): any `title` in it moves to `data-tip` on first hover (the browser's own never shows), naming a
   textless control (`aria-label`) or describing one with text (`aria-description`). Fixed in the root, centred
-  under the control, kept on screen. Set `title`, never draw a tooltip of a panel's own. A control's keys
+  under the control, kept on screen, or beside it in a bar that runs down (`aria-orientation="vertical"`). Set `title`, never draw a tooltip of a panel's own. A control's keys
   (`aria-keyshortcuts`, `Control+Z`) are in its tip as keycaps after the words, and a tip of their own for a control
   whose text already names it: set that for a shortcut, never write it into the title.
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
   first (a failing one is logged, the rest go on). Each plugin with a `mount` is a tab in the popup.
-  Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), and opens the popup on
+  Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), shows the tool panel
+  meanwhile (`tools.ts`; it lights the page the same way while a tool picks a spot), and opens the popup on
   its button (`click`, `auxclick` or `contextmenu`, the first of them per press): deictic's own at the
-  tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. While it's open over the page its element
+  tab used last (`localStorage` `deictic:tab`), a plugin's at its tab. Opened on a spot (`context.open`'s `at`), it's
+  beside the spot, which is what's lit. While it's open over the page its element
   stays lit (nothing is drawn on the element itself; followed each frame), keys typed in it stop at the host, so the page's own
   shortcuts don't run on them, and its Esc is kept from the page. It follows its element as the page moves it
   (`keepInView`, read each frame) until it's dragged by its head, and then stays where it's put, in the window. A press on the page outside it closes it, unless the shown panel
@@ -205,13 +222,14 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   dot marks those on the element now (most of their classes among its own, all the page says of a condition).
   Each state keeps its draft; Save applies every changed one, a change each. The rest show under their
   condition as dashed chips, faint while not on the element.
-- `src/plugins/screenshots/`: no panel. `index.ts`, the server half: keeps the latest `keep` PNGs under
+- `src/plugins/screenshots/`: no tab. `index.ts`, the server half: keeps the latest `keep` PNGs under
   `.deictic/screenshots` (IDs sort by time), answers `read(id)` to other plugins, and its `add`
   route takes a PNG, or JSON its renderer's `render` makes one of. A `Renderer` is a page module (`client`, which
   becomes the plugin's) and an optional `render`: `rrweb()` (default) and `dom()`. `client.ts` is
   `screenshotsClient(capture)`, the page half around a renderer's capture, which posts to `add` and answers the
   `Shot` with the element's `box`; nothing of deictic's is ever drawn. Its API has `masked(element)` too, a copy with
-  what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. `dom.ts` draws in the page with
+  what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. Its tool in the tool panel (S)
+  takes the window, with the page's marks, into the tray; a problem is its tooltip. `dom.ts` draws in the page with
   `modern-screenshot`, masking the copy. `rrweb.ts` sends an `rrweb-snapshot` (masked by rrweb, the overlay cut
   out) with viewport, window, scroll and density, and which node the element is; `playwright.ts` answers the PNG and the element's
   `box` as it's drawn there (measured in the rebuilt page, as the two can lay out a few pixels apart, and what the `Shot` then has; a `render` may answer `{ png, box }`): it rebuilds it in a sandboxed iframe on a blank page of
@@ -220,22 +238,18 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   width, the layout has what the scrollbar leaves), and the shot is cut to the viewport. Masking options follow rrweb's names and defaults. Optional peers, each imported on
   first use. `test/rrweb.test.ts` compares a render with the live page by brightness (the iframe's text has no
   colour fringes) and skips without a browser.
-- `src/plugins/annotations/`: marks on the page, page half only. `index.ts` is the types (`Shape`: box, arrow, pen,
-  note, in page coordinates) and the factory (shortcut, `color`). `svg.ts` is `toSvg(annotations, area, scroll)`,
+- `src/plugins/annotations/`: marks on the page, page half only, no tab. `index.ts` is the types (`Shape`: box,
+  arrow, pen, note, in page coordinates) and the factory (`color`). `svg.ts` is `toSvg(annotations, area, scroll)`,
   shapes only (no `foreignObject`), the one drawing both the page's layer and a shot use. `client.ts`: `setup` keeps
-  the marks per page in session storage, draws them in a layer of the overlay that lets the pointer through, and
-  answers `list`, `add`, `remove`, `clear`, `subscribe` (for a recording), `svg(area)`, `edit(picture, marks)` (the
-  same toolbar over a picture, in a modal over everything; marks in the picture's CSS pixels) `flatten` (its
-  PNG with them drawn in) and `tools()` (the toolbar for another plugin's UI, with a pointer tool that leaves
-  the page usable, drawing its own `marks`, kept by nothing and gone on `close`); `mount` is annotate mode, a toolbar and a surface over the page that takes the pointer.
-  `draw.ts` is the toolbar, its keys and the gestures both share, each saying where an event is in its marks' coordinates.
-  The toolbar has no words: each tool is an icon named by its tooltip, with its key (V pointer, B box, A arrow, P pen,
-  N note, Ctrl or ⌘ Z undo, Shift+Backspace clear, with a modifier as nothing brings the marks back; Esc is Done and
-  Cancel, Ctrl or ⌘ Enter the editor's Save). The keys are heard on `window` before the page, for as long as there's
-  drawing: all the while under a surface that takes the pointer, and in a recording's toolbar only once a drawing tool is
-  picked, where V and Esc give the page back. A note being typed has its keys to itself (Enter places it, Esc doesn't),
-  and the editor takes the focus while it's open, so nothing is typed into the field under it. Screenshots' renderers draw `svg(area)`
-  over a shot (`overlay` in a `PageCapture`), and a task names the count and notes.
+  the marks per page in session storage, draws them in a layer of the overlay that lets the pointer through, adds
+  its tools to the tool panel, and answers `list`, `add`, `remove`, `clear`, `subscribe` (for a recording) and
+  `svg(area)`. `draw.ts` is the tools (`drawing`, a group) and the gestures, on a surface over the page that takes
+  the pointer only while a tool is picked (`tools.hold`, so the pointer tool, Esc or another plugin's tool gives the
+  page back). No words: each tool is an icon named by its tooltip, with its key (M box, A arrow, B pen, N note,
+  Ctrl or ⌘ Z undo, Shift+Backspace clear, with a modifier as nothing brings the marks back), which the tool panel
+  hears. A note being typed has its keys to itself (Enter places it, Esc doesn't). Screenshots' renderers draw
+  `svg(area)` over a shot (`overlay` in a `PageCapture`), and a task names the count and notes, and clears the marks
+  once it's added.
 - `src/plugins/recordings/`: no tab. `index.ts`, the server half: keeps the latest `keep` recordings (JSON:
   `Kept`, rrweb's events with page, viewport and duration) under `.deictic/recordings`, answers
   `read(id)`, and routes `begin`, `part/<id>?seq=<n>`, `end/<id>` and `discard/<id>` (a recording comes as it goes: its
@@ -251,21 +265,24 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   as pictures, `sampling.canvas` at the `canvas` option's `fps`, 2, or not with `false`: never rrweb's other way, which
   wraps every drawing method), sends the
   events each second, and keeps what the next page needs in session storage (`deictic:recording`: the ID, the start, the
-  next part's place, the clips, the mic, the toolbar's marks and their page). So a load doesn't end it: `setup` on the
+  next part's place, the clips, the mic). So a load doesn't end it: `setup` on the
   next page carries on under the same ID (rrweb's own `Meta` and snapshot per page, and for an address that changes with no load, a router's, a custom event,
   `PAGE` in `marks.ts`, with the `href`; the last events go with `keepalive`
-  on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there, which is what tasks'
-  `resume` gives the overlay. It
+  on `pagehide`; a page out of the back-forward cache reloads), and `going()` answers it there. It
   takes rrweb's own plugins from the plugins that add to a recording (`use('logs')`, `use('network')`: each a `Recorded`,
   whose `plugin({ sinceLoad })` answers a `RecordPlugin`; one that fails is warned of and left out), and
-  shows the toolbar (`draggable`, docked to the nearest edge, kept in `localStorage`) with `annotations.tools()`;
-  the marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each change.
+  the page's marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each
+  change. Its tool in the tool panel is Record (R): while one goes, its group (`.recorder.going`) has the time, the
+  mic (K, with voice loaded), Stop (R) and Discard (Shift+R) in Record's place, and keeps the panel up. One that's
+  stopped and kept goes in the tray, whoever started it.
 - `src/plugins/voice/`: no tab. `index.ts`, the server half: keeps the latest `keep` clips under
   `.deictic/voice` as the audio a `MediaRecorder` makes (webm, ogg, mp4, by extension), answers
   `read(id)`, routes `add`, `more/<id>` and `clip/<id>`. `client.ts`: `start()` asks for the mic and answers a `Take`,
   which sends the audio each second (`add` its start, `more` the rest, the last with `?last`); `stop` lets the mic go and
   answers the clip, `cancel` answers none, and `soFar()` is the clip as far as it's sent, for a page that's going: a
-  recording's take ends there, and the next page's mic starts another. The recording toolbar's mic (its live waveform beside it while on) makes a clip of each
+  recording's take ends there, and the next page's mic starts another. Its tool in the tool panel is the mic (K): on,
+  a take, with its time and live waveform, keeping the panel up; off, the clip goes in the tray. It's away while a
+  recording goes, whose own mic (its live waveform beside it while on) makes a clip of each
   stretch it's on, at its offset (`Kept.voice`); the replay plays them in step and starts paused, as a browser
   plays sound only after a click.
 - `src/plugins/logs/` and `src/plugins/network/`: what a recording has besides the page. No tab, no routes: each
@@ -278,14 +295,16 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   query and fragment, headers and JSON or form bodies, cuts bodies, and drops deictic's own requests (a recording
   sends itself each second) and the `ignore`d. `test/network.test.ts` covers it. (`logs` is un-ignored in `.gitignore`.)
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
-  recordings and voice, in their tabs' order, then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
+  recordings and voice, in their tools' order in the tool panel (tasks' is last there), then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where
   only something attached says it), and the rest as labels (`deictic.project`, from the `project` option
   or the root's `package.json`, `at`, `file`, `tag`, `line`, `page`, `url` where it fits, `viewport`, `count`, `source`), under
   the user's own `labels`; the source isn't sent. What the attached files don't say is labels numbered from 1
-  (`attachedLabels`): `screenshot.N.position`, `.size` and `.note.M` for the Nth PNG attached, `note.M` on the page,
+  (`attachedLabels`): `screenshot.N.position` and `.size` for the Nth PNG attached, where it's a shot of the element
+  (it has a `box`; the window's, from the tool panel, has none), `note.M` on the page, `point` (`x,y` from the
+  element's top left, for a task about a spot: `Op.point`, read back as `Task.point`),
   `recording.N.replay` for the Nth recording, `dropped.N` and `pointed` (the path; its HTML is in `element.html`, or `pointed.html` without
   it). Control characters become spaces and a value is cut at 256. `deictic task` prints them. A task added before has them
   after a `---` in its text, which `deictic task` prints as it is and an edit keeps. `deictic.source` is the chain it rendered through, out from its own
@@ -307,7 +326,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   `pins.ts` is the page's tasks where they are (`pinsIn(context)`, one set per overlay
   root): the `page` route answers every task still to do with its `place` (`Placed`), and each place with an element
   on the page gets a pin, its outline and a badge on its corner (how many, the colour of the furthest along), followed
-  each frame. `glance()` shows them while pointing (`pointing`), the pointer going through them; `around(element)`
+  each frame; a task about a spot has a pin of its own there, the badge's point on it and no outline. `glance()` shows them while pointing (`pointing`), the pointer going through them; `around(element)`
   while the Task tab is open over the page, without that element's, where a badge under the pointer shows a card of
   its tasks and a click opens them (`context.open`, which a draft refuses). A pin has no layer to stack in: each is
   fixed under the popup, and the one pointed at over it. The tab's own tasks are cards (`.tasks li`:
@@ -324,20 +343,21 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   through `use('screenshots')` (the server context kept from `setup`), and the record keeps the
   attachment's ID for redo. A shot, recording or voice clip no longer kept (past its plugin's `keep`, or cleaned) is
   left out, not the task: `keptOf` drops it from the op, `deictic.dropped.N` says so, which `read`
-  gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. With annotations
-  loaded, Annotate captures a shot and `edit`s it: saved, each is a chip (removable; removing the last unticks the
-  box). Every chip opens one lightbox of all that's attached, at itself: a shot with Change marks, a recording's
-  replay (`?embed`) with New tab, a voice note's player; and sending uploads each `flatten`ed PNG with `screenshots.upload`, as it was drawn. Only the shot the box takes as the task goes
-  has the element outlined in it (`outlined`, in green dashes `ROOM` off it, drawn on and kept again), which the op says (`outlined`), not the text. `Op.screenshots`
-  is a list, each with its `box` and `marks` (count and notes). With recordings loaded, Record calls
-  `away` with what's typed and attached, and the panel comes back with the recording as a chip;
-  `Op.recordings` attaches each one's JSON (and its voice clips, which the JSON names), and a label says where it replays.
-  The kept state has `facts` too, what only the element's page says (page, viewport, count, chain, pointed, HTML): a
-  recording stopped on a page without the element comes back to a panel with no shot to take, and the task says those.
+  gives back as `Task.dropped` for the panel to say; only a task left with nothing to say is refused. What's in the
+  tray (shots, recordings, voice clips) is the task's to attach: each a chip under the field (removable, which takes
+  it out of the tray; removing the last unticks the box), and every chip opens one lightbox of all that's attached,
+  at itself: a shot, a recording's replay (`?embed`) with New tab, a voice note's player. The panel follows the tray
+  (`subscribe`), so a shot taken while it's open is a chip at once, and a task that's added empties it and clears
+  the page's marks. With no shot in the tray, the box takes one as the task goes, and only that one has the element
+  outlined in it (`outlined`, in green dashes `ROOM` off it, or a circle of `SPOT` around the task's spot, drawn on
+  and kept again with `screenshots.upload`), which the op says (`outlined`), not the text. `Op.screenshots` is a
+  list, each with its `box` where it's of the element. `Op.recordings` attaches each one's JSON (and its voice
+  clips, which the JSON names), and a label says where it replays. Its tool in the tool panel (T, last, with a count
+  of what's in the tray) picks a spot (`tools.pick()`) and opens the tab on it: `context.at`, sent as `Op.point`.
   After a task is added, the page hears of it: a `deictic:task` event on `window` (`TASK_ADDED`), its
   `detail` a `TaskAdded` (ID, title, state, channel, target, page, what was attached, and each shot's URL as sent),
   which the playground lists as a board, its shots shown.
-  With voice loaded, Voice records a take in the panel, its button the time and the mic's live waveform (`Take.stream`); `Op.voice` attaches each note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
+  `Op.voice` attaches each voice note's audio. Tests run it against `local({ memory: true })`. What works the tasks is the user's, not ours.
   `local.ts` is the board with no `board` option and no `BOARD_URL`: `localBoard(root)` spawns `vb serve` (the
   project's `@vercel/board`, this process's runtime) from `setup`, not waited for, on port 4100 or a free one, its log
   in `.deictic/board`, and writes `.deictic/board.json` (`url`, `pid`), which the CLI reads (`boardUrl`, in `src/cli/board.ts`).

@@ -143,7 +143,7 @@ test('takes a PNG and nothing else from a renderer without render', async () => 
   expect(await add('{}', 'application/json')).toMatchObject({ status: 415, problem: 'send the shot as image/png' });
 });
 
-test('a task attaches each shot, labelling where the element is in which and the notes drawn on it', async () => {
+test('a task attaches each shot, labelling where the element is in the one taken of it, the spot and the notes on the page', async () => {
   const { p, ask, add } = setup();
   const [one, two] = [await add(), await add()];
   const res = await ask('apply', {
@@ -156,27 +156,29 @@ test('a task attaches each shot, labelling where the element is in which and the
         text: 'Too tight',
         page: `${ORIGIN}/`,
         viewport: { width: 800, height: 600 },
-
+        point: { x: 12.4, y: -3 },
         count: 1,
-        screenshots: [
-          { id: one.id, box: { x: 10, y: 20, width: 300, height: 24 }, marks: { count: 2, notes: ['Too close', 'Two\nlines'] } },
-          { id: two.id, box: { x: 0, y: 0, width: 300, height: 24 }, outlined: true },
-        ],
+        // The first is the window's, from the tool panel: it says nothing of the element.
+        screenshots: [{ id: one.id }, { id: two.id, box: { x: 0, y: 0, width: 300, height: 24 }, outlined: true }],
+        annotations: { count: 3, notes: ['Too close', 'Two\nlines'] },
       },
     }),
   });
   const { model } = (await res.json()) as { model: Model };
-  const { message } = await team.thread(model.tasks.at(-1)!.id);
+  const task = model.tasks.at(-1)!;
+  // The spot it's about, as the page reads it back: a pin goes there.
+  expect(task.point).toEqual({ x: 12, y: -3 });
+  const { message } = await team.thread(task.id);
   expect(message.text).toBe('Too tight');
   // The Nth PNG attached is `deictic.screenshot.N`'s.
   expect(message.labels).toMatchObject({
-    'deictic.screenshot.1.position': '10,20',
-    'deictic.screenshot.1.note.1': 'Too close',
-    // A board takes no control characters in a label.
-    'deictic.screenshot.1.note.2': 'Two lines',
+    'deictic.point': '12,-3',
     'deictic.screenshot.2.position': '0,0',
     'deictic.screenshot.2.size': '300x24',
+    'deictic.note.1': 'Too close',
+    // A board takes no control characters in a label.
+    'deictic.note.2': 'Two lines',
   });
-  expect(message.labels['deictic.screenshot.2.note.1']).toBeUndefined();
+  expect(message.labels['deictic.screenshot.1.position']).toBeUndefined();
   expect(message.attachments?.map((a) => a.name)).toEqual([`${one.id}.png`, `${two.id}.png`]);
 });

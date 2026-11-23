@@ -79,7 +79,15 @@ function changeTasks(place: string, change: Change): Step {
       before.filter((task) => task.id !== remove),
     );
   }
-  const task: Task = { id: `demo-${++added}`, title: titleOf(change.text), text: change.text, state: 'ready', open: true };
+  const { point } = change;
+  const task: Task = {
+    id: `demo-${++added}`,
+    title: titleOf(change.text),
+    text: change.text,
+    state: 'ready',
+    open: true,
+    ...(point === undefined ? {} : { point }),
+  };
   return step(`add "${task.title}"`, [...before, task]);
 }
 

@@ -4,10 +4,31 @@
  * the rest to `more/<id>`. So a take the page leaves in the middle of (a recording that goes on to another
  * page) is kept up to there. `stop` sends the last of it and lets the mic go, so the browser's recording
  * light goes out between takes.
+ *
+ * Its tool in the tool panel is the mic: on, it's a take, with its time and the mic's live waveform, so it's plain
+ * it hears; off again, the clip goes in the tray, for the next task. While a recording is going the mic is the
+ * recording's own, and this one is away.
  */
+import { toolButton } from '#src/client/dom.ts';
+import { liveWaveform } from '#src/client/waveform.ts';
 import { defineClientPlugin } from '#src/index.ts';
 
-import type { Clip, Voice } from './index.ts';
+import type { Clip, Take, Voice } from './index.ts';
+
+const STYLE = `
+.voice-tool .time { font: 12px ui-monospace, monospace; }
+.voice-tool .wave { width: 44px; height: 18px; }
+.tool-panel.vertical .voice-tool .wave { width: 28px; }
+.voice-tool .mic[aria-pressed='true'], .voice-tool .mic[aria-pressed='true']:hover { background: #ef4444; color: #fff; }
+/* The recordings plugin's own mic is in the panel while one is going (its \`.recorder.going\`): one mic at a time. */
+.tool-panel:has(.recorder.going) :is(.voice-tool, .sep:has(+ .voice-tool)) { display: none; }
+`;
+const MIC = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+
+const clock = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 /** What the browser can record, best first: Opus in WebM where it can (Chrome, Firefox), else MP4 (Safari). */
 const TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
@@ -16,8 +37,8 @@ const EVERY = 1000;
 
 export default defineClientPlugin<never, never, Voice>({
   name: 'voice',
-  setup: ({ base, request }) => ({
-    start: async () => {
+  setup: ({ base, request, tools, tray }) => {
+    const start = async (): Promise<Take> => {
       if (typeof MediaRecorder === 'undefined' || navigator.mediaDevices?.getUserMedia === undefined)
         throw new Error("voice: this browser can't record the mic here: it needs a secure page (https or localhost)");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch((e: unknown) => {
@@ -75,6 +96,66 @@ export default defineClientPlugin<never, never, Voice>({
           return { id: id!, url: url ?? `${base}__deictic/plugins/voice/clip/${id}`, duration, type: typeOf() };
         },
       };
-    },
-  }),
+    };
+
+    const group = Object.assign(document.createElement('div'), { className: 'tool-group voice-tool' });
+    const time = Object.assign(document.createElement('span'), { className: 'time', hidden: true });
+    const wave = Object.assign(document.createElement('canvas'), { className: 'wave', hidden: true });
+    let take: Take | undefined;
+    // What the mic is doing (asking for it, keeping a take): the next press waits for it.
+    let busy: Promise<void> = Promise.resolve();
+    const problem = (e: unknown) => {
+      mic.classList.add('problem');
+      mic.title = e instanceof Error ? e.message : String(e);
+    };
+    const on = async () => {
+      const mine = await start();
+      take = mine;
+      // The panel stays while the mic is on: its button is what turns it off.
+      const unkeep = tools.keep();
+      const stopWave = liveWaveform(wave, mine.stream, { played: '#ef4444', rest: '#52525b' });
+      const tick = () => (time.textContent = clock(Date.now() - mine.started));
+      tick();
+      const ticking = setInterval(tick, 250);
+      time.hidden = wave.hidden = false;
+      mic.setAttribute('aria-pressed', 'true');
+      mic.title = 'Stop';
+      return async () => {
+        take = undefined;
+        clearInterval(ticking);
+        stopWave();
+        time.hidden = wave.hidden = true;
+        mic.setAttribute('aria-pressed', 'false');
+        mic.title = 'Voice';
+        unkeep();
+        const clip = await mine.stop();
+        tray.add('voice', clip.id, clip);
+      };
+    };
+    let off: (() => Promise<void>) | undefined;
+    const mic = toolButton(MIC, 'Voice', 'K', () => {
+      busy = busy.then(async () => {
+        mic.classList.remove('problem');
+        try {
+          if (off === undefined) {
+            off = await on();
+          } else {
+            const ending = off;
+            off = undefined;
+            await ending();
+          }
+        } catch (e) {
+          problem(e);
+        }
+      });
+    });
+    mic.classList.add('mic');
+    mic.setAttribute('aria-pressed', 'false');
+    group.append(Object.assign(document.createElement('style'), { textContent: STYLE }), mic, time, wave);
+    tools.add(group);
+    // A take the page leaves in the middle of is kept as far as it's sent, and the mic let go.
+    addEventListener('pagehide', () => take?.cancel());
+
+    return { start };
+  },
 });

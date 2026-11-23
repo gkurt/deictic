@@ -7,7 +7,7 @@
  * open the element stays lit, tied to the popup by a line that follows both. Nothing here takes the pointer, and
  * the page comes back to full light once the pointer has been out on it a moment.
  */
-import type { Target } from '#src/index.ts';
+import type { Point, Target } from '#src/index.ts';
 
 import { div, nameOf, place, reduced } from './dom.ts';
 
@@ -31,8 +31,8 @@ export interface Lighting {
   /** Shows what's pointed at. Not `glide`: it moved with the page, which nothing eases. */
   point(at: Pointed, glide?: boolean): void;
   hide(): void;
-  /** Marks the element the popup (`panel`) is open on, for as long as it is. Answers what ends it. */
-  hold(element: Element, panel: HTMLElement): () => void;
+  /** Marks the element the popup (`panel`) is open on, or the spot `at` in it, for as long as it is. Answers what ends it. */
+  hold(element: Element, panel: HTMLElement, at?: Point): () => void;
 }
 
 /**
@@ -42,6 +42,15 @@ export interface Lighting {
 export const CLEAR = 8;
 
 const grown = (r: DOMRect) => new DOMRect(r.left - CLEAR, r.top - CLEAR, r.width + 2 * CLEAR, r.height + 2 * CLEAR);
+
+/** How far around a spot its light reaches, in pixels: a circle that shows what's under the point. */
+const SPOT = 16;
+
+/** A spot in an element, as the box its light fills. */
+export function spotOf(element: Element, at: Point): DOMRect {
+  const r = element.getBoundingClientRect();
+  return new DOMRect(r.left + at.x - SPOT, r.top + at.y - SPOT, 2 * SPOT, 2 * SPOT);
+}
 
 /** How long the pointer is out on the page, in milliseconds, before the page gets its light back. */
 const LINGER = 700;
@@ -169,7 +178,7 @@ export function spotlight(root: ShadowRoot): Lighting {
       inner.classList.remove('shown');
       dark();
     },
-    hold(element, panel) {
+    hold(element, panel, at) {
       held = true;
       const lit = div('lit');
       lit.innerHTML = LIT;
@@ -193,7 +202,7 @@ export function spotlight(root: ShadowRoot): Lighting {
       const follow = () => {
         frame = requestAnimationFrame(follow);
         const on = element.isConnected;
-        const e = grown(element.getBoundingClientRect());
+        const e = at === undefined ? grown(element.getBoundingClientRect()) : spotOf(element, at);
         const p = panel.getBoundingClientRect();
         const now = on ? [e.left, e.top, e.width, e.height, p.left, p.top, p.width, p.height].join() : '';
         if (now === was) return;
@@ -201,7 +210,7 @@ export function spotlight(root: ShadowRoot): Lighting {
         lit.classList.toggle('shown', on);
         // An element that's not on the page has nothing to light: the page stays as it is.
         if (!on) return veil.classList.remove('shown');
-        const radius = radiusOf(element, e);
+        const radius = at === undefined ? radiusOf(element, e) : SPOT;
         if (first) light(e, radius, true);
         else place(veil, e);
         veil.style.borderRadius = `${radius}px`;

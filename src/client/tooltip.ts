@@ -40,9 +40,16 @@ export function tooltips(root: ShadowRoot): void {
     // Last in the root, over a modal or toolbar added since at the same z-index.
     if (tip !== root.lastElementChild) root.append(tip);
     tip.classList.add('shown');
-    // Centred below it, kept on screen; above it where there's no room below.
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();
+    // Beside it in a toolbar that runs down the window's side: below would be over the next tool.
+    if (el.closest('[aria-orientation="vertical"]') !== null) {
+      const left = r.right + 6 + t.width > innerWidth - 8 ? r.left - 6 - t.width : r.right + 6;
+      const top = Math.max(8, Math.min(r.top + r.height / 2 - t.height / 2, innerHeight - t.height - 8));
+      Object.assign(tip.style, { left: `${left}px`, top: `${top}px` });
+      return;
+    }
+    // Centred below it, kept on screen; above it where there's no room below.
     const left = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
     const top = r.bottom + 6 + t.height > innerHeight - 8 ? r.top - 6 - t.height : r.bottom + 6;
     Object.assign(tip.style, { left: `${left}px`, top: `${top}px` });

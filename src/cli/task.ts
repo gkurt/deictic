@@ -35,6 +35,12 @@ export function run(id: string, values: { out?: string }): void {
     ['deictic.url', (v) => v],
     ['deictic.viewport', (v) => `Viewport ${v}`],
     ['deictic.count', (v) => (v === '1' ? undefined : `${v} elements on the page come from that line`)],
+    [
+      'deictic.point',
+      // Circled only in a shot taken of the element as the task went, which is the one that says where the element is.
+      (v) =>
+        `About the spot at x,y ${v} in that element (CSS pixels from its top left)${label('deictic.screenshot.1.position') === undefined ? '' : ', circled in the screenshot'}`,
+    ],
     // A task added before shots were numbered had its one shot's place here.
     ['deictic.position', (v) => `In the screenshot at x,y ${v}, ${label('deictic.size') ?? '?'} (CSS pixels from its top left)`],
   ];

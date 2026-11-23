@@ -25,7 +25,8 @@
 ## What
 
 Hold **Alt** and point: the page dims around the element, lit with its tag and the file and line that rendered it. **Alt-click**,
-say what should change, and attach a screenshot to draw on, a screen recording or a voice note.
+and say what should change. Alt also brings up the tools: draw on the page, take a screenshot, record the screen or
+your voice, or pin a task to any point. What they make goes with your next task.
 
 The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a teammate or an agent to work.
 
@@ -33,7 +34,7 @@ The task goes to a [Vercel Board](https://vercel.com/docs/board), for you, a tea
 
 - **No describing where.** "The second button in the header on the pricing page" becomes `src/Header.tsx:12:5`.
   Every task carries the element's place in the source, the page and the viewport.
-- **Show, don't type.** Draw on a screenshot, record the bug as it happens, or just say it.
+- **Show, don't type.** Draw on the page, record the bug as it happens, or just say it.
 - **Agents pick it up.** A bundled skill watches the board and works each task as it arrives.
 - **Nothing in production.** It runs in your dev server only. A build has none of it.
 - **Any JSX.** Vite, Next.js, webpack, Rspack, Astro and Bun, server components too.

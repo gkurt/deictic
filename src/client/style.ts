@@ -207,6 +207,46 @@ export const STYLE = `
 @keyframes deictic-pulse {
   to { outline-offset: 14px; outline-color: transparent; }
 }
+/* The tool panel (tools.ts): the plugins' tools in a bar on an edge of the window, there while it's of use. */
+.tool-panel {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 12px;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: var(--deictic-fg);
+  background: linear-gradient(rgb(39 39 42 / 0.92), rgb(24 24 27 / 0.96));
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  user-select: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0s 0.15s;
+}
+.tool-panel.shown { opacity: 1; visibility: visible; transition: opacity 0.15s; }
+.tool-panel.vertical, .tool-panel.vertical .tool-group { flex-direction: column; }
+.tool-panel .tool-group { display: flex; align-items: center; gap: 4px; }
+.tool-panel .grip { display: inline-flex; padding: 2px; color: var(--deictic-muted); cursor: grab; touch-action: none; }
+.tool-panel .grip:active { cursor: grabbing; }
+.tool-panel .grip svg { width: 16px; height: 16px; }
+.tool-panel .sep { align-self: stretch; width: 1px; background: rgb(255 255 255 / 0.12); }
+.tool-panel.vertical .sep { width: auto; height: 1px; }
+/* A group with nothing to show now (a plugin's, hidden) has no line of its own either. */
+.tool-panel .sep:has(+ [hidden]) { display: none; }
+.tool-panel [hidden] { display: none; }
+.tool-panel button.icon { width: 28px; height: 26px; border-radius: 6px; color: var(--deictic-fg); }
+.tool-panel button.icon svg { width: 16px; height: 16px; }
+.tool-panel button[aria-pressed='true'], .tool-panel button[aria-pressed='true']:hover {
+  color: var(--deictic-on-accent);
+  background: var(--deictic-accent);
+}
+.tool-panel button.problem { color: var(--deictic-problem); }
+/* What a tool that picks a point takes the pointer with, over the page and under the popup. */
+.tool-surface { position: fixed; inset: 0; z-index: 2147483645; cursor: crosshair; }
 .lightbox {
   position: fixed;
   inset: 0;

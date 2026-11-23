@@ -2,7 +2,11 @@
  * The screenshots plugin's page half, around a renderer's capture: the renderer makes the shot (a PNG,
  * or what its server half makes one of), and this sends it to the plugin's `add` route and answers the
  * `Shot`. A renderer's page module default-exports `screenshotsClient(itsCapture)`.
+ *
+ * Its tool in the tool panel takes the window as it is, with what's drawn on the page, and puts the shot in the
+ * tray, for the next task.
  */
+import { toolButton } from '#src/client/dom.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { Annotations } from '#src/plugins/annotations/index.ts';
 
@@ -34,6 +38,8 @@ export function boxOf(element: Element, area: NonNullable<CaptureOptions['area']
 }
 
 const BLANK = '#d4d4d8';
+/** A camera, on a 24-pixel grid. */
+const CAMERA = '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
 
 const selector = (className: string, extra: string | undefined) => [`.${CSS.escape(className)}`, ...(extra ? [extra] : [])].join(', ');
 
@@ -66,7 +72,7 @@ export function mask(copy: Node, m: ResolvedMasking): void {
 export function screenshotsClient(capture: PageCapture) {
   return defineClientPlugin<never, never, Capture>({
     name: 'screenshots',
-    setup: ({ base, request, options, use }) => {
+    setup: ({ base, request, options, use, tools, tray }) => {
       const { masking, renderer } = options as { masking: ResolvedMasking; renderer: unknown };
       // Asked at each shot: the annotations plugin may be set up after this one.
       const overlay = (area: Box) => {
@@ -81,7 +87,7 @@ export function screenshotsClient(capture: PageCapture) {
         if (id === undefined) throw new Error(`screenshots: ${problem ?? res.statusText}`);
         return { id, url: url ?? `${base}__deictic/plugins/screenshots/shot/${id}`, box: drawn ?? box, size };
       };
-      return {
+      const api: Capture = {
         capture: async (element, { area = 'viewport' } = {}) => {
           const { body, type, box } = await capture(element, { area, masking, renderer, overlay });
           const { clientWidth, clientHeight } = document.documentElement;
@@ -95,6 +101,34 @@ export function screenshotsClient(capture: PageCapture) {
           return copy;
         },
       };
+
+      const group = Object.assign(document.createElement('div'), { className: 'tool-group' });
+      const shoot = toolButton(CAMERA, 'Screenshot', 'S', () => {
+        shoot.disabled = true;
+        shoot.classList.remove('problem');
+        // The panel stays while the shot is made: it's in none, as nothing of deictic's is.
+        const done = tools.keep();
+        api
+          .capture(document.documentElement)
+          .then(
+            (shot) => {
+              tray.add('screenshots', shot.id, shot);
+              shoot.title = 'Screenshot';
+            },
+            (e: unknown) => {
+              // Said where it was asked for: its tooltip, which a missing renderer's fix fits in.
+              shoot.classList.add('problem');
+              shoot.title = e instanceof Error ? e.message : String(e);
+            },
+          )
+          .finally(() => {
+            shoot.disabled = false;
+            done();
+          });
+      });
+      group.append(shoot);
+      tools.add(group);
+      return api;
     },
   });
 }

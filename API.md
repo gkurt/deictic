@@ -96,6 +96,31 @@ corner: how many, in the colour of the furthest along. With the Task tab open, a
 tasks, and a click opens them. The tab has the window's height: each task is a card that says its state and reads
 whole, and they scroll over the field.
 
+### The tool panel
+
+While the keys are held, a bar of the plugins' tools shows at the bottom of the window. It goes a moment after
+they're let go, unless it's in use: a tool has the page, a recording or the mic is on, or the pointer is on it. Its
+grip drags it to any edge of the window, where it stays. Each tool is an icon, its tooltip its name and its key. The
+keys work while the shortcut's are held, and while a tool has the page:
+
+| Key                                | Tool                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| `V`, `Esc`                         | The pointer: the page is the page's again                                 |
+| `M`, `A`, `B`, `N`                 | Box, arrow, pen and note, drawn on the page (annotations)                 |
+| `Ctrl+Z` (`⌘Z`), `Shift+Backspace` | Takes the last mark back, or all of them                                  |
+| `S`                                | A screenshot of the window, with what's drawn on it (screenshots)         |
+| `R`, `Shift+R`                     | Starts a recording, and stops it; discards it (recordings)                |
+| `K`                                | The mic: a voice note, or a recording's voice (voice)                     |
+| `T`                                | A task about a point: the next press on the page opens the Task tab there |
+
+A recording, the mic and a drawing tool keep the panel up: stop them (`R`, `K`, `Esc`) and it goes with the keys.
+What the tools make (shots, recordings, voice notes) waits for the next task, whichever element it's about: the Task
+tool counts them, and the Task tab lists each as a chip, to open or to leave out. Marks stay on the page until a task
+takes them.
+
+A task about a point is pinned on that point, not on an element's corner, and a shot taken as it goes has the point
+circled. It still names an element, the marked one under the point or the nearest to it, for its file and line.
+
 `recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
 network, which put the page's console and its requests in a recording. Each takes its
 options under its name, and `false` leaves it out (`recommended({ logs: false, network: false })`). Other plugins, your own included, go beside it:
@@ -145,14 +170,16 @@ In the Task tab a task's dot says its state, and who holds it while it's claimed
 A task's text is the words typed, and nothing else. The rest is its attachments and labels: `deictic.project`,
 `deictic.at` (the element's `file:line:column`), `deictic.file`, `deictic.url`, `deictic.viewport` and more, with your
 own beside them. What the attached files don't say is numbered from 1: `deictic.screenshot.1.position` and `.size`
-are where the element is in the first PNG attached, and `.note.1` a note drawn on it; `deictic.note.1` is a note drawn
+are where the element is in the first PNG attached, where that's a shot taken of it; `deictic.note.1` is a note drawn
 on the page; `deictic.recording.1.replay` is where the first recording plays back; `deictic.pointed` is the path to
 what was pointed at inside the element; `deictic.dropped.1` is something attached that wasn't kept any more.
+`deictic.point` is the spot a task about a point is on, `x,y` in CSS pixels from the element's top left.
 `deictic.source` is what it rendered through, out from its own place, as `Field (src/Field.tsx:20) ← Panel` (a shared
 component's line is the same wherever it's used; these say where: with React in development the components that use
 it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
-Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the box has the element outlined in it; one you annotated is as you drew it.
+Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the
+box has the element outlined in it, or the point circled; one taken from the tool panel is the window as it was.
 
 The tab lists the element's tasks, then the rest of its file's, folded away: each with its tag and line, which opens
 that element's tasks when it's on the page. A task stays with its element as lines above it change, while the opening
@@ -160,14 +187,13 @@ tag's first line is still the same and the file has it once.
 
 In the Task tab:
 
-- **Attach** adds a screenshot of the page, and **Annotate** opens it to draw boxes, arrows and notes on. Each
-  tool has a key, which its tooltip shows: `B` box, `A` arrow, `P` pen, `N` note, `Ctrl+Z` (`⌘Z`) to take the last
-  mark back and `Shift+Backspace` to clear them.
+- **Attach a screenshot** adds one of the page as the task goes, the element outlined in it.
 - **Attach HTML snapshot** adds the element as the page has it, as a file.
-- **Record** records the page as you use it, drawing as you go, with the mic on if you like. A reload, or a link to
-  another page of your site, leaves it going: stop it there, and the Task tab comes back with it, about the element
-  you started on, whether that page has it or not.
-- **Voice** records a note.
+- What the tool panel's tools made since the last task is under the field, a chip each: a shot, a recording, a voice
+  note. A chip opens it, and its × leaves it out. With a chip there, no other screenshot is taken. A recording
+  carries on over a reload, or a link to another page of your site: stop it there, and it's the next task's.
+- What's drawn on the page goes with the task, in its screenshot and as `deictic.note` labels, and is cleared once
+  the task is added.
 - The tasks already about the element are listed. An ID opens the task on the board, and a task no one has claimed
   can be edited or deleted. Undo takes any of it back.
 - Beside the channel it says who's watching it, `claude watching`, or `no agent watching`: whether a task you add
@@ -189,7 +215,7 @@ for ever. `init` offers to add it; otherwise `npx skills add gkurt/deictic`.
 | Plugin                | Options                                           |
 | --------------------- | ------------------------------------------------- |
 | `deictic/screenshots` | `renderer`, `keep` (100), `dir`, masking          |
-| `deictic/annotations` | `color`, `shortcut`                               |
+| `deictic/annotations` | `color`                                           |
 | `deictic/recordings`  | `keep` (20), `dir`, `canvas`, masking             |
 | `deictic/voice`       | `keep` (50), `dir`                                |
 | `deictic/logs`        | `levels`                                          |
@@ -324,12 +350,18 @@ export default defineClientPlugin<Model, Op>({
 - `read` and `apply` get the element's source, or a `Refusal` saying why it isn't to be found (the file doesn't parse,
   or the page runs other code than the file has): throw it where the plugin needs the source, or go on without, as
   tasks do. Text edits without it are refused.
-- `page: true` on the page half says its tab works on the page as a whole, as annotations' does: while it's shown,
-  the element isn't lit, and the page keeps its light.
 - `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held, and
   answers what takes it away: tasks pins each task where its element is.
-- `context.open(plugin, element)` opens the popup on another element. Not while the open one holds something
-  `unsaved`: its button shakes, and it answers false.
+- `context.open(plugin, element, at?)` opens the popup on another element, or on a point in it (`at`, in CSS pixels
+  from its top left, which the panel then gets as `context.at`). Not while the open one holds something `unsaved`:
+  its button shakes, and it answers false.
+- `context.tools` is the tool panel, for a page half's `setup`: `add(group)` puts a group of controls in it (buttons
+  with a `title`, and their keys in `aria-keyshortcuts`, which the panel hears), `hold(left)` takes the page for a
+  tool until the panel gives it back, `keep()` keeps the panel up while something goes on, and `pick()` answers the
+  next point pressed on the page, as a `Spot` (the element and the point in it).
+- `context.tray` is what the tools made that no task has taken: `add(plugin, id, value)`, `list(plugin?)`,
+  `remove(plugin, id?)` and `subscribe`. It's kept for the tab, over page loads. A plugin of yours can add to it, or
+  take from it as tasks does.
 - A panel leaves the popup for something on the page with `away(state, task)`, and is mounted again with `resumed`.
   Where the task outlasts a page load, as a recording does, the page half's `resume` answers it on the next page, and
   the popup comes back there: on the element, or without it (`element.isConnected` is false) where that page has none.
