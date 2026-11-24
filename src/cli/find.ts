@@ -140,7 +140,11 @@ export async function fromProject<T>(...names: string[]): Promise<T> {
   const project = createRequire(join(process.cwd(), 'package.json'));
   for (const name of names) {
     try {
-      return (await import(pathToFileURL(project.resolve(name)).href)) as T;
+      const module = (await import(pathToFileURL(project.resolve(name)).href)) as Record<string, unknown>;
+      // A CommonJS package whose exports Node can't name, as playwright-core's `module.exports = require(…)`, has
+      // them on `default` alone.
+      const exported = module.default;
+      return (typeof exported === 'object' && exported !== null ? { ...exported, ...module } : module) as T;
     } catch {
       // Not this one: the next name.
     }

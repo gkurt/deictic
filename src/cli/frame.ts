@@ -44,15 +44,18 @@ export async function run(ref: string, values: { nth: string; at?: string[]; eve
 
   const playwright = await fromProject<{ chromium: typeof chromium }>('playwright-core', 'playwright');
   let browser: Browser | undefined;
+  // Why each browser didn't launch, said where none did.
+  const tried: string[] = [];
   for (const channel of [undefined, 'chrome', 'msedge']) {
     try {
       browser = await playwright.chromium.launch(channel === undefined ? {} : { channel });
       break;
-    } catch {
-      // Not this one: the next.
+    } catch (e) {
+      tried.push(`${channel ?? "Playwright's Chromium"}: ${(e instanceof Error ? e.message : String(e)).split('\n', 1)[0]}`);
     }
   }
-  if (browser === undefined) fail('No Chromium to launch: npx playwright install chromium, or install Chrome or Edge.');
+  if (browser === undefined)
+    fail(`No Chromium to launch (${tried.join('; ')}): npx playwright install chromium, or install Chrome or Edge.`);
   try {
     // `bare`: the replay alone, at the recorded size, so a window that size shows it 1:1.
     const view = await browser.newPage({ viewport: kept.viewport });
