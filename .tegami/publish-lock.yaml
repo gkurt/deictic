@@ -1,37 +1,33 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### The popup closes once a task is added\n"
-    filename: close-on-add.md
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic frame` finds the project's Playwright\n\n`deictic frame` said \"No Chromium to launch\" with Chromium installed, as `playwright-core` names its exports only on `default` to an `import`. The command now reads them there, and says why each browser failed to launch where none did.\n"
+    filename: frame-playwright.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### deictic's own problems are tasks on the board\n\nA package the project hasn't installed, a plugin that failed to set up on the dev server or in the page, or a request\nthat broke is posted as a task, once while it's open, saying what to do: fix the setup, or report deictic's bug.\n`tasks({ problems: false })` posts none. Plugins report their own with `context.report(problem)`, and hear them with\n`problem(problem)`; a server plugin whose `setup` throws no longer stops the others.\n"
-    filename: problem-tasks.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A task's pin is on the element it's about, of several from one line\n\nA task about one of a list's items says which (`deictic.nth`, and its text as `deictic.text`), and its pin and outline\nfind that one, not the first.\n\n### A screenshot of a page with smooth scrolling is where the page was scrolled\n"
-    filename: which-element.md
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A screenshot shows what the page's canvases drew\n\nThe `rrweb()` renderer drew every `<canvas>` blank, WebGL's and 2D's alike. A shot now has each canvas's picture, a WebGL canvas's too, which keeps its drawing buffer unless the page says otherwise.\n\n### A screenshot no longer says SCRIPT_PLACEHOLDER\n\nA page with a `<script>` in its body had the text SCRIPT_PLACEHOLDER in the `rrweb()` renderer's shot, where rrweb keeps the script.\n"
+    filename: screenshot-canvases.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - close-on-add.md
-      - problem-tasks.md
-      - which-element.md
+      - frame-playwright.md
+      - screenshot-canvases.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
-  - id: npm:example-vite
+  - id: npm:example-slop
     updated: false
   - id: npm:example-rspack
     updated: false
   - id: npm:example-bun
     updated: false
-  - id: npm:example-slop
+  - id: npm:example-vite
     updated: false
   - id: npm:example-next
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
-  - id: npm:example-vite
+  - id: npm:example-slop
   - id: npm:example-rspack
   - id: npm:example-bun
-  - id: npm:example-slop
+  - id: npm:example-vite
   - id: npm:example-next
