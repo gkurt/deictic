@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import type { Browser } from 'playwright-core';
 import type * as Rrweb from 'rrweb-snapshot';
 
+import { CANVAS_SIZE } from './canvas.ts';
 import type { Box, BrowserOptions } from './index.ts';
 
 /** What the page sends: its snapshot and what's needed to show it as the page does. */
@@ -98,7 +99,9 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
     await page.route(host, (route) => route.fulfill({ contentType: 'text/html', body: HOST }));
     await page.goto(host);
     await page.addScriptTag({ path: bundle() });
-    const found = await page.evaluate(async ({ snapshot, scroll, overlay, element }) => {
+    // The shot, and the attribute that sizes each canvas's picture, which the page's code can't import.
+    const given = { ...shot, size: CANVAS_SIZE };
+    const found = await page.evaluate(async ({ snapshot, scroll, overlay, element, size }) => {
       const { rebuildIntoSandboxedIframe, createCache, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb })
         .rrwebSnapshot;
       const mirror = createMirror();
@@ -110,14 +113,33 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
       });
       const doc = iframe.contentDocument;
       if (doc === null) throw new Error('screenshots: the snapshot was rebuilt where it cannot be read');
+      // By its kind: the iframe's elements aren't instances of this page's `Element`.
+      const isElement = (node: Node | null): node is Element => node?.nodeType === 1;
+      // rrweb rebuilds a script as a `noscript` holding SCRIPT_PLACEHOLDER, which the sandbox, running no scripts,
+      // shows: hidden, as rrweb's own replayer hides it.
+      const hidden = doc.createElement('style');
+      hidden.textContent = 'noscript { display: none !important; }';
+      doc.head.append(hidden);
+      // The sandbox runs no scripts, and where scripts don't run, a canvas shows what's inside the canvas instead of
+      // what was drawn on the canvas: so each canvas's picture goes inside the canvas, at the size the page laid the
+      // canvas out at. rrweb's own drawing of the picture on the canvas never shows.
+      for (const canvas of doc.querySelectorAll(`canvas[${size}]`)) {
+        const meta = mirror.getMeta(canvas);
+        const [box, inline] = (canvas.getAttribute(size) ?? '').split(' ');
+        const [width, height] = (box ?? '').split('x');
+        if (meta === null || !('attributes' in meta) || typeof meta.attributes.rr_dataURL !== 'string') continue;
+        const picture = doc.createElement('img');
+        picture.src = meta.attributes.rr_dataURL;
+        // In a line as the canvas was, else the whole of the canvas's box.
+        picture.style.cssText = `display:${inline === undefined ? 'block' : 'inline'};width:${width}px;height:${height}px`;
+        canvas.replaceChildren(picture);
+      }
       await doc.fonts.ready;
       await Promise.all([...doc.images].map((img) => img.decode().catch(() => {})));
       // At once: a page with `scroll-behavior: smooth` would glide there, and be shot on its way.
       iframe.contentWindow?.scrollTo({ left: scroll.x, top: scroll.y, behavior: 'instant' });
       // rrweb scrolled each element as it built it, before the fonts and images gave its content its height:
       // one that couldn't scroll that far yet is scrolled again now.
-      // By its kind: the iframe's elements aren't instances of this page's `Element`.
-      const isElement = (node: Node | null): node is Element => node?.nodeType === 1;
       for (const id of mirror.getIds()) {
         const node = mirror.getNode(id);
         const meta = node === null ? null : mirror.getMeta(node);
@@ -141,7 +163,7 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
       marks.innerHTML = overlay;
       document.body.append(marks);
       return box;
-    }, shot);
+    }, given);
     // Without the scrollbars: a shot is what the page is drawn in, which is what an element's box is from.
     // A shot of the element alone is cut where the element is here.
     const clip = clamp(shot.clip === undefined ? { x: 0, y: 0, ...shot.viewport } : (found ?? shot.clip), shot.viewport);

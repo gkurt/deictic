@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import type { Browser, Page } from 'playwright-core';
 import type * as Rrweb from 'rrweb-snapshot';
 
+import { CANVAS_SIZE, keepWebGLDrawing } from '#src/plugins/screenshots/canvas.ts';
 import { browserOf, render, type Snapshot } from '#src/plugins/screenshots/playwright.ts';
 
 const browser: Browser | undefined = await browserOf({}).catch(() => undefined);
@@ -32,6 +33,18 @@ const server = Bun.serve({
         <h1>Pricing</h1><code>npm install -D deictic</code>
         <p>Signed in as <span class="rr-mask">Ada Lovelace</span></p>
         <div class="panel"><label></label><div class="tall"></div></div>
+        <!-- A canvas the page draws with WebGL, asking for no drawing buffer kept, one it draws in 2D, and the
+        script, which rrweb keeps as SCRIPT_PLACEHOLDER. -->
+        <canvas id="gl" width="120" height="40"></canvas><canvas id="flat" width="120" height="40"></canvas>
+        <script>
+          // Once, as a page that draws only as something changes does, then still.
+          const gl = document.getElementById('gl').getContext('webgl');
+          gl.clearColor(0, 0.6, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+          const flat = document.getElementById('flat').getContext('2d');
+          flat.fillStyle = '#c000c0';
+          flat.fillRect(0, 0, 120, 40);
+        </script>
         <div class="tall"></div><p id="below">Further down</p>
         <deictic-overlay><div style="position:fixed;inset:0;background:red"></div></deictic-overlay>
       </body></html>`,
@@ -48,17 +61,34 @@ const ALLOWED = Math.round(viewport.width * viewport.height * 0.0005);
 /** The page, open, with what the page half sends for it. */
 async function open(): Promise<{ page: Page; snapshot: (scroll?: number, element?: string) => Promise<Snapshot> }> {
   const page = await browser!.newPage({ viewport, deviceScaleFactor: 1 });
+  // As the page half does as the page loads.
+  await page.addInitScript(keepWebGLDrawing);
   await page.goto(server.url.href);
   await page.addScriptTag({ path: bundle });
   const snapshot = async (scroll = 0, element?: string) => {
     await page.evaluate((y) => scrollTo({ top: y, behavior: 'instant' }), scroll);
     // As the page half takes it: masked as rrweb masks, without deictic's overlay.
-    const { taken, id } = await page.evaluate((selector) => {
-      const { snapshot, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot;
-      const mirror = createMirror();
-      const taken = snapshot(document, { mirror, inlineStylesheet: true, maskTextClass: 'rr-mask' });
-      return { taken, id: selector === undefined ? undefined : mirror.getId(document.querySelector(selector)) };
-    }, element);
+    const { taken, id } = await page.evaluate(
+      async ({ selector, size }) => {
+        const { snapshot, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot;
+        const mirror = createMirror();
+        // In a frame, with the canvases as pictures, as the page half takes it.
+        const taken = await new Promise<ReturnType<typeof snapshot>>((done) =>
+          requestAnimationFrame(() =>
+            done(snapshot(document, { mirror, inlineStylesheet: true, recordCanvas: true, maskTextClass: 'rr-mask' })),
+          ),
+        );
+        for (const canvas of document.querySelectorAll('canvas')) {
+          const node = mirror.getMeta(canvas);
+          if (node !== null && 'attributes' in node && typeof node.attributes.rr_dataURL === 'string') {
+            node.attributes[size] =
+              `${canvas.offsetWidth}x${canvas.offsetHeight}${getComputedStyle(canvas).display === 'inline' ? ' inline' : ''}`;
+          }
+        }
+        return { taken, id: selector === undefined ? undefined : mirror.getId(document.querySelector(selector)) };
+      },
+      { selector: element, size: CANVAS_SIZE },
+    );
     const strip = (node: Snapshot['snapshot']): Snapshot['snapshot'] =>
       'childNodes' in node
         ? {
@@ -175,7 +205,9 @@ test.skipIf(browser === undefined)(
       },
       [...png],
     );
-    expect(size).toEqual([Math.round(box!.width), Math.round(box!.height)]);
+    // Measured in the rebuilt page, where text may lay out a fraction of a pixel apart from the live page's.
+    expect(Math.abs(size[0]! - box!.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(size[1]! - box!.height)).toBeLessThanOrEqual(1);
     await page.close();
   },
   30_000,

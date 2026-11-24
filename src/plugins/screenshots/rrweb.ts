@@ -5,8 +5,12 @@
  * And which node of the snapshot the element is, so the server says where it is in what it drew.
  */
 
+import { CANVAS_SIZE, keepWebGLDrawing } from './canvas.ts';
 import { boxOf, screenshotsClient } from './client.ts';
 import type { Snapshot, SnapshotNode } from './playwright.ts';
+
+// As the page loads, before the page makes its canvases.
+keepWebGLDrawing();
 
 /** The snapshot without deictic's overlay, which rrweb has no option to leave out. */
 function withoutOurs(node: SnapshotNode): SnapshotNode {
@@ -20,16 +24,33 @@ export default screenshotsClient(async (element, { area, masking, overlay }) => 
     throw new Error('the rrweb() renderer needs rrweb-snapshot: add it to your devDependencies', { cause: e });
   });
   const mirror = createMirror();
-  const taken = snapshot(document, {
-    mirror,
-    inlineStylesheet: true,
-    blockClass: masking.blockClass,
-    blockSelector: masking.blockSelector ?? null,
-    maskTextClass: masking.maskTextClass,
-    maskTextSelector: masking.maskTextSelector ?? null,
-    maskAllInputs: masking.maskAllInputs,
-  });
+  // In a frame, after the page drew in it: a WebGL canvas reads back blank once its frame is shown, unless the page
+  // keeps its drawing buffer, and the page's own callbacks for the frame were asked for before this one.
+  const taken = await new Promise<ReturnType<typeof snapshot>>((done) =>
+    requestAnimationFrame(() =>
+      done(
+        snapshot(document, {
+          mirror,
+          inlineStylesheet: true,
+          // A canvas as a picture of what it shows, which the server draws on the canvas it rebuilds.
+          recordCanvas: true,
+          blockClass: masking.blockClass,
+          blockSelector: masking.blockSelector ?? null,
+          maskTextClass: masking.maskTextClass,
+          maskTextSelector: masking.maskTextSelector ?? null,
+          maskAllInputs: masking.maskAllInputs,
+        }),
+      ),
+    ),
+  );
   if (taken === null) throw new Error('screenshots: rrweb took no snapshot of this page');
+  // Each canvas's size as the page lays it out, and whether in a line, as which the server shows the canvas's picture.
+  for (const canvas of document.querySelectorAll('canvas')) {
+    const node = mirror.getMeta(canvas);
+    if (node === null || !('attributes' in node) || typeof node.attributes.rr_dataURL !== 'string') continue;
+    const inline = getComputedStyle(canvas).display === 'inline';
+    node.attributes[CANVAS_SIZE] = `${canvas.offsetWidth}x${canvas.offsetHeight}${inline ? ' inline' : ''}`;
+  }
   const box = boxOf(element, area);
   const viewport = { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
   // Over the viewport, which the server renders before cutting out an element's part.

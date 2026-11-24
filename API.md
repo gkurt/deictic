@@ -289,7 +289,8 @@ screenshots({ renderer: dom() }); // drawn in the page with modern-screenshot: n
 ```
 
 `rrweb()` uses Playwright's Chromium (`npx playwright install chromium`), else Chrome or Edge; `channel` or
-`executablePath` names one.
+`executablePath` names one. A shot has what a `<canvas>` shows, WebGL's included: `rrweb()` has a WebGL canvas keep
+its drawing buffer unless the page says otherwise.
 
 Masking follows [rrweb](https://github.com/rrweb-io/rrweb)'s names and defaults: `rr-block` blanks an element
 (`blockClass`, `blockSelector`), `rr-mask` masks its text (`maskTextClass`, `maskTextSelector`), and `maskAllInputs`

@@ -271,7 +271,12 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `box` as it's drawn there (measured in the rebuilt page, as the two can lay out a few pixels apart, and what the `Shot` then has; a `render` may answer `{ png, box }`): it rebuilds it in a sandboxed iframe on a blank page of
   the page's origin (Playwright answers it) in a browser launched once (Playwright's Chromium, then Chrome, then
   Edge), and screenshots it. The browser is the window's size and shows its scrollbars (media queries ask the window's
-  width, the layout has what the scrollbar leaves), and the shot is cut to the viewport, scrolled at once (never the page's `scroll-behavior: smooth`). Masking options follow rrweb's names and defaults. Optional peers, each imported on
+  width, the layout has what the scrollbar leaves), and the shot is cut to the viewport, scrolled at once (never the page's `scroll-behavior: smooth`). Canvases (`canvas.ts`): the page half
+  makes WebGL contexts keep their drawing buffer as the page loads (`keepWebGLDrawing`, where the page doesn't say),
+  snapshots in a frame with `recordCanvas`, and gives each canvas its laid-out size (`CANVAS_SIZE`); the sandbox runs no
+  scripts, so a canvas there shows its fallback content, never its drawing, and the server puts the picture inside the
+  canvas as an `img` at that size. The sandbox shows `noscript` too, where rrweb rebuilds each script as
+  SCRIPT_PLACEHOLDER: hidden, as rrweb's replayer hides it. Masking options follow rrweb's names and defaults. Optional peers, each imported on
   first use. `test/rrweb.test.ts` compares a render with the live page by brightness (the iframe's text has no
   colour fringes) and skips without a browser.
 - `src/plugins/annotations/`: marks on the page, page half only, no tab. `index.ts` is the types (`Shape`: box,
