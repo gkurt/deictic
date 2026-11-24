@@ -1,3 +1,17 @@
+## deictic@0.8.1
+
+### `deictic frame` finds the project's Playwright
+
+`deictic frame` said "No Chromium to launch" with Chromium installed, as `playwright-core` names its exports only on `default` to an `import`. The command now reads them there, and says why each browser failed to launch where none did.
+
+### A screenshot shows what the page's canvases drew
+
+The `rrweb()` renderer drew every `<canvas>` blank, WebGL's and 2D's alike. A shot now has each canvas's picture, a WebGL canvas's too, which keeps its drawing buffer unless the page says otherwise.
+
+### A screenshot no longer says SCRIPT_PLACEHOLDER
+
+A page with a `<script>` in its body had the text SCRIPT_PLACEHOLDER in the `rrweb()` renderer's shot, where rrweb keeps the script.
+
 ## deictic@0.8.0
 
 ### The popup closes once a task is added
