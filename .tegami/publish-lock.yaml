@@ -1,25 +1,45 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### `deictic frame` finds the project's Playwright\n\n`deictic frame` said \"No Chromium to launch\" with Chromium installed, as `playwright-core` names its exports only on `default` to an `import`. The command now reads them there, and says why each browser failed to launch where none did.\n"
-    filename: frame-playwright.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `recommended()` is `deicticRecommended()`, so it doesn't clash with other presets' `recommended`\n"
+    filename: deictic-recommended.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### A screenshot shows what the page's canvases drew\n\nThe `rrweb()` renderer drew every `<canvas>` blank, WebGL's and 2D's alike. A shot now has each canvas's picture, a WebGL canvas's too, which keeps its drawing buffer unless the page says otherwise.\n\n### A screenshot no longer says SCRIPT_PLACEHOLDER\n\nA page with a `<script>` in its body had the text SCRIPT_PLACEHOLDER in the `rrweb()` renderer's shot, where rrweb keeps the script.\n"
-    filename: screenshot-canvases.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### In a React project, a task attaches the props, state and hooks of the components that wrote its element as `react.json`\n\n`deicticRecommended()` adds `reactState()` (`deictic/react`, read with bippy) where React is installed, and `deictic init` installs bippy there.\n"
+    filename: react-state.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A recording can have React's commits: press React (P) among its controls, and the replay and `deictic recording` list what rendered, how long it took and why\n"
+    filename: react-recordings.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A recording has eleven entries of React's commits a second at most: past ten, the rest of the second is one, with its slowest commit\n"
+    filename: react-rate.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `deictic recording` lists what the person did and what went wrong, and counts the page's other requests, console lines and React commits: `--only` or `--all` lists them\n"
+    filename: quiet-timeline.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `react.json` says how each component rendered: how often, how recently, how long, and why\n"
+    filename: react-renders.md
+    v: 0.0.0
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task's screenshot is the page as it was when you Alt-clicked, with what was hovered and focused: a tooltip, a hover card or a menu the popup would close is still in it\n"
+    filename: frozen-shots.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - frame-playwright.md
-      - screenshot-canvases.md
+      - deictic-recommended.md
+      - react-state.md
+      - react-recordings.md
+      - react-rate.md
+      - quiet-timeline.md
+      - react-renders.md
+      - frozen-shots.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
   - id: npm:example-slop
     updated: false
-  - id: npm:example-rspack
-    updated: false
   - id: npm:example-bun
     updated: false
   - id: npm:example-vite
+    updated: false
+  - id: npm:example-rspack
     updated: false
   - id: npm:example-next
     updated: false
@@ -27,7 +47,7 @@ npm:packages:
   - id: npm:deictic
   - id: npm:site
   - id: npm:example-slop
-  - id: npm:example-rspack
   - id: npm:example-bun
   - id: npm:example-vite
+  - id: npm:example-rspack
   - id: npm:example-next

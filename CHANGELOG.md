@@ -1,3 +1,21 @@
+## deictic@0.9.0
+
+### `recommended()` is `deicticRecommended()`, so it doesn't clash with other presets' `recommended`
+
+### In a React project, a task attaches the props, state and hooks of the components that wrote its element as `react.json`
+
+`deicticRecommended()` adds `reactState()` (`deictic/react`, read with bippy) where React is installed, and `deictic init` installs bippy there.
+
+### A recording can have React's commits: press React (P) among its controls, and the replay and `deictic recording` list what rendered, how long it took and why
+
+### A recording has eleven entries of React's commits a second at most: past ten, the rest of the second is one, with its slowest commit
+
+### `deictic recording` lists what the person did and what went wrong, and counts the page's other requests, console lines and React commits: `--only` or `--all` lists them
+
+### `react.json` says how each component rendered: how often, how recently, how long, and why
+
+### A task's screenshot is the page as it was when you Alt-clicked, with what was hovered and focused: a tooltip, a hover card or a menu the popup would close is still in it
+
 ## deictic@0.8.1
 
 ### `deictic frame` finds the project's Playwright
