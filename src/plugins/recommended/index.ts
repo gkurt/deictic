@@ -57,7 +57,4 @@ export function deicticRecommended(options: RecommendedOptions = {}): ServerPlug
   return plugins;
 }
 
-/** @deprecated `deicticRecommended`, as `deictic init` writes it now: this name clashes with other presets'. */
-export const recommended = deicticRecommended;
-
 export default deicticRecommended;
