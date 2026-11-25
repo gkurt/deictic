@@ -204,6 +204,20 @@
         "default": "./dist/network/client.js"
       }
     },
+    "./react": {
+      "deictic@dev": "./src/plugins/react/index.ts",
+      "default": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      }
+    },
+    "./react/client": {
+      "deictic@dev": "./src/plugins/react/client.ts",
+      "default": {
+        "types": "./dist/react/client.d.ts",
+        "default": "./dist/react/client.js"
+      }
+    },
     "./recommended": {
       "deictic@dev": "./src/plugins/recommended/index.ts",
       "default": {
@@ -267,11 +281,13 @@
     "@rrweb/rrweb-plugin-network-record": "2.2.2",
     "@rspack/core": "2.3.3",
     "@types/bun": "^1.4.5",
+    "@types/react": "^19.3.0",
     "@vercel/board": "^0.54.0",
     "@vitejs/plugin-react": "^6.3.0",
     "astro": "^7.4.13",
     "babel-loader": "^10.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
+    "bippy": "0.7.3",
     "launch-editor": "2.14.2",
     "modern-screenshot": "^4.7.0",
     "next": "^16.4.6",
@@ -296,10 +312,12 @@
     "@rspack/core": ">=1",
     "@vercel/board": ">=0.53.0",
     "astro": ">=5",
+    "bippy": "^0.7.3",
     "launch-editor": "^2.9.0",
     "modern-screenshot": "^4.7.0",
     "next": ">=16",
     "playwright-core": "^1.50.0",
+    "react": ">=18",
     "rrweb": "^2.2.2",
     "rrweb-player": "^2.2.2",
     "rrweb-snapshot": "^2.2.2",
@@ -322,6 +340,9 @@
     "astro": {
       "optional": true
     },
+    "bippy": {
+      "optional": true
+    },
     "launch-editor": {
       "optional": true
     },
@@ -332,6 +353,9 @@
       "optional": true
     },
     "playwright-core": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     },
     "rrweb": {

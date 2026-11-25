@@ -183,6 +183,10 @@ function attachments(message: Message, out: string | undefined, indent: string, 
       if (task === undefined) console.log(`${indent}  ${ME} voice ${/^voice-(.+)\.\w+$/.exec(a.name)?.[1] ?? a.id} (speech)`);
     } else if (a.name === 'element.html') {
       console.log(`${indent}${a.name} (${kb}), the element's HTML as it rendered, if you need it${saved}`);
+    } else if (/^react(\.\d+)?\.json$/.test(a.name)) {
+      console.log(
+        `${indent}${a.name} (${kb}), the props, state and hooks of the components that wrote it, as React's DevTools has them, if the change depends on them${saved}`,
+      );
     } else {
       console.log(`${indent}${a.name} (${kb})${saved}`);
     }

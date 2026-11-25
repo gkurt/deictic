@@ -229,7 +229,7 @@ export interface Op {
    * The other elements it's about, after the one it's sent on, in the order they were attached: each one's place,
    * its tag, and its HTML as it rendered, where that's attached.
    */
-  also?: { at: string; tag: string; html?: string }[];
+  also?: { at: string; tag: string; html?: string; react?: string }[];
   /**
    * No element is attached: it's about the page, and the element it's sent on is only where the popup was. It has
    * no place then, so no element's tab lists it and nothing pins it.
@@ -244,6 +244,11 @@ export interface Op {
   chain?: string[];
   /** The element's HTML as it rendered, to attach: cut short, and masked where the screenshots plugin is loaded. */
   html?: string;
+  /**
+   * What React's DevTools would show of the components that wrote it, as JSON, to attach as `react.json`: where the
+   * react plugin is loaded, and sent with the HTML.
+   */
+  react?: string;
   /**
    * Shots the screenshots plugin took, to attach, where that plugin is loaded: each with where the element is in
    * it (`box`, for one taken of the element; one taken of the window from the tool panel has none), whether
@@ -607,8 +612,14 @@ export function tasks(options: TasksOptions = {}) {
     if (html !== undefined) files.push({ data: new TextEncoder().encode(html.slice(0, HTML)), name: 'element.html', type: 'text/html' });
     else if (op.pointed !== undefined)
       files.push({ data: new TextEncoder().encode(op.pointed.html.slice(0, HTML)), name: 'pointed.html', type: 'text/html' });
+    const json = (of: unknown, name: string) => {
+      if (typeof of === 'string' && of !== '')
+        files.push({ data: new TextEncoder().encode(of.slice(0, REACT)), name, type: 'application/json' });
+    };
+    json(op.react, 'react.json');
     // The others': the Nth element's is `element.N.html`, the first being the one it's sent on.
     for (const [i, other] of (op.also ?? []).entries()) {
+      json(other.react, `react.${i + 2}.json`);
       if (typeof other.html !== 'string' || other.html === '') continue;
       files.push({ data: new TextEncoder().encode(other.html.slice(0, HTML)), name: `element.${i + 2}.html`, type: 'text/html' });
     }
@@ -845,7 +856,7 @@ function textPage(name: string, text: string): string {
 type Kind = 'screenshot' | 'recording' | 'voice clip' | 'voice note';
 
 /** What a task or a reply attaches: files, and what the labels say of them. */
-type Attaching = Partial<Pick<Op, 'screenshots' | 'recordings' | 'voice' | 'annotations' | 'html' | 'pointed' | 'also'>>;
+type Attaching = Partial<Pick<Op, 'screenshots' | 'recordings' | 'voice' | 'annotations' | 'html' | 'react' | 'pointed' | 'also'>>;
 
 /**
  * A message's files, as the drawer shows them: each recording with where it replays, which its
@@ -912,6 +923,9 @@ const boxOf = ({ x, y, width, height }: Box) => [x, y, width, height].map(Math.r
 
 /** What `element.html` holds of an element at most, in characters: a table's rows, not a whole page. */
 const HTML = 100_000;
+
+/** What `react.json` holds at most, in characters: the page half cuts it to less. */
+const REACT = 250_000;
 
 /** A label's value: a board holds 256 characters. */
 const LABEL = 256;

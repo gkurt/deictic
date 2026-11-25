@@ -30,6 +30,8 @@ export default defineConfig({
     'logs/client': 'src/plugins/logs/client.ts',
     'network/index': 'src/plugins/network/index.ts',
     'network/client': 'src/plugins/network/client.ts',
+    'react/index': 'src/plugins/react/index.ts',
+    'react/client': 'src/plugins/react/client.ts',
     'recommended/index': 'src/plugins/recommended/index.ts',
   },
   format: 'esm',

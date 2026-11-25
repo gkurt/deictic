@@ -226,6 +226,19 @@ export default defineClientPlugin<Model, Op>({
     // The server half's `html` option, which takes the button away; a page half with no options (a `standalone` server's) has it.
     const sendsHtml = (context.options as { html?: boolean } | undefined)?.html !== false;
     const own = (): About[] => [{ target: context.target, own: true, el: context.element }];
+    const inspector = context.use('react');
+    /**
+     * What React's DevTools would show of an element, where the react plugin is loaded: read now, while the page has
+     * it, or as the panel left it. A read that fails leaves it out, not the task.
+     */
+    const reactOf = async (a: About): Promise<string | undefined> => {
+      const el = onPage(a);
+      if (el === undefined) return a.seen?.react;
+      return inspector?.snapshot(el).catch((e: unknown) => {
+        console.warn('deictic: the task goes without react.json', e);
+        return undefined;
+      });
+    };
 
     /**
      * What the page says of an element: read now, while the page has it, and as the panel left it where the page
@@ -273,10 +286,16 @@ export default defineClientPlugin<Model, Op>({
         ...(shot === undefined ? {} : { shot }),
         html,
         ...wherever(about),
-        about: about.flatMap(({ target, own: mine, ...a }) => {
-          const seen = seenOf({ target, own: mine, ...a });
-          return seen === undefined ? [] : [{ target, own: mine, seen }];
-        }),
+        about: (
+          await Promise.all(
+            about.map(async (a) => {
+              const seen = seenOf(a);
+              if (seen === undefined) return [];
+              const react = sendsHtml && html ? await reactOf(a) : undefined;
+              return [{ target: a.target, own: a.own, seen: { ...seen, ...(react === undefined ? {} : { react }) } }];
+            }),
+          )
+        ).flat(),
       };
       context.away(kept, () => recorder.record());
     };
@@ -297,15 +316,27 @@ export default defineClientPlugin<Model, Op>({
         const { text, about, html: withHtml, screenshots } = gathered;
         // The first element is the task's place; the rest are named beside it; with none, it's the page's.
         const [first, ...rest] = about;
-        const { html, ...said } = (first === undefined ? undefined : seenOf(first)) ?? { html: undefined, count: 0 };
+        const { html, react: _, ...said } = (first === undefined ? undefined : seenOf(first)) ?? { html: undefined, count: 0 };
         const htmlOf = (of: string | undefined) => (sendsHtml && withHtml && of !== undefined ? { html: of } : {});
+        // Its components' props and state go with its HTML, as what the page had.
+        const reactWith = async (a: About) => {
+          const react = sendsHtml && withHtml ? await reactOf(a) : undefined;
+          return react === undefined ? {} : { react };
+        };
         const op: Op = {
           text,
           ...wherever(about),
           ...said,
           ...(first === undefined ? { detached: true } : {}),
           ...htmlOf(html),
-          ...(rest.length === 0 ? {} : { also: rest.map((a) => ({ at: atOf(a.target), tag: a.target.tag, ...htmlOf(seenOf(a)?.html) })) }),
+          ...(first === undefined ? {} : await reactWith(first)),
+          ...(rest.length === 0
+            ? {}
+            : {
+                also: await Promise.all(
+                  rest.map(async (a) => ({ at: atOf(a.target), tag: a.target.tag, ...htmlOf(seenOf(a)?.html), ...(await reactWith(a)) })),
+                ),
+              }),
           ...attachedOf(gathered),
         };
         // Sent on its first element, which may not be the popup's.

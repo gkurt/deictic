@@ -79,10 +79,11 @@ test('adds a task saying what and where, and lists it on the element', async () 
 test('a task names the other elements it is about, and no element where none is attached', async () => {
   const { post, target } = setup('several');
   const also = [
-    { at: 'src/Nav.tsx:4:7', tag: 'a', html: '<a>Docs</a>' },
+    { at: 'src/Nav.tsx:4:7', tag: 'a', html: '<a>Docs</a>', react: '{"components":[]}' },
     { at: 'src/Nav.tsx:9:5', tag: 'button' },
   ];
-  const added = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, html: '<h1>Pricing</h1>', also } });
+  const react = '{"components":[{"name":"Pricing"}]}';
+  const added = await post<{ model: Model }>('apply', { plugin: 'tasks', target, op: { ...op, html: '<h1>Pricing</h1>', react, also } });
   const { message } = await team.thread(added.json.model.tasks[0]!.id);
   // The first is its place, as ever; the rest are numbered after it.
   expect(message.labels).toMatchObject({
@@ -90,8 +91,9 @@ test('a task names the other elements it is about, and no element where none is 
     'deictic.also.1': 'src/Nav.tsx:4:7 <a>',
     'deictic.also.2': 'src/Nav.tsx:9:5 <button>',
   });
-  // The Nth element's HTML is `element.N.html`, where it was sent.
-  expect(message.attachments?.map((a) => a.name)).toEqual(['element.html', 'element.2.html']);
+  // The Nth element's HTML is `element.N.html`, where it was sent, and its components' `react.N.json`.
+  expect(message.attachments?.map((a) => a.name)).toEqual(['element.html', 'react.json', 'react.2.json', 'element.2.html']);
+  expect(message.attachments?.find((a) => a.name === 'react.json')).toMatchObject({ type: 'application/json', size: react.length });
 
   // With none attached it's the page's alone: nothing of the element it was sent on, whose tab doesn't list it.
   const page = await post<{ model: Model }>('apply', {

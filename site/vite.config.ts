@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { reactState } from 'deictic/react';
 import { recommended } from 'deictic/recommended';
 import { dom } from 'deictic/screenshots';
 import { tailwind } from 'deictic/tailwind';
@@ -24,7 +25,7 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages serves it under the repository's name (`BASE=/deictic/`, set by the deploy workflow).
   base: process.env.BASE ?? '/',
   plugins: [
-    deictic(command === 'build' ? deployed : { plugins: [...recommended(), tailwind({ css: 'src/site.css' })] }),
+    deictic(command === 'build' ? deployed : { plugins: [...recommended(), reactState(), tailwind({ css: 'src/site.css' })] }),
     react({ compiler: true }),
     tailwindcss(),
     highlighted(),

@@ -338,6 +338,16 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `network/mask.ts` is the masking, rrweb's `transformRequestFn`: `maskRequest` blanks by name (`sensitive`) in a URL's
   query and fragment, headers and JSON or form bodies, cuts bodies, and drops deictic's own requests (a recording
   sends itself each second) and the `ignore`d. `test/network.test.ts` covers it. (`logs` is un-ignored in `.gitignore`.)
+- `src/plugins/react/`: `reactState(options)` (`deictic/react`, not in `recommended()`), page half only, no tab: what
+  React's DevTools would show of an element, which the Task tab asks for (`use('react').snapshot(el)`) and sends as
+  `Op.react` (and `also[].react`) while its HTML goes, kept over `away` in `Seen.react`; the server half attaches it as
+  `react.json` (`react.N.json`). From the component that wrote it (`ownerOf`) out, `components` (4) of them, each its
+  name, `at` (the nearest element around it in its JSX), props, and a class's state or a function's hooks, read with
+  bippy (an optional peer, imported on first use: `getFiberHooks`, named by `parseHookNames` from the source map unless
+  `names: false`), effects left out. Where no renderer reached DevTools' hook, the page's React (`react`, an optional
+  peer, so the build never bundles a copy of its own) gives bippy its dispatcher. `serialize.ts` makes the values JSON:
+  what JSON can't hold in brackets, cut by `LIMITS`, masked by name as `network/mask.ts`'s `sensitive`.
+  `test/react.test.ts`.
 - `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
   recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.

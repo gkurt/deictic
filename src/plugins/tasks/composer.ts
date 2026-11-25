@@ -134,6 +134,8 @@ export type Sent = NonNullable<Op['screenshots']>[number] & { url: string };
 export interface Seen extends Pick<Op, 'point' | 'pointed' | 'count' | 'which' | 'chain'> {
   /** The element's HTML, as it would be attached. */
   html: string;
+  /** What React's DevTools would show of it, `react.json`, where the react plugin is loaded and React wrote it. */
+  react?: string;
 }
 
 /**

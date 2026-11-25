@@ -210,7 +210,9 @@ order, and `deictic.text` its text: the pins find it by its text, then by its pl
 component's line is the same wherever it's used; these say where: with React in development the components that use
 it, three at most, and otherwise the files around it). The element's HTML as it rendered is attached as `element.html`,
 masked as screenshots are, for whoever can't open the page as you had it: a file, so the task stays short.
-Untick **Attach HTML snapshot** for a task without it; `html: false` takes the box away. A screenshot attached by the
+With [`reactState()`](#react-state) loaded, the props, state and hooks of the components that wrote it go beside it,
+as `react.json` (`react.2.json` for the second element). Untick **Attach HTML snapshot** for a task without either;
+`html: false` takes the box away. A screenshot attached by the
 button has the element outlined in it, or the point circled; one you drew on is as you drew it, and one taken from
 the tool panel is the window as it was.
 
@@ -317,6 +319,30 @@ Requests are masked before they're kept. A value is blanked to `***` where its n
 and a body's fields where the body is JSON or a form; `mask: ['email']` adds names. A password before a URL's host is
 dropped, a body is cut at 10,000 characters, and `ignore: ['/analytics']` leaves requests out whole. A secret under a
 name that says nothing isn't found, which is why headers and bodies are kept only when asked for.
+
+## React state
+
+Not in `recommended()`. `reactState()`, from `deictic/react`, attaches what React's DevTools would show of the element
+a task is about, as `react.json`: the component that wrote it, and the ones that wrote that, each with its props and its
+state (a class's, or a function's hooks, named as your code names them: `chosen`, not `State`). For a task whose change
+depends on what the page held: the plan that was picked, the list that was empty. It reads React's fibers with
+[bippy](https://github.com/aidenybai/bippy), in development only.
+
+```ts
+import { reactState } from 'deictic/react';
+
+deictic({ plugins: [...recommended(), reactState()] });
+```
+
+| Option       | Default | What it is                                                                    |
+| ------------ | ------- | ----------------------------------------------------------------------------- |
+| `components` | `4`     | How many components, out from the one that wrote the element                  |
+| `mask`       | none    | More names whose values are blanked, as `network`'s `mask`                    |
+| `names`      | `true`  | Whether hooks are named from the source and its map, fetched as DevTools does |
+
+Values are your page's, so they're masked as requests are: a value whose name says it's a secret (`token`, `password`,
+`auth` and the like) is `***`. What JSON can't hold says what it was, in brackets (`[function onClick]`, `[<Button>]`,
+`[circular]`), and what's deep or long is cut, saying so. Effects are left out.
 
 ## Tailwind
 
