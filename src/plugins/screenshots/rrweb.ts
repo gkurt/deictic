@@ -1,6 +1,6 @@
 /**
- * The `rrweb()` renderer's page half: a snapshot of the page's DOM with `rrweb-snapshot` (imported on the
- * first shot), masked as rrweb masks, without deictic's overlay, sent with what the server's browser needs
+ * The `rrweb()` renderer's page half: a snapshot of the page's DOM with `rrweb-snapshot` (imported as the page
+ * starts), masked as rrweb masks, without deictic's overlay, sent with what the server's browser needs
  * to show it as the page does: the viewport and the window around it, where it's scrolled to, the pixel density, the page's URL.
  * And which node of the snapshot the element is, so the server says where it is in what it drew, and which match
  * `:hover` and `:focus` and the like, which a copy of the DOM has no state for and the server gives them again.
