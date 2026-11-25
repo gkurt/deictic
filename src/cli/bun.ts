@@ -16,11 +16,11 @@ import { addFirst, addImports, eolOf } from './edit.ts';
 export const MODULE = 'deictic.plugin.ts';
 
 export const PLUGIN = `import { deictic } from 'deictic/bun';
-import { recommended } from 'deictic/recommended';
+import { deicticRecommended } from 'deictic/recommended';
 
 // One module for both: bunfig.toml names it as the dev server's bundler plugin, and the server spreads its routes,
 // deictic's endpoints, into its own.
-export default deictic({ plugins: recommended() });
+export default deictic({ plugins: deicticRecommended() });
 `;
 
 const SOURCE = /\.[cm]?[jt]sx?$/;

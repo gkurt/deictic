@@ -7,7 +7,7 @@ what's wrong with deictic, leave a task, and let an agent fix it.
 bun run slop    # build deictic, then this page on http://localhost:5184
 ```
 
-It has every plugin of `recommended()` and Tailwind's, so a task can carry a shot, marks, a recording (with its console
+It has every plugin of `deicticRecommended()` and Tailwind's, so a task can carry a shot, marks, a recording (with its console
 and network) or a voice note. Reset it to its sloppy self with `git checkout examples/slop`.
 
 ## What's wrong with it

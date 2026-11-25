@@ -59,7 +59,7 @@ In the config `init` wrote, each plugin takes its options under its name, and `f
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt
-  plugins: recommended({
+  plugins: deicticRecommended({
     tasks: { channel: 'ui', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },
     voice: false,

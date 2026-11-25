@@ -26,19 +26,19 @@ the page point at that plugin's code, not the file.
 ```ts
 // Vite, and anything on it (React Router, TanStack Start…): vite.config.ts
 import { deictic } from 'deictic/vite';
-export default defineConfig({ plugins: [deictic({ plugins: recommended() }), react()] });
+export default defineConfig({ plugins: [deictic({ plugins: deicticRecommended() }), react()] });
 
 // Next.js (`next dev`, Turbopack or webpack): next.config.ts
 import { withDeictic } from 'deictic/next';
-export default withDeictic(nextConfig, { plugins: recommended() });
+export default withDeictic(nextConfig, { plugins: deicticRecommended() });
 
 // webpack 5, Rspack (`launch-editor` opens files in your editor)
 import { DeicticPlugin } from 'deictic/webpack';
-export default { plugins: [new DeicticPlugin({ plugins: recommended() })] };
+export default { plugins: [new DeicticPlugin({ plugins: deicticRecommended() })] };
 
 // Astro: astro.config.ts
 import { deictic } from 'deictic/astro';
-export default defineConfig({ integrations: [deictic({ plugins: recommended() })] });
+export default defineConfig({ integrations: [deictic({ plugins: deicticRecommended() })] });
 ```
 
 Astro marks `.astro` components with Astro 7 or later, and JSX islands with any version.
@@ -48,7 +48,7 @@ Bun (`Bun.serve` with HTML imports) takes one module for both the bundler plugin
 ```ts
 // deictic.plugin.ts
 import { deictic } from 'deictic/bun';
-export default deictic({ plugins: recommended() });
+export default deictic({ plugins: deicticRecommended() });
 ```
 
 ```toml
@@ -70,7 +70,7 @@ React Native isn't supported: there's no DOM to point at.
 ```ts
 deictic({
   shortcut: { modifiers: ['Control', 'Shift'] }, // instead of Alt; `false` for none
-  plugins: recommended({
+  plugins: deicticRecommended({
     tasks: { channel: 'ui', project: 'storefront', labels: { team: 'web' } },
     screenshots: { maskAllInputs: true },
     voice: false,
@@ -148,10 +148,11 @@ page until a task takes them.
 A task about a point is pinned on that point, not on an element's corner, and a shot taken as it goes has the point
 circled. It still names an element, the marked one under the point or the nearest to it, for its file and line.
 
-`recommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
-network, which put the page's console and its requests in a recording. Each takes its
-options under its name, and `false` leaves it out (`recommended({ logs: false, network: false })`). Other plugins, your own included, go beside it:
-`plugins: [...recommended(), notes()]`. Each plugin is also its own import (`deictic/tasks`, `deictic/screenshots`…),
+`deicticRecommended()`, from `deictic/recommended`, is tasks, screenshots, annotations, recordings and voice, and logs and
+network, which put the page's console and its requests in a recording, and, where the project has React,
+[React state](#react-state). Each takes its options under its name, and `false` leaves it out
+(`deicticRecommended({ logs: false, react: false })`). Other plugins, your own included, go beside it:
+`plugins: [...deicticRecommended(), notes()]`. It was `recommended()`, which still works. Each plugin is also its own import (`deictic/tasks`, `deictic/screenshots`…),
 to pick them one by one.
 
 What a project keeps (the history, shots, recordings, voice notes) is in `.deictic/`, which ignores itself in git.
@@ -186,8 +187,8 @@ BOARD_URL=https://team.example/api/board vite  # any board, by its URL
 import { board } from '@vercel/board';
 import { local } from 'deictic/tasks';
 
-recommended({ tasks: { board: board() } }); // your team's, after `vercel login`
-recommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your machine, whatever BOARD_URL says
+deicticRecommended({ tasks: { board: board() } }); // your team's, after `vercel login`
+deicticRecommended({ tasks: { board: local({ port: 4200 }) } }); // the one on your machine, whatever BOARD_URL says
 ```
 
 `local()` takes `port`, `dir` (its folder, from the root), `inspect: false` for none of the board's own pages, and
@@ -322,16 +323,16 @@ name that says nothing isn't found, which is why headers and bodies are kept onl
 
 ## React state
 
-Not in `recommended()`. `reactState()`, from `deictic/react`, attaches what React's DevTools would show of the element
+In `deicticRecommended()` where React is installed (found from where the dev server starts), under `react`, or
+`reactState()` from `deictic/react` on its own. It attaches what React's DevTools would show of the element
 a task is about, as `react.json`: the component that wrote it, and the ones that wrote that, each with its props and its
 state (a class's, or a function's hooks, named as your code names them: `chosen`, not `State`). For a task whose change
 depends on what the page held: the plan that was picked, the list that was empty. It reads React's fibers with
 [bippy](https://github.com/aidenybai/bippy), in development only.
 
 ```ts
-import { reactState } from 'deictic/react';
-
-deictic({ plugins: [...recommended(), reactState()] });
+deicticRecommended({ react: { components: 2, mask: ['email'] } });
+deicticRecommended({ react: false }); // none
 ```
 
 | Option       | Default | What it is                                                                    |
@@ -346,7 +347,7 @@ Values are your page's, so they're masked as requests are: a value whose name sa
 
 ## Tailwind
 
-Not in `recommended()`. `tailwind()`, from `deictic/tailwind`, adds a tab that edits the element's classes in place,
+Not in `deicticRecommended()`. `tailwind()`, from `deictic/tailwind`, adds a tab that edits the element's classes in place,
 with completion, previews and undo, and writes them to the source. It needs Tailwind v4.
 
 ```ts

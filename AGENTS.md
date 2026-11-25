@@ -338,7 +338,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `network/mask.ts` is the masking, rrweb's `transformRequestFn`: `maskRequest` blanks by name (`sensitive`) in a URL's
   query and fragment, headers and JSON or form bodies, cuts bodies, and drops deictic's own requests (a recording
   sends itself each second) and the `ignore`d. `test/network.test.ts` covers it. (`logs` is un-ignored in `.gitignore`.)
-- `src/plugins/react/`: `reactState(options)` (`deictic/react`, not in `recommended()`), page half only, no tab: what
+- `src/plugins/react/`: `reactState(options)` (`deictic/react`; in `deicticRecommended()` where React is installed), page half only, no tab: what
   React's DevTools would show of an element, which the Task tab asks for (`use('react').snapshot(el)`) and sends as
   `Op.react` (and `also[].react`) while its HTML goes, kept over `away` in `Seen.react`; the server half attaches it as
   `react.json` (`react.N.json`). From the component that wrote it (`ownerOf`) out, `components` (4) of them, each its
@@ -348,8 +348,10 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   peer, so the build never bundles a copy of its own) gives bippy its dispatcher. `serialize.ts` makes the values JSON:
   what JSON can't hold in brackets, cut by `LIMITS`, masked by name as `network/mask.ts`'s `sensitive`.
   `test/react.test.ts`.
-- `src/plugins/recommended/`: `recommended(options)`, the preset the docs show: tasks, screenshots, annotations,
-  recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), each with its options under its name or left out with `false`. Server
+- `src/plugins/recommended/`: `deicticRecommended(options)`, the preset the docs show: tasks, screenshots, annotations,
+  recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), then react where `installed(process.cwd(), 'react')` (init's
+  `packagesFor` asks the project's root instead, its `package.json` too), each with its options under its name or left
+  out with `false`. Named for deictic, as configs import other presets' `recommended`; that name is a deprecated alias. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where
@@ -520,7 +522,7 @@ have no hash in their names (`hash: false`; they go in `dist/shared/`, where non
 restart it to load the new build (the site's restart restarts its board too, which ends a `vb tail`: `deictic watch` waits for the board and follows it again). `examples/next`
 (port 5181), `examples/rspack` (5182) and `examples/bun` (5183) are the same page on the other
 integrations, also from `dist`. `examples/slop` (5184, `bun run slop`) is a landing page full of AI slop and bad
-design, with `recommended()` and Tailwind's plugin, to unslop with an agent for testing and demos: its README lists
+design, with `deicticRecommended()` and Tailwind's plugin, to unslop with an agent for testing and demos: its README lists
 what's planted, so keep that list true when the page changes, and never fix the page itself outside a demo;
 `test/integrations.test.ts` covers each integration, Rspack with a real compile.
 `test/production.test.ts` runs real production builds (Vite, Rspack, `Bun.build`) and fails on any mention of deictic

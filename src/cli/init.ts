@@ -12,9 +12,9 @@ import { createInterface } from 'node:readline/promises';
 import MagicString from 'magic-string';
 import { type Expression, type ObjectExpression, parseSync, type Program } from 'oxc-parser';
 
-import { recommended } from '#src/plugins/recommended/index.ts';
+import { deicticRecommended } from '#src/plugins/recommended/index.ts';
 
-import { installCommand, packageManager, readJson, runnerOf } from '#src/tools/packages.ts';
+import { installCommand, installed, packageManager, readJson, runnerOf } from '#src/tools/packages.ts';
 
 import { fail } from './board.ts';
 import { addToBunfig, addToServer, BY_HAND, MODULE, PLUGIN, serverOf } from './bun.ts';
@@ -37,7 +37,7 @@ interface Setup {
 }
 
 const extensions = (base: string) => ['ts', 'mts', 'js', 'mjs', 'cts', 'cjs'].map((e) => `${base}.${e}`);
-const PLUGINS = '{ plugins: recommended() }';
+const PLUGINS = '{ plugins: deicticRecommended() }';
 
 const SETUPS: Record<Exclude<Bundler, 'bun'>, Setup> = {
   next: {
@@ -109,9 +109,14 @@ export function bundlerOf(root: string): Bundler | undefined {
   return undefined;
 }
 
-/** What the recommended setup imports, for the bundler: launch-editor opens files under webpack, which has no launcher. */
-export function packagesFor(bundler: Bundler | undefined): string[] {
-  const plugins = recommended().flatMap((p) => p.packages ?? []);
+/**
+ * What the recommended setup imports, for the bundler and the project: launch-editor opens files under webpack, which
+ * has no launcher, and React's state is read only where it has React.
+ */
+export function packagesFor(bundler: Bundler | undefined, root: string): string[] {
+  // Named in package.json and not installed yet, in a fresh checkout, or installed from a workspace's.
+  const react = dependenciesOf(root).has('react') || installed(root, 'react');
+  const plugins = deicticRecommended({ react: react ? {} : false }).flatMap((p) => p.packages ?? []);
   return ['deictic', ...plugins, ...(bundler === 'webpack' || bundler === 'rspack' ? ['launch-editor'] : [])];
 }
 
@@ -197,7 +202,7 @@ export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code
   }
 
   const lines: [string, string][] = [
-    ['{ recommended }', 'deictic/recommended'],
+    ['{ deicticRecommended }', 'deictic/recommended'],
     [`{ ${setup.name} }`, setup.from],
   ];
   addImports(out, program, code, lines, exported.commonjs);
@@ -259,7 +264,7 @@ export async function init(options: InitOptions): Promise<void> {
   const bundler = bundlerOf(root);
   const has = dependenciesOf(root);
 
-  const wanted = packagesFor(bundler).filter((p) => !has.has(p));
+  const wanted = packagesFor(bundler, root).filter((p) => !has.has(p));
   const command = installCommand(manager, wanted, root);
   if (wanted.length === 0) {
     log('deictic: its packages are installed');
@@ -298,7 +303,7 @@ function configure(root: string, bundler: Bundler | undefined, dryRun: boolean, 
   }
   const setup = SETUPS[bundler];
   const file = setup.files.map((f) => join(root, f)).find((f) => existsSync(f));
-  const imports = `import { recommended } from 'deictic/recommended';\nimport { ${setup.name} } from '${setup.from}';`;
+  const imports = `import { deicticRecommended } from 'deictic/recommended';\nimport { ${setup.name} } from '${setup.from}';`;
   if (file === undefined) {
     log(`deictic: no ${setup.files[0]} here: add deictic to your ${bundler} config:\n\n${imports}\n${setup.snippet}\n`);
     return;

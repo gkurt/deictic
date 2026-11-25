@@ -2,8 +2,7 @@ import { resolve } from 'node:path';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { reactState } from 'deictic/react';
-import { recommended } from 'deictic/recommended';
+import { deicticRecommended } from 'deictic/recommended';
 import { dom } from 'deictic/screenshots';
 import { tailwind } from 'deictic/tailwind';
 import { deictic } from 'deictic/vite';
@@ -14,10 +13,10 @@ import { replay } from './replay.ts';
 
 // The deployed site has no dev server, and deictic all the same, to try: `standalone` puts it in the build, and
 // `src/standalone.ts` answers it in the page. Shots are drawn in the page (`dom()`), as there's no server to render
-// one, and a recording's replay is a page the build publishes (`replay.ts`).
+// one, and a recording's replay is a page the build publishes (`replay.ts`). No React state: the build's React keeps none.
 const deployed = {
   standalone: 'src/standalone.ts',
-  plugins: [...recommended({ screenshots: { renderer: dom() } }), tailwind({ css: 'src/site.css' })],
+  plugins: [...deicticRecommended({ screenshots: { renderer: dom() }, react: false }), tailwind({ css: 'src/site.css' })],
 };
 
 // The homepage, and a playground to try the plugins on. deictic runs on both.
@@ -25,7 +24,7 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages serves it under the repository's name (`BASE=/deictic/`, set by the deploy workflow).
   base: process.env.BASE ?? '/',
   plugins: [
-    deictic(command === 'build' ? deployed : { plugins: [...recommended(), reactState(), tailwind({ css: 'src/site.css' })] }),
+    deictic(command === 'build' ? deployed : { plugins: [...deicticRecommended(), tailwind({ css: 'src/site.css' })] }),
     react({ compiler: true }),
     tailwindcss(),
     highlighted(),

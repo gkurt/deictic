@@ -1,10 +1,12 @@
 import { expect, test } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { addToBunfig, addToServer, PLUGIN } from '#src/cli/bun.ts';
 import { addToConfig, bundlerOf, init, packagesFor } from '#src/cli/init.ts';
 import { definePlugin } from '#src/index.ts';
-import { recommended } from '#src/plugins/recommended/index.ts';
+import { deicticRecommended } from '#src/plugins/recommended/index.ts';
 import { dom, screenshots } from '#src/plugins/screenshots/index.ts';
 import { installCommand, missing, missingProblem, packageManager, specOf } from '#src/tools/packages.ts';
 
@@ -52,7 +54,10 @@ test("says which plugins' packages aren't installed, and the command that instal
 });
 
 test("each recommended plugin names what it imports, and screenshots its renderer's", () => {
-  expect(packagesFor('vite')).toEqual([
+  // Outside this repository, whose React any folder under it finds.
+  const plain = mkdtempSync(join(tmpdir(), 'deictic-init-'));
+  writeFileSync(join(plain, 'package.json'), manifest());
+  expect(packagesFor('vite', plain)).toEqual([
     'deictic',
     '@vercel/board',
     'rrweb-snapshot',
@@ -62,10 +67,16 @@ test("each recommended plugin names what it imports, and screenshots its rendere
     '@rrweb/rrweb-plugin-console-record',
     '@rrweb/rrweb-plugin-network-record',
   ]);
-  expect(packagesFor('webpack')).toContain('launch-editor');
+  expect(packagesFor('webpack', plain)).toContain('launch-editor');
+  rmSync(plain, { recursive: true, force: true });
+  // With React, named in package.json though not installed yet, bippy reads its state.
+  const app = mkdtempSync(join(tmpdir(), 'deictic-init-'));
+  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'app', dependencies: { react: '^19.0.0' } }));
+  expect(packagesFor('vite', app)).toContain('bippy');
+  rmSync(app, { recursive: true, force: true });
   expect(screenshots({ renderer: dom() }).packages).toEqual(['modern-screenshot']);
   // Every one is a peer of deictic's, so the command pins its range.
-  for (const name of recommended().flatMap((p) => p.packages ?? [])) expect(specOf(name)).toStartWith('"');
+  for (const name of deicticRecommended().flatMap((p) => p.packages ?? [])) expect(specOf(name)).toStartWith('"');
 });
 
 test('knows the bundler from the dependencies', () => {
@@ -89,31 +100,31 @@ export default defineConfig({
 `;
   expect(addToConfig('vite', 'vite.config.ts', code)).toBe(`import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
-import { recommended } from "deictic/recommended"
+import { deicticRecommended } from "deictic/recommended"
 import { deictic } from "deictic/vite"
 
 export default defineConfig({
   plugins: [
-    deictic({ plugins: recommended() }),
+    deictic({ plugins: deicticRecommended() }),
     react(),
   ],
 })
 `);
   expect(addToConfig('vite', 'vite.config.ts', `export default { plugins: [react()] };\n`)).toBe(
-    `import { recommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/vite';\n\nexport default { plugins: [deictic({ plugins: recommended() }), react()] };\n`,
+    `import { deicticRecommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/vite';\n\nexport default { plugins: [deictic({ plugins: deicticRecommended() }), react()] };\n`,
   );
 });
 
 test("finds the config through a function, a const and satisfies, and adds the list where there's none", () => {
   const out = (code: string) => addToConfig('vite', 'vite.config.ts', code)?.split('\n').slice(2).join('\n');
   expect(out(`export default defineConfig(() => ({ server: { port: 1 } }));`)).toBe(
-    `\nexport default defineConfig(() => ({ plugins: [deictic({ plugins: recommended() })], server: { port: 1 } }));`,
+    `\nexport default defineConfig(() => ({ plugins: [deictic({ plugins: deicticRecommended() })], server: { port: 1 } }));`,
   );
   expect(out(`const config = { plugins: [] } satisfies UserConfig;\nexport default config;`)).toBe(
-    `\nconst config = { plugins: [deictic({ plugins: recommended() })] } satisfies UserConfig;\nexport default config;`,
+    `\nconst config = { plugins: [deictic({ plugins: deicticRecommended() })] } satisfies UserConfig;\nexport default config;`,
   );
   expect(out(`export default defineConfig(({ mode }) => {\n  return {};\n});`)).toBe(
-    `\nexport default defineConfig(({ mode }) => {\n  return { plugins: [deictic({ plugins: recommended() })] };\n});`,
+    `\nexport default defineConfig(({ mode }) => {\n  return { plugins: [deictic({ plugins: deicticRecommended() })] };\n});`,
   );
   // Where it can't tell, nothing: plugins that aren't a list, a config of no shape it knows, one that doesn't parse.
   expect(addToConfig('vite', 'vite.config.ts', `export default { plugins: list };`)).toBeUndefined();
@@ -229,20 +240,20 @@ test("wraps Next's config, and requires in a CommonJS one", () => {
       `import type { NextConfig } from 'next';\n\nconst nextConfig: NextConfig = {};\n\nexport default nextConfig;\n`,
     ),
   ).toBe(
-    `import type { NextConfig } from 'next';\nimport { recommended } from 'deictic/recommended';\nimport { withDeictic } from 'deictic/next';\n\nconst nextConfig: NextConfig = {};\n\nexport default withDeictic(nextConfig, { plugins: recommended() });\n`,
+    `import type { NextConfig } from 'next';\nimport { deicticRecommended } from 'deictic/recommended';\nimport { withDeictic } from 'deictic/next';\n\nconst nextConfig: NextConfig = {};\n\nexport default withDeictic(nextConfig, { plugins: deicticRecommended() });\n`,
   );
   expect(addToConfig('next', 'next.config.js', `module.exports = { reactStrictMode: true };\n`)).toBe(
-    `const { recommended } = require('deictic/recommended');\nconst { withDeictic } = require('deictic/next');\n\nmodule.exports = withDeictic({ reactStrictMode: true }, { plugins: recommended() });\n`,
+    `const { deicticRecommended } = require('deictic/recommended');\nconst { withDeictic } = require('deictic/next');\n\nmodule.exports = withDeictic({ reactStrictMode: true }, { plugins: deicticRecommended() });\n`,
   );
 });
 
 test("adds Astro's integration, and webpack's plugin after its requires", () => {
   expect(addToConfig('astro', 'astro.config.mjs', `import { defineConfig } from 'astro/config';\nexport default defineConfig({});\n`)).toBe(
-    `import { defineConfig } from 'astro/config';\nimport { recommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/astro';\nexport default defineConfig({ integrations: [deictic({ plugins: recommended() })] });\n`,
+    `import { defineConfig } from 'astro/config';\nimport { deicticRecommended } from 'deictic/recommended';\nimport { deictic } from 'deictic/astro';\nexport default defineConfig({ integrations: [deictic({ plugins: deicticRecommended() })] });\n`,
   );
   const webpack = `const path = require('path');\r\n\r\nmodule.exports = (env) => ({\r\n  entry: './src/index.js',\r\n  plugins: [],\r\n});\r\n`;
   expect(addToConfig('webpack', 'webpack.config.js', webpack)).toBe(
-    `const path = require('path');\r\nconst { recommended } = require('deictic/recommended');\r\nconst { DeicticPlugin } = require('deictic/webpack');\r\n\r\nmodule.exports = (env) => ({\r\n  entry: './src/index.js',\r\n  plugins: [new DeicticPlugin({ plugins: recommended() })],\r\n});\r\n`,
+    `const path = require('path');\r\nconst { deicticRecommended } = require('deictic/recommended');\r\nconst { DeicticPlugin } = require('deictic/webpack');\r\n\r\nmodule.exports = (env) => ({\r\n  entry: './src/index.js',\r\n  plugins: [new DeicticPlugin({ plugins: deicticRecommended() })],\r\n});\r\n`,
   );
 });
 
@@ -259,7 +270,7 @@ test('init installs what the project lacks with its manager, adds deictic to the
   expect(ran[0]).toStartWith('pnpm add -D "deictic@^');
   expect(ran[0]).not.toContain('"rrweb@');
   expect(ran[0]).toContain('"rrweb-player@');
-  expect(app.read('vite.config.ts')).toContain('plugins: [deictic({ plugins: recommended() })]');
+  expect(app.read('vite.config.ts')).toContain('plugins: [deictic({ plugins: deicticRecommended() })]');
   expect(lines.some((l) => l.includes('pnpm dlx skills add gkurt/deictic'))).toBe(true);
 
   // Again: nothing more to add.
