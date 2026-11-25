@@ -1,8 +1,9 @@
 /**
  * React's commits as a timeline, for a recording: what DevTools' profiler shows of each commit, cut to what reads in
  * a list. Commits a frame apart are one entry (an animation commits each frame), each names the components that
- * rendered in it, the slowest first, and past `RATE` entries a second only a slow one names them: a recording is
- * kept as it goes, and a page that renders without stop would fill it.
+ * rendered in it, the slowest first. Past `RATE` entries in a second, the rest of that second's commits are one entry
+ * at its end, which says how long it spans and its slowest commit: a recording is kept as it goes, and a page that
+ * renders without stop would fill it. So it's `RATE + 1` entries a second at most, whatever the page does.
  */
 import { componentOf } from '#src/client/component.ts';
 
@@ -13,8 +14,10 @@ import type { Fiber, Rendering } from './renders.ts';
 export const FRAME = 16;
 /** How many components an entry names, the slowest first. */
 const NAMED = 20;
-/** How many entries a second name their components; past that, only those slower than a frame. */
-const RATE = 10;
+/** How many entries a second go in as they come; past that, the rest of the second is one. */
+export const RATE = 10;
+/** The span entries are counted in, in milliseconds. */
+const SECOND = 1000;
 /** How far down a component a host element it wrote is looked for, in fibers. */
 const LOOKED = 200;
 
@@ -39,8 +42,8 @@ function placeOf(fiber: Fiber): string | undefined {
 
 const round = (ms: number) => Math.round(ms * 100) / 100;
 
-/** One entry of commits a frame apart: the components that rendered, each once with how often, the slowest first. */
-export function summarize(commits: Rendering[], named: boolean): Commit {
+/** One entry of commits: the components that rendered, each once with how often, the slowest first. */
+export function summarize(commits: Rendering[]): Commit {
   const by = new Map<string, Rendered & { order: number }>();
   for (const { rendered } of commits) {
     for (const { fiber, why, ms, selfMs } of rendered) {
@@ -60,12 +63,15 @@ export function summarize(commits: Rendering[], named: boolean): Commit {
   const all = [...by.values()].sort((a, b) =>
     (b.selfMs ?? 0) - (a.selfMs ?? 0) !== 0 ? (b.selfMs ?? 0) - (a.selfMs ?? 0) : a.order - b.order,
   );
-  const kept = named ? all.slice(0, NAMED) : [];
-  const ms = commits.reduce<number | undefined>((sum, c) => (c.ms === undefined ? sum : (sum ?? 0) + c.ms), undefined);
+  const kept = all.slice(0, NAMED);
+  const timed = commits.flatMap((c) => (c.ms === undefined ? [] : [c.ms]));
+  const ms = timed.length === 0 ? undefined : timed.reduce((sum, n) => sum + n, 0);
   const priority = commits.at(-1)?.priority;
   return {
     commits: commits.length,
     ...(ms === undefined ? {} : { ms: round(ms) }),
+    // Of several: what makes a page stutter is one slow commit, not many quick ones.
+    ...(commits.length > 1 && timed.length > 0 ? { slowest: round(Math.max(...timed)) } : {}),
     ...(priority === undefined || PRIORITIES[priority] === undefined ? {} : { priority: PRIORITIES[priority] }),
     components: kept.map(({ order: _, count, ...rest }) => ({ ...rest, ...(count !== undefined && count > 1 ? { count } : {}) })),
     ...(all.length > kept.length ? { more: all.length - kept.length } : {}),
@@ -73,8 +79,8 @@ export function summarize(commits: Rendering[], named: boolean): Commit {
 }
 
 /**
- * Listens to the commits `subscribe` gives, and answers each frame's as one entry: `emit` hears them, until what's
- * answered stops it (what's waiting goes first).
+ * Listens to the commits `subscribe` gives, and answers each frame's as one entry, `RATE` a second, then the rest of
+ * that second as one: `emit` hears them, until what's answered stops it (what's waiting goes first).
  */
 export function timeline(
   subscribe: (listen: (commit: Rendering) => void) => () => void,
@@ -85,20 +91,45 @@ export function timeline(
   },
 ): () => void {
   let waiting: Rendering[] = [];
-  let second = 0;
+  // The second being counted: when it started, and its entries so far.
+  let second = Number.NEGATIVE_INFINITY;
   let inSecond = 0;
+  // Its commits past `RATE` entries, and since when.
+  let over: Rendering[] = [];
+  let overFrom = 0;
+  const flushOver = () => {
+    if (over.length === 0) return;
+    const commits = over;
+    over = [];
+    emit({ ...summarize(commits), over: Math.round(clock.now() - overFrom) });
+  };
   const flush = () => {
     const commits = waiting;
     waiting = [];
     if (commits.length === 0) return;
     const now = clock.now();
-    if (now - second >= 1000) {
+    if (now - second >= SECOND) {
+      flushOver();
       second = now;
       inSecond = 0;
     }
-    inSecond++;
-    const ms = commits.reduce((sum, c) => sum + (c.ms ?? 0), 0);
-    emit(summarize(commits, inSecond <= RATE || ms > FRAME));
+    if (inSecond < RATE) {
+      inSecond++;
+      emit(summarize(commits));
+      return;
+    }
+    if (over.length === 0) {
+      overFrom = now;
+      // At the second's end, unless the next second's first entry has said it by then.
+      const counting = second;
+      clock.later(
+        () => {
+          if (second === counting) flushOver();
+        },
+        second + SECOND - now,
+      );
+    }
+    over.push(...commits);
   };
   const unsubscribe = subscribe((commit) => {
     if (waiting.length === 0) clock.later(flush, FRAME);
@@ -107,5 +138,6 @@ export function timeline(
   return () => {
     unsubscribe();
     flush();
+    flushOver();
   };
 }

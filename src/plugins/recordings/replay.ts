@@ -171,11 +171,13 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
       const named = (c.components ?? []).map((r) => r.name + (r.count > 1 ? ' ×' + r.count : '') + ' (' + r.why + ')');
       const text = (named.length > 0 ? named.slice(0, 3).join(', ') : (c.more ?? 0) + ' components') + (named.length > 3 || (c.more && named.length > 0) ? ', …' : '');
       const more = [
-        [c.commits > 1 ? c.commits + ' commits' : '1 commit', c.priority, ms(c.ms)].filter(Boolean).join(' · '),
+        [c.commits > 1 ? c.commits + ' commits' + (c.over === undefined ? '' : ' over ' + (c.over / 1000).toFixed(1) + ' s') : '1 commit', c.priority, ms(c.ms), c.slowest === undefined ? '' : 'slowest ' + ms(c.slowest)].filter(Boolean).join(' · '),
         ...(c.components ?? []).map((r) => [r.name + (r.count > 1 ? ' ×' + r.count : ''), r.at, ms(r.ms), r.selfMs === undefined ? '' : ms(r.selfMs) + ' own', r.why].filter(Boolean).join(' · ')),
         ...(c.more ? ['and ' + c.more + ' more'] : []),
       ];
-      rows.push({ at, kind: 'react', label: c.ms === undefined ? 'React' : ms(c.ms), warn: c.ms > 16, slow: c.ms > 16, text, more });
+      // One slow commit is what makes a page stutter, not many quick ones.
+      const slow = (c.slowest ?? c.ms) > 16;
+      rows.push({ at, kind: 'react', label: c.ms === undefined ? 'React' : ms(c.ms), warn: slow, slow, text: (c.over === undefined ? '' : c.commits + ' commits: ') + text, more });
     }
     for (const e of events) {
       if (e.type !== 6 || bare) continue;

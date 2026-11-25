@@ -367,6 +367,15 @@ test("recording says React's commits where it had them on, a slow one a problem,
         more: 2,
       }),
       react(1500, { commits: 1, ms: 0.4, priority: 'immediate', components: [{ name: 'Toggle', why: 'state changed' }] }),
+      // The rest of a busy second, as one: many quick commits, and one slow.
+      react(1800, {
+        commits: 40,
+        ms: 80,
+        slowest: 31,
+        over: 800,
+        priority: 'normal',
+        components: [{ name: 'Ticker', count: 40, selfMs: 40, why: 'state changed' }],
+      }),
       react(2000, { on: false }),
       { type: 5, timestamp: t + 3000, data: { tag: 'deictic.end', payload: {} } },
     ],
@@ -382,10 +391,12 @@ test("recording says React's commits where it had them on, a slow one a problem,
   );
   expect(all.out).toContain('react         0.4ms (immediate): Toggle (state changed)');
   expect(all.out).toContain('react         commits no longer recorded');
+  expect(all.out).toContain('react         80ms (normal, 40 commits over 0.8s, slowest 31ms): Ticker ×40 40ms (state changed)');
   // Slower than a frame: what makes a page stutter.
   const problems = deictic(p.root, 'recording', 'rec-2', '--problems');
   expect(problems.out).toContain('SearchResults');
   expect(problems.out).not.toContain('Toggle');
+  expect(problems.out).toContain('Ticker');
   // Asked for nothing: the slow one, as a problem, and the rest counted, with what lists them.
   const plain = deictic(p.root, 'recording', 'rec-2');
   expect(plain.out).toContain('SearchResults');
@@ -396,7 +407,7 @@ test("recording says React's commits where it had them on, a slow one a problem,
   // A moment is every line of it.
   expect(deictic(p.root, 'recording', 'rec-2', '--around', '1.5').out).toContain('Toggle (state changed)');
   // And a script has every line.
-  expect(JSON.parse(deictic(p.root, 'recording', 'rec-2', '--json').out).timeline).toHaveLength(6);
+  expect(JSON.parse(deictic(p.root, 'recording', 'rec-2', '--json').out).timeline).toHaveLength(7);
   const full = deictic(p.root, 'recording', 'rec-2', '--only', 'react', '--full');
   expect(full.out).toContain('SearchResults · src/Search.tsx:20 · 36ms with what it rendered · props changed: query');
 });

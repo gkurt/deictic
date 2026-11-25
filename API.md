@@ -357,8 +357,9 @@ they're counted from when the page started deictic, not from its first render.
 A recording can have React's commits too, as DevTools' profiler has them: press **React** (`P`) among its controls.
 It's off until you do, stays as you leave it, for the next recording too, and carries on over a page load. Commits a
 frame apart are one entry: how long they took, React's priority (`immediate` for a click or a key), and the
-components that rendered, the slowest first, each with its time, where its JSX is and why. Past ten entries a second
-only one slower than a frame names its components, so a page that animates doesn't fill the recording. The replay
+components that rendered, the slowest first, each with its time, where its JSX is and why. Past ten entries in a second,
+the rest of that second is one entry at its end (`40 commits over 0.8s, slowest 31ms`), so a page that animates is
+eleven entries a second at most. The replay
 lists them beside the page under **React**, a slow one marked on the timeline; `deictic recording` lists the slow
 ones and counts the rest, `--only react` lists them all, `--full` with each component's line, and `--problems` has those slower than a frame.
 

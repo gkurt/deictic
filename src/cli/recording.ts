@@ -121,7 +121,16 @@ const ms = (n: number) => `${n < 10 ? n.toFixed(1) : round(n)}ms`;
 /** A React commit entry, as a line: how long, why it ran, and what rendered, the slowest first. */
 function commitLine(c: Partial<Commit>): Pick<Line, 'text' | 'details' | 'problem'> {
   const components = c.components ?? [];
-  const head = [c.priority, (c.commits ?? 1) > 1 ? `${c.commits} commits` : undefined].filter(Boolean).join(', ');
+  const many = (c.commits ?? 1) > 1;
+  const head = [
+    c.priority,
+    many ? `${c.commits} commits${c.over === undefined ? '' : ` over ${(c.over / 1000).toFixed(1)}s`}` : undefined,
+    c.slowest === undefined ? undefined : `slowest ${ms(c.slowest)}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  // One slow commit is what makes a page stutter, not many quick ones.
+  const slow = c.slowest ?? c.ms;
   const named = components.map(
     (r) => `${r.name}${(r.count ?? 1) > 1 ? ` ×${r.count}` : ''}${r.selfMs === undefined ? '' : ` ${ms(r.selfMs)}`} (${r.why})`,
   );
@@ -138,7 +147,7 @@ function commitLine(c: Partial<Commit>): Pick<Line, 'text' | 'details' | 'proble
         .filter(Boolean)
         .join(' · '),
     ),
-    ...(c.ms !== undefined && c.ms > FRAME ? { problem: true } : {}),
+    ...(slow !== undefined && slow > FRAME ? { problem: true } : {}),
   };
 }
 

@@ -81,9 +81,16 @@ export interface Commit {
   commits: number;
   /** How long rendering them took, in milliseconds, where React times it. */
   ms?: number;
+  /** Of several, the slowest one's, in milliseconds: one past a frame is what makes a page stutter. */
+  slowest?: number;
+  /**
+   * The rest of a busy second, past ten entries in it: how long it spans, in milliseconds, up to this entry's
+   * moment. A page that renders without stop is ten entries and this one a second.
+   */
+  over?: number;
   /** React's scheduler priority for the last: `immediate` (a click, a key), `user-blocking`, `normal`, `low`, `idle`. */
   priority?: string;
-  /** Twenty at most, or none past ten entries a second, unless the entry took longer than a frame. */
+  /** Twenty at most. */
   components: Rendered[];
   /** How many more components rendered than it names. */
   more?: number;

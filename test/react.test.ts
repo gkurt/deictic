@@ -170,10 +170,22 @@ test("answers DevTools' hook after the handler it had, and counts nothing where 
   expect(countRenders({})).toBeUndefined();
 });
 
-test("a recording's timeline is an entry a frame, the slowest first, naming fewer once it's busy", () => {
+test("a recording's timeline is an entry a frame, the slowest first, and ten a second, then the rest of it as one", () => {
   let time = 0;
-  const later: (() => void)[] = [];
-  const clock = { now: () => time, later: (run: () => void) => void later.push(run) };
+  const later: { run: () => void; at: number }[] = [];
+  const clock = { now: () => time, later: (run: () => void, ms: number) => void later.push({ run, at: time + ms }) };
+  /** Moves the clock on, running what's due by then, in order. */
+  const tick = (to: number) => {
+    for (;;) {
+      later.sort((a, b) => a.at - b.at);
+      const next = later[0];
+      if (next === undefined || next.at > to) break;
+      later.shift();
+      time = next.at;
+      next.run();
+    }
+    time = to;
+  };
   let listen: ((commit: Rendering) => void) | undefined;
   const subscribe = (given: (commit: Rendering) => void) => {
     listen = given;
@@ -193,12 +205,12 @@ test("a recording's timeline is an entry a frame, the slowest first, naming fewe
       { fiber: row, why: 'its parent rendered', selfMs: 0.5 },
     ],
   });
-  expect(later).toHaveLength(1);
-  later.shift()!();
+  tick(16);
   expect(out).toEqual([
     {
       commits: 2,
       ms: 5,
+      slowest: 3,
       priority: 'user-blocking',
       components: [
         { name: 'List', why: 'state changed', ms: 3, selfMs: 2 },
@@ -206,16 +218,19 @@ test("a recording's timeline is an entry a frame, the slowest first, naming fewe
       ],
     },
   ]);
-  // Past ten entries in a second, a fast one names none: only how many rendered.
-  for (let i = 0; i < 11; i++) {
-    listen!({ ms: 1, rendered: [{ fiber: row, why: 'state changed' }] });
-    later.shift()!();
+  // A page that commits each frame: nine more entries this second, then the rest of it as one at its end.
+  for (let at = 20; at < 1000; at += 20) {
+    listen!({ ms: at === 500 ? 40 : 1, rendered: [{ fiber: row, why: 'state changed', selfMs: 1 }] });
+    tick(at + 17);
   }
-  expect(out.at(-1)).toEqual({ commits: 1, ms: 1, components: [], more: 1 });
-  // A slow one still does.
-  listen!({ ms: 40, rendered: [{ fiber: row, why: 'state changed' }] });
-  later.shift()!();
-  expect(out.at(-1)?.components).toHaveLength(1);
+  // The second started with the first entry, at 16 ms.
+  tick(1016);
+  expect(out).toHaveLength(11);
+  expect(out[9]).toMatchObject({ commits: 1, ms: 1, components: [{ name: 'Row' }] });
+  const rest = out[10]!;
+  expect(rest).toMatchObject({ commits: 40, slowest: 40, components: [{ name: 'Row', count: 40 }] });
+  // From the first entry past ten, a frame after its commit at 197 ms, to the second's end.
+  expect(rest.over).toBe(803);
   // Stopped, what's waiting goes first, and nothing after.
   listen!({ ms: 1, rendered: [] });
   stop();

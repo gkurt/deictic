@@ -358,8 +358,9 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   `actualDuration`/`selfBaseDuration` and `whyOf` (props by key, hooks' state but effects, context, else the parent).
   Its `subscribe` hears each commit (`Rendering`, timings taken then, as the next render reuses the fiber);
   `timeline.ts` makes them a recording's entries (`commits` on the page half's API): a frame's commits as one
-  `Commit`, components grouped by name and place (`placeOf`, the first host element it wrote), the slowest 20, and
-  past 10 entries a second only a slow one's named.
+  `Commit`, components grouped by name and place (`placeOf`, the first host element it wrote), the slowest 20; past
+  `RATE` (10) entries in a second, the rest of it is one at its end (`over`, the span, and `slowest`, which the replay
+  and the CLI judge a commit entry slow by).
   `test/react.test.ts`.
 - `src/plugins/recommended/`: `deicticRecommended(options)`, the preset the docs show: tasks, screenshots, annotations,
   recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), then react where `installed(process.cwd(), 'react')` (init's
