@@ -57,6 +57,38 @@ export interface Renders {
   why: string;
 }
 
+/** A component that rendered in a recording's commit, once for each time it did in the entry. */
+export interface Rendered {
+  name: string;
+  /** Where its JSX has the first element it wrote, `src/Plan.tsx:12`, where it wrote one. */
+  at?: string;
+  /** How many times it rendered in the entry, where that's more than once. */
+  count?: number;
+  /** How long it took, with what it rendered, in milliseconds, all its renders in the entry together. */
+  ms?: number;
+  /** Its own part of it. */
+  selfMs?: number;
+  /** Why it last rendered, as `Renders.why`. */
+  why: string;
+}
+
+/**
+ * A recording's entry of React's commits, `deictic.react` events: commits a frame apart, as one, with the components
+ * they rendered, the slowest first. `{ on: boolean }` events say where the recording starts and stops having them.
+ */
+export interface Commit {
+  /** How many commits it is. */
+  commits: number;
+  /** How long rendering them took, in milliseconds, where React times it. */
+  ms?: number;
+  /** React's scheduler priority for the last: `immediate` (a click, a key), `user-blocking`, `normal`, `low`, `idle`. */
+  priority?: string;
+  /** Twenty at most, or none past ten entries a second, unless the entry took longer than a frame. */
+  components: Rendered[];
+  /** How many more components rendered than it names. */
+  more?: number;
+}
+
 /** A component that wrote the element, or wrote one that did. */
 export interface Component {
   name: string;

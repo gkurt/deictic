@@ -21,6 +21,29 @@ export interface Fiber {
   actualDuration?: number;
   /** And its own part of it. */
   selfBaseDuration?: number;
+  /** The component, or a host element's tag. */
+  type?: unknown;
+  /** Who wrote it, in development. */
+  _debugOwner?: Fiber | null;
+  /** A host element's DOM node. */
+  stateNode?: unknown;
+}
+
+/** A component that rendered in a commit: its timings as they were then, as the next render overwrites a fiber's. */
+export interface RenderedFiber {
+  fiber: Fiber;
+  why: string;
+  ms?: number;
+  selfMs?: number;
+}
+
+/** A commit, as it was made: for whoever listens to them (a recording's timeline). */
+export interface Rendering {
+  /** The whole commit's render, in milliseconds, where React times it. */
+  ms?: number;
+  /** React's scheduler priority for it. */
+  priority?: number;
+  rendered: RenderedFiber[];
 }
 
 interface Dependency {
@@ -97,7 +120,9 @@ function contextChanged(next: Fiber, prev: Fiber): boolean {
 export function renderStats(now: () => number = () => performance.now()) {
   const stats = new WeakMap<Fiber, Stats>();
 
-  const record = (fiber: Fiber, prev: Fiber | null) => {
+  const listeners = new Set<(commit: Rendering) => void>();
+
+  const record = (fiber: Fiber, prev: Fiber | null): RenderedFiber => {
     const kept = stats.get(fiber) ?? (fiber.alternate === null ? undefined : stats.get(fiber.alternate));
     const entry: Stats = kept ?? { count: 0, at: [], why: '' };
     entry.count++;
@@ -108,21 +133,40 @@ export function renderStats(now: () => number = () => performance.now()) {
     if (typeof fiber.selfBaseDuration === 'number') entry.selfMs = fiber.selfBaseDuration;
     stats.set(fiber, entry);
     if (fiber.alternate !== null) stats.set(fiber.alternate, entry);
+    return {
+      fiber,
+      why: entry.why,
+      ...(typeof fiber.actualDuration === 'number' ? { ms: fiber.actualDuration } : {}),
+      ...(typeof fiber.selfBaseDuration === 'number' ? { selfMs: fiber.selfBaseDuration } : {}),
+    };
   };
 
   /** A committed tree, from its root's current fiber: what was rendered in it, and nothing React left as it was. */
-  const commit = (root: Fiber) => {
+  const commit = (root: Fiber, priority?: number) => {
+    const rendered: RenderedFiber[] = [];
     const stack: Fiber[] = [];
     for (let child = root.child; child !== null; child = child.sibling) stack.push(child);
     while (stack.length > 0) {
       const fiber = stack.pop()!;
       const prev = fiber.alternate;
-      const rendered = prev === null || ((fiber.flags ?? 0) & PERFORMED_WORK) !== 0;
-      if (rendered && COMPOSITE.has(fiber.tag)) record(fiber, prev);
+      if ((prev === null || ((fiber.flags ?? 0) & PERFORMED_WORK) !== 0) && COMPOSITE.has(fiber.tag)) rendered.push(record(fiber, prev));
       // Children React didn't clone weren't rendered, nor anything under them.
       if (prev !== null && fiber.child === prev.child) continue;
       for (let child = fiber.child; child !== null; child = child.sibling) stack.push(child);
     }
+    if (listeners.size === 0) return;
+    const made: Rendering = {
+      rendered,
+      ...(typeof root.actualDuration === 'number' ? { ms: root.actualDuration } : {}),
+      ...(priority === undefined ? {} : { priority }),
+    };
+    for (const listen of listeners) listen(made);
+  };
+
+  /** Hears each commit from now, until what's answered stops it. */
+  const subscribe = (listen: (commit: Rendering) => void) => {
+    listeners.add(listen);
+    return () => void listeners.delete(listen);
   };
 
   const read = (fiber: Fiber): Renders | undefined => {
@@ -140,16 +184,17 @@ export function renderStats(now: () => number = () => performance.now()) {
     };
   };
 
-  return { commit, read };
+  return { commit, read, subscribe };
 }
 
 /** DevTools' hook, as React calls it. */
 interface Hook {
-  onCommitFiberRoot?: (id: number, root: { current: Fiber }, ...rest: unknown[]) => unknown;
+  onCommitFiberRoot?: (id: number, root: { current: Fiber }, priority?: number, ...rest: unknown[]) => unknown;
 }
 
 /**
- * Counts every commit from now on, where the page has DevTools' hook: answers what reads the counts, or nothing where
+ * Counts every commit from now on, where the page has DevTools' hook: answers what reads the counts and what hears
+ * each commit, or nothing where
  * there's no hook (React then calls nothing, and keeps no timings either). The hook's own handler (React Refresh's,
  * or the DevTools extension's) goes on being called first.
  */
@@ -159,10 +204,10 @@ export function countRenders(target: { __REACT_DEVTOOLS_GLOBAL_HOOK__?: Hook } =
   const counts = renderStats();
   let warned = false;
   const before = hook.onCommitFiberRoot;
-  hook.onCommitFiberRoot = function (this: unknown, id, root, ...rest) {
-    const answer = before?.call(this, id, root, ...rest);
+  hook.onCommitFiberRoot = function (this: unknown, id, root, priority, ...rest) {
+    const answer = before?.call(this, id, root, priority, ...rest);
     try {
-      counts.commit(root.current);
+      counts.commit(root.current, priority);
     } catch (e) {
       // Never the page's render: a fiber of a React this doesn't know. Said once, not on each commit.
       if (!warned) console.warn("deictic: renders aren't counted on this page", e);
@@ -170,5 +215,5 @@ export function countRenders(target: { __REACT_DEVTOOLS_GLOBAL_HOOK__?: Hook } =
     }
     return answer;
   };
-  return counts.read;
+  return { read: counts.read, subscribe: counts.subscribe };
 }

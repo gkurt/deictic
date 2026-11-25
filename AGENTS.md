@@ -317,7 +317,11 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   whose `plugin({ sinceLoad })` answers a `RecordPlugin`; one that fails is warned of and left out), and
   the page's marks go in as custom events (`MARKS`, in `marks.ts`), an SVG in page coordinates, at start and each
   change. Its tool in the tool panel is Record (R): while one goes, its group (`.recorder.going`) has the time, the
-  mic (K, with voice loaded), Stop (R) and Discard (Shift+R) in Record's place, and keeps the panel up. One that's
+  mic (K, with voice loaded), React (P, where react counts renders: `use('react').commits`), Stop (R) and Discard
+  (Shift+R) in Record's place, and keeps the panel up. React's commits go in as custom events (`REACT`, in `marks.ts`:
+  each a `Commit`, and `{ on }` where they start and stop), off until pressed, as it was last left
+  (`deictic:recording:react` in `localStorage`) and carried over a page load (`Carried.react`); the replay lists them
+  (`React`, a slow one marked) and `deictic recording` says them (`react` lines, slower than a frame a problem). One that's
   stopped and kept goes in the tray, whoever started it.
 - `src/plugins/voice/`: no tab. `index.ts`, the server half: keeps the latest `keep` clips under
   `.deictic/voice` as the audio a `MediaRecorder` makes (webm, ogg, mp4, by extension), answers
@@ -352,6 +356,10 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   rendered before isn't counted), and walks each commit for the components that rendered (`PerformedWork`, or mounted;
   a subtree whose children React didn't clone is skipped), keeping per fiber pair a count, the times, React's
   `actualDuration`/`selfBaseDuration` and `whyOf` (props by key, hooks' state but effects, context, else the parent).
+  Its `subscribe` hears each commit (`Rendering`, timings taken then, as the next render reuses the fiber);
+  `timeline.ts` makes them a recording's entries (`commits` on the page half's API): a frame's commits as one
+  `Commit`, components grouped by name and place (`placeOf`, the first host element it wrote), the slowest 20, and
+  past 10 entries a second only a slow one's named.
   `test/react.test.ts`.
 - `src/plugins/recommended/`: `deicticRecommended(options)`, the preset the docs show: tasks, screenshots, annotations,
   recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), then react where `installed(process.cwd(), 'react')` (init's

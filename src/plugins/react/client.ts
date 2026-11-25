@@ -8,14 +8,20 @@ import type * as Source from 'bippy/source';
 import { componentOf, fiberOf, type Owner, ownerOf } from '#src/client/component.ts';
 import { defineClientPlugin } from '#src/index.ts';
 
-import type { Component, Hook, ReactOptions, Snapshot } from './index.ts';
+import type { Commit, Component, Hook, ReactOptions, Snapshot } from './index.ts';
 import { countRenders, type Fiber } from './renders.ts';
 import { serialize } from './serialize.ts';
+import { timeline } from './timeline.ts';
 
-/** What a task asks of the plugin: the snapshot of the element's components, as the JSON it attaches. */
+/** What a task asks of the plugin, and a recording. */
 export interface Inspector {
-  /** `undefined` where React didn't render the element in development: there's nothing to say. */
+  /** The snapshot of the element's components, as the JSON a task attaches: `undefined` where React didn't render it in development. */
   snapshot(el: Element): Promise<string | undefined>;
+  /**
+   * React's commits from now, an entry a frame (`emit` hears each), until what's answered stops it: for a recording.
+   * `undefined` where renders aren't counted (`renders: false`, or no DevTools hook on the page).
+   */
+  commits?: (emit: (commit: Commit) => void) => () => void;
 }
 
 declare module 'deictic' {
@@ -80,7 +86,7 @@ export default defineClientPlugin<never, never, Inspector>({
   setup: ({ options }) => {
     const { components = 4, mask = [], names = true, renders = true } = (options ?? {}) as ReactOptions;
     // From now, before any task: what rendered before the page started deictic goes uncounted.
-    const rendersOf = renders ? countRenders() : undefined;
+    const counted = renders ? countRenders() : undefined;
     const value = (of: unknown) => serialize(of, mask);
 
     /** A hook as DevTools lists it: its kind (`State`, or a custom hook's name less `use`), what the code calls it, its value. */
@@ -99,6 +105,7 @@ export default defineClientPlugin<never, never, Inspector>({
     };
 
     return {
+      ...(counted === undefined ? {} : { commits: (emit: (commit: Commit) => void) => timeline(counted.subscribe, emit) }),
       snapshot: async (el) => {
         const wrote = ownerOf(fiberOf(el));
         if (wrote === undefined) return undefined;
@@ -120,8 +127,8 @@ export default defineClientPlugin<never, never, Inspector>({
           const component: Component = { name, ...(at === undefined ? {} : { at }) };
           const props = value(fiber.memoizedProps);
           if (props !== undefined) component.props = props;
-          const counted = rendersOf?.(fiber as unknown as Fiber);
-          if (counted !== undefined) component.renders = counted;
+          const rendered = counted?.read(fiber as unknown as Fiber);
+          if (rendered !== undefined) component.renders = rendered;
           // A class's state is its instance's; a function's is its hooks.
           if (fiber.stateNode !== null && typeof fiber.stateNode === 'object' && 'state' in fiber.stateNode) {
             const state = value(fiber.stateNode.state);

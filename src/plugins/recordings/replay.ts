@@ -24,7 +24,7 @@
  * publishes it as a file instead, `replayPage(sources)`: which recording is `?id=`, and a script of its own says
  * where one is.
  */
-import { MARKS } from './marks.ts';
+import { MARKS, REACT } from './marks.ts';
 
 /** Where the replay page finds what the plugin's routes would serve it, for a page published as a file. */
 export interface ReplaySources {
@@ -76,7 +76,10 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
   #log .text { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   #log li.open .text { display: block; white-space: pre-wrap; }
   #log pre { margin: 0; padding: 2px 8px 8px calc(8px + 6ch + 8px); color: #a1a1aa; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
-  #log.no-console li.console, #log.no-network li.network, #log.only-bad li:not(.bad) { display: none; }
+  #log.no-console li.console, #log.no-network li.network, #log.no-react li.react, #log.only-bad li:not(.bad) { display: none; }
+  #log li.react .label { color: #58c4dc; }
+  #log li.react.warn .label { color: #fbbf24; }
+  #main .rr-player .rr-progress .slow-mark { position: absolute; top: -3px; width: 3px; height: 10px; margin-left: -1px; border-radius: 1px; background: #fbbf24; pointer-events: none; }
   #main .rr-player .rr-progress .bad-mark { position: absolute; top: -3px; width: 3px; height: 10px; margin-left: -1px; border-radius: 1px; background: #f87171; pointer-events: none; }
   body.embed #main .rr-player { box-shadow: none; border-radius: 0; }
   #marks { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; }
@@ -112,6 +115,7 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
     <div class="filters">
       <button type="button" data-hides="no-console" aria-pressed="true">Console</button>
       <button type="button" data-hides="no-network" aria-pressed="true">Network</button>
+      <button type="button" data-hides="no-react" aria-pressed="true" hidden title="React's commits: what rendered, how long it took, and why">React</button>
       <button type="button" data-shows="only-bad" aria-pressed="false" title="Errors, and requests that failed">Problems</button>
     </div>
     <ol></ol>
@@ -154,6 +158,25 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
     const origin = (() => { try { return new URL(kept.page).origin; } catch { return ''; } })();
     const fields = (title, held) => (held && Object.keys(held).length > 0 ? [title, ...Object.entries(held).map(([k, v]) => '  ' + k + ': ' + v)] : []);
     const rows = [];
+    // React's commits, where the recording had them on: a row an entry, slow ones (past a frame) marked.
+    const ms = (n) => (n === undefined ? '' : (n < 10 ? n.toFixed(1) : Math.round(n)) + ' ms');
+    for (const e of events) {
+      if (e.type !== 5 || bare || e.data.tag !== ${JSON.stringify(REACT)}) continue;
+      const at = e.timestamp - t0;
+      const c = e.data.payload;
+      if (c.on !== undefined) {
+        rows.push({ at, kind: 'react', label: 'React', text: c.on ? 'commits recorded from here' : 'commits no longer recorded', more: [] });
+        continue;
+      }
+      const named = (c.components ?? []).map((r) => r.name + (r.count > 1 ? ' ×' + r.count : '') + ' (' + r.why + ')');
+      const text = (named.length > 0 ? named.slice(0, 3).join(', ') : (c.more ?? 0) + ' components') + (named.length > 3 || (c.more && named.length > 0) ? ', …' : '');
+      const more = [
+        [c.commits > 1 ? c.commits + ' commits' : '1 commit', c.priority, ms(c.ms)].filter(Boolean).join(' · '),
+        ...(c.components ?? []).map((r) => [r.name + (r.count > 1 ? ' ×' + r.count : ''), r.at, ms(r.ms), r.selfMs === undefined ? '' : ms(r.selfMs) + ' own', r.why].filter(Boolean).join(' · ')),
+        ...(c.more ? ['and ' + c.more + ' more'] : []),
+      ];
+      rows.push({ at, kind: 'react', label: c.ms === undefined ? 'React' : ms(c.ms), warn: c.ms > 16, slow: c.ms > 16, text, more });
+    }
     for (const e of events) {
       if (e.type !== 6 || bare) continue;
       const at = e.timestamp - t0;
@@ -179,8 +202,10 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
         }
       }
     }
+    rows.sort((a, b) => a.at - b.at);
     const logged = rows.length > 0;
     const log = document.getElementById('log');
+    if (rows.some((r) => r.kind === 'react')) log.querySelector('[data-hides="no-react"]').hidden = false;
     if (logged) document.body.classList.add('logged');
     // The panel's room, where the window is wide enough to show it (as the stylesheet has it).
     const side = () => (logged && innerWidth >= 900 ? 340 : 0);
@@ -241,6 +266,7 @@ export const replayPage = ({ player = '..', source }: ReplaySources = {}) => `<!
       row.el.append(go, more);
       list.append(row.el);
       // An error, or a request that failed, is a mark on the timeline too.
+      if (row.slow && bar) bar.append(Object.assign(cell('i', 'slow-mark', ''), { title: row.label + ': ' + row.text.slice(0, 200), style: 'left:' + (total > 0 ? (row.at / total) * 100 : 0) + '%' }));
       if (row.bad && bar) bar.append(Object.assign(cell('i', 'bad-mark', ''), { title: row.text.slice(0, 200), style: 'left:' + (total > 0 ? (row.at / total) * 100 : 0) + '%' }));
     }
     for (const button of log.querySelectorAll('.filters button')) {

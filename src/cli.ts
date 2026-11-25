@@ -88,13 +88,17 @@ program
   .description('a recording as a timeline, or the part of it asked for')
   .argument('<recording>', RECORDING)
   .option('--nth <n>', "a task's nth recording", '1')
-  .option('--only <kinds>', 'these kinds of line: console, request, page, click, input, scroll, resize, marks, voice (repeatable)', all)
-  .option('--problems', 'errors, warnings and requests that failed')
+  .option(
+    '--only <kinds>',
+    'these kinds of line: console, request, react, page, click, input, scroll, resize, marks, voice (repeatable)',
+    all,
+  )
+  .option('--problems', 'errors, warnings, requests that failed and React commits slower than a frame')
   .option('--from <seconds>', 'from this far in')
   .option('--to <seconds>', 'to this far in')
   .option('--around <seconds>', 'the 3 seconds either side of this')
   .option('--grep <text>', 'lines with this in them, in any case')
-  .option('--full', "all of each line: where it was logged from, a request's headers and bodies")
+  .option('--full', "all of each line: where it was logged from, a request's headers and bodies, a React commit's components")
   .option('--json', 'as JSON')
   .action(async (ref: string, options) => (await import('./cli/recording.ts')).run(ref, options));
 

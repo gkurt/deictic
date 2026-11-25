@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 
-import { reactState } from '#src/plugins/react/index.ts';
-import { countRenders, type Fiber, renderStats, whyOf } from '#src/plugins/react/renders.ts';
+import { type Commit, reactState } from '#src/plugins/react/index.ts';
+import { countRenders, type Fiber, type Rendering, renderStats, whyOf } from '#src/plugins/react/renders.ts';
 import { serialize } from '#src/plugins/react/serialize.ts';
+import { timeline } from '#src/plugins/react/timeline.ts';
 import { clientModule } from '#src/vite.ts';
 
 test('says what JSON cannot hold, in brackets', () => {
@@ -161,10 +162,63 @@ test('says a render was its state, a context or its parent, an effect being no c
 test("answers DevTools' hook after the handler it had, and counts nothing where there's no hook", () => {
   const heard: number[] = [];
   const hook = { onCommitFiberRoot: (id: number, _root: { current: Fiber }) => void heard.push(id) };
-  const read = countRenders({ __REACT_DEVTOOLS_GLOBAL_HOOK__: hook });
+  const counted = countRenders({ __REACT_DEVTOOLS_GLOBAL_HOOK__: hook });
   const card = fiber(0);
   hook.onCommitFiberRoot(1, { current: children(fiber(3), card) });
   expect(heard).toEqual([1]);
-  expect(read?.(card)).toMatchObject({ count: 1, why: 'mounted' });
+  expect(counted?.read(card)).toMatchObject({ count: 1, why: 'mounted' });
   expect(countRenders({})).toBeUndefined();
+});
+
+test("a recording's timeline is an entry a frame, the slowest first, naming fewer once it's busy", () => {
+  let time = 0;
+  const later: (() => void)[] = [];
+  const clock = { now: () => time, later: (run: () => void) => void later.push(run) };
+  let listen: ((commit: Rendering) => void) | undefined;
+  const subscribe = (given: (commit: Rendering) => void) => {
+    listen = given;
+    return () => void (listen = undefined);
+  };
+  const out: Commit[] = [];
+  const stop = timeline(subscribe, (c) => out.push(c), clock);
+  const row = fiber(0, { type: function Row() {} });
+  const list = fiber(0, { type: { displayName: 'List' } });
+  // Two commits a frame apart: one entry, each component once, with how often, the slowest first.
+  listen!({ ms: 2, priority: 1, rendered: [{ fiber: row, why: 'mounted', selfMs: 0.5 }] });
+  listen!({
+    ms: 3,
+    priority: 2,
+    rendered: [
+      { fiber: list, why: 'state changed', ms: 3, selfMs: 2 },
+      { fiber: row, why: 'its parent rendered', selfMs: 0.5 },
+    ],
+  });
+  expect(later).toHaveLength(1);
+  later.shift()!();
+  expect(out).toEqual([
+    {
+      commits: 2,
+      ms: 5,
+      priority: 'user-blocking',
+      components: [
+        { name: 'List', why: 'state changed', ms: 3, selfMs: 2 },
+        { name: 'Row', why: 'its parent rendered', selfMs: 1, count: 2 },
+      ],
+    },
+  ]);
+  // Past ten entries in a second, a fast one names none: only how many rendered.
+  for (let i = 0; i < 11; i++) {
+    listen!({ ms: 1, rendered: [{ fiber: row, why: 'state changed' }] });
+    later.shift()!();
+  }
+  expect(out.at(-1)).toEqual({ commits: 1, ms: 1, components: [], more: 1 });
+  // A slow one still does.
+  listen!({ ms: 40, rendered: [{ fiber: row, why: 'state changed' }] });
+  later.shift()!();
+  expect(out.at(-1)?.components).toHaveLength(1);
+  // Stopped, what's waiting goes first, and nothing after.
+  listen!({ ms: 1, rendered: [] });
+  stop();
+  expect(out.at(-1)).toMatchObject({ commits: 1 });
+  expect(listen).toBeUndefined();
 });

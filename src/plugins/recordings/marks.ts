@@ -15,3 +15,10 @@ export const PAGE = 'deictic.page';
  * recording of a still page (a voice-over, say) would replay as a moment, and its voice never play.
  */
 export const END = 'deictic.end';
+
+/**
+ * The custom event for React's commits, where the react plugin is loaded and they're asked for (the recording's React
+ * button): a `Commit` each (`deictic/react`'s), and `{ on }` where the recording starts and stops having them, so a
+ * stretch without them isn't read as one where nothing rendered.
+ */
+export const REACT = 'deictic.react';

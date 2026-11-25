@@ -136,11 +136,12 @@ keys work while the shortcut's are held, and while a tool has the page:
 | `S`                                | A screenshot of the window, with what's drawn on it (screenshots)         |
 | `R`, `Shift+R`                     | Starts a recording, and stops it; discards it (recordings)                |
 | `K`                                | The mic: a voice note, or a recording's voice (voice)                     |
+| `P`                                | While a recording goes, whether React's commits go in it (react)          |
 | `T`                                | A task about a point: the next press on the page opens the Task tab there |
 
 A recording, the mic and a drawing tool keep the panel up: stop them (`R`, `K`, `Esc`) and it goes with the keys.
-While a recording goes, Screenshot, the mic and Task step aside for its own controls: its time, its mic, Stop and
-Discard.
+While a recording goes, Screenshot, the mic and Task step aside for its own controls: its time, its mic, React
+(where [React state](#react-state) is loaded), Stop and Discard.
 What the tools make (shots, recordings, voice notes) waits for the next task, whichever element it's about: the Task
 tool counts them, and the Task tab lists each as a chip, to open or to leave out, and the drawer has them meanwhile. Marks stay on the
 page until a task takes them.
@@ -351,6 +352,14 @@ before the task (a loop, a burst on each keystroke), how long ago, how long the 
 it rendered, and `selfMs`, its own part), and why (`mounted`, `props changed: chosen`, `state changed`, `context
 changed`, `its parent rendered`). React tells them to DevTools' hook, which React Refresh installs in development, so
 they're counted from when the page started deictic, not from its first render.
+
+A recording can have React's commits too, as DevTools' profiler has them: press **React** (`P`) among its controls.
+It's off until you do, stays as you leave it, for the next recording too, and carries on over a page load. Commits a
+frame apart are one entry: how long they took, React's priority (`immediate` for a click or a key), and the
+components that rendered, the slowest first, each with its time, where its JSX is and why. Past ten entries a second
+only one slower than a frame names its components, so a page that animates doesn't fill the recording. The replay
+lists them beside the page under **React**, a slow one marked on the timeline; `deictic recording --only react` is
+the same in a terminal, `--full` with each component's line, and `--problems` has those slower than a frame.
 
 ## Tailwind
 

@@ -1,12 +1,15 @@
 /**
  * `deictic recording`: a recording as a timeline: the page, each click and field typed in (with the element's place
  * in the source), scrolls, resizes, each change to the marks (what was drawn, where, and the notes' text), the voice
- * clips, the page's console and its requests where the project records them, and the end. Or the part of it asked
+ * clips, the page's console and its requests where the project records them, React's commits where the recording had
+ * them on, and the end. Or the part of it asked
  * for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, and `--full` for all of each line.
  */
 import { relative } from 'node:path';
 
 import type { Shape } from '#src/plugins/annotations/index.ts';
+import type { Commit } from '#src/plugins/react/index.ts';
+import { REACT } from '#src/plugins/recordings/marks.ts';
 
 import { clock, fail, ME } from './board.ts';
 import { loadRecording } from './find.ts';
@@ -56,7 +59,7 @@ interface Data {
     trace?: string[];
     requests?: Request[];
     isInitial?: boolean;
-  };
+  } & Partial<Commit> & { on?: boolean };
   source?: number;
   type?: number;
   id?: number;
@@ -91,6 +94,37 @@ interface Line {
   before?: string;
   marks?: Shape[];
   node?: number;
+  /** A React commit entry's components, one line each: under it with `--full`. */
+  details?: string[];
+}
+
+/** A commit past this took longer than a frame: a problem, as it's what makes a page stutter. */
+const FRAME = 16;
+
+const ms = (n: number) => `${n < 10 ? n.toFixed(1) : round(n)}ms`;
+
+/** A React commit entry, as a line: how long, why it ran, and what rendered, the slowest first. */
+function commitLine(c: Partial<Commit>): Pick<Line, 'text' | 'details' | 'problem'> {
+  const components = c.components ?? [];
+  const head = [c.priority, (c.commits ?? 1) > 1 ? `${c.commits} commits` : undefined].filter(Boolean).join(', ');
+  const named = components.map(
+    (r) => `${r.name}${(r.count ?? 1) > 1 ? ` ×${r.count}` : ''}${r.selfMs === undefined ? '' : ` ${ms(r.selfMs)}`} (${r.why})`,
+  );
+  const rest = c.more === undefined ? '' : named.length === 0 ? `${c.more} components` : `, and ${c.more} more`;
+  return {
+    text: `${c.ms === undefined ? 'commit' : ms(c.ms)}${head === '' ? '' : ` (${head})`}: ${named.join(', ')}${rest}`,
+    details: components.map((r) =>
+      [
+        `${r.name}${(r.count ?? 1) > 1 ? ` ×${r.count}` : ''}`,
+        r.at,
+        r.ms === undefined ? undefined : `${ms(r.ms)} with what it rendered`,
+        r.why,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    ),
+    ...(c.ms !== undefined && c.ms > FRAME ? { problem: true } : {}),
+  };
 }
 
 type Point = { x: number; y: number };
@@ -261,6 +295,10 @@ function timelineOf(events: Event[], voice: { id: string; at: number; duration: 
         });
       }
     }
+    if (e.type === 5 && d.tag === REACT) {
+      if (payload.on !== undefined) push(t, 'react', payload.on ? 'commits recorded from here' : 'commits no longer recorded');
+      else push(t, 'react', '', commitLine(payload));
+    }
     if (e.type === 5 && d.tag === 'deictic.end') push(t, 'end', 'recording stopped');
     if (e.type !== 3) continue;
     if (d.source === 0) {
@@ -386,6 +424,7 @@ export async function run(named: string, values: Options): Promise<void> {
     // Where a warning or an error came from, its nearest few places: all of them, and every line's, with `--full`.
     if (e.trace && (values.full === true || e.problem === true))
       for (const line of values.full ? e.trace : e.trace.slice(0, 5)) under(`at ${line}`);
+    if (values.full === true) for (const line of e.details ?? []) under(line);
     if (values.full !== true || e.request === undefined) continue;
     const r = e.request;
     if (e.before !== undefined) under(e.before);

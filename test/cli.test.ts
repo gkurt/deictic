@@ -342,3 +342,50 @@ test('cleans what deictic kept after saying what and how big, and leaves the his
   expect(readdirSync(join(p.root, '.deictic')).toSorted()).toEqual(['recordings', 'screenshots', 'voice']);
   expect(readdirSync(cache)).toEqual([]);
 });
+
+test("recording says React's commits where it had them on, a slow one a problem, and their components with --full", () => {
+  const t = 1_700_000_000_000;
+  const p = project({ 'package.json': '{}' });
+  const react = (at: number, payload: object) => ({ type: 5, timestamp: t + at, data: { tag: 'deictic.react', payload } });
+  const kept: Kept = {
+    page: `${ORIGIN}/`,
+    viewport: { width: 800, height: 600 },
+    startedAt: t,
+    duration: 3000,
+    events: [
+      { type: 4, timestamp: t, data: { href: `${ORIGIN}/`, width: 800, height: 600 } },
+      { type: 2, timestamp: t, data: { node: { id: 1, type: 0, childNodes: [] } } },
+      react(500, { on: true }),
+      react(1000, {
+        commits: 3,
+        ms: 38.2,
+        priority: 'user-blocking',
+        components: [
+          { name: 'SearchResults', at: 'src/Search.tsx:20', ms: 36, selfMs: 31, why: 'props changed: query' },
+          { name: 'ResultRow', count: 120, selfMs: 4, why: 'its parent rendered' },
+        ],
+        more: 2,
+      }),
+      react(1500, { commits: 1, ms: 0.4, priority: 'immediate', components: [{ name: 'Toggle', why: 'state changed' }] }),
+      react(2000, { on: false }),
+      { type: 5, timestamp: t + 3000, data: { tag: 'deictic.end', payload: {} } },
+    ],
+  };
+  mkdirSync(join(p.root, '.deictic', 'recordings'), { recursive: true });
+  writeFileSync(join(p.root, '.deictic', 'recordings', 'rec-2.json'), JSON.stringify(kept));
+
+  const all = deictic(p.root, 'recording', 'rec-2', '--only', 'react');
+  expect(all.err).toBe('');
+  expect(all.out).toContain('react         commits recorded from here');
+  expect(all.out).toContain(
+    'react         38ms (user-blocking, 3 commits): SearchResults 31ms (props changed: query), ResultRow ×120 4.0ms (its parent rendered), and 2 more',
+  );
+  expect(all.out).toContain('react         0.4ms (immediate): Toggle (state changed)');
+  expect(all.out).toContain('react         commits no longer recorded');
+  // Slower than a frame: what makes a page stutter.
+  const problems = deictic(p.root, 'recording', 'rec-2', '--problems');
+  expect(problems.out).toContain('SearchResults');
+  expect(problems.out).not.toContain('Toggle');
+  const full = deictic(p.root, 'recording', 'rec-2', '--only', 'react', '--full');
+  expect(full.out).toContain('SearchResults · src/Search.tsx:20 · 36ms with what it rendered · props changed: query');
+});

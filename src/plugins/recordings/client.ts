@@ -10,7 +10,8 @@
  * the time running, and turns the mic back on where it was.
  *
  * Nothing of deictic's is recorded: the overlay is blocked, as rrweb blocks. The marks are, as custom
- * events: the page's annotations, as SVGs in page coordinates, at the start and at each change.
+ * events: the page's annotations, as SVGs in page coordinates, at the start and at each change. So are React's
+ * commits, where the react plugin is loaded, while its button is on (P): off by default, and as it was last left.
  */
 import { toolButton } from '#src/client/dom.ts';
 import { playMark, trayed } from '#src/client/drawer.ts';
@@ -21,7 +22,7 @@ import type { ResolvedMasking } from '#src/plugins/screenshots/index.ts';
 import type { Take } from '#src/plugins/voice/index.ts';
 
 import type { Kept, Meta, Recorder, Recording, RecordPlugin, VoiceClip } from './index.ts';
-import { END, MARKS, PAGE } from './marks.ts';
+import { END, MARKS, PAGE, REACT } from './marks.ts';
 import { dropOurs } from './ours.ts';
 
 /** Where the recording going on is kept, for the tab's next page to carry on with. */
@@ -38,7 +39,28 @@ interface Carried {
   /** The mic's clips so far, and whether it was on. */
   clips: VoiceClip[];
   mic: boolean;
+  /** Whether React's commits were going in. */
+  react?: boolean;
 }
+
+/** Whether the last recording had React's commits going in when it ended, for the next to start as it was left. */
+const REACT_ON = 'deictic:recording:react';
+
+const reactWanted = () => {
+  try {
+    return localStorage.getItem(REACT_ON) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const wantReact = (on: boolean) => {
+  try {
+    localStorage.setItem(REACT_ON, String(on));
+  } catch {
+    // Not remembered, then: the next recording starts without.
+  }
+};
 
 function carried(): Carried | undefined {
   try {
@@ -69,6 +91,7 @@ const STYLE = `
 .tool-panel.vertical .recorder .live { flex-direction: column; gap: 2px; padding: 4px 0; }
 .recorder .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: deictic-blink 1.2s infinite; }
 .recorder .mic[aria-pressed='true'], .recorder .mic[aria-pressed='true']:hover { background: #ef4444; color: #fff; }
+.recorder .react[aria-pressed='true'], .recorder .react[aria-pressed='true']:hover { background: #087ea4; color: #fff; }
 .recorder .wave { width: 44px; height: 18px; }
 .tool-panel.vertical .recorder .wave { width: 28px; }
 @keyframes deictic-blink { 50% { opacity: 0.3; } }
@@ -79,6 +102,9 @@ const RECORD = '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fil
 const STOP = '<rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/>';
 const DISCARD = '<path d="M6 6l12 12M18 6 6 18"/>';
 const MIC = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+/** An atom, as React's own mark is drawn. */
+const ATOM =
+  '<circle cx="12" cy="12" r="1.6" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>';
 
 const clock = (ms: number) => {
   const s = Math.floor(ms / 1000);
@@ -219,11 +245,14 @@ export default defineClientPlugin<never, never, Recorder>({
       // The mic, where the voice plugin is loaded: each stretch it's on is a clip, at its time in the recording.
       const voice = use('voice');
       let take: Take | undefined;
+      // React's commits, where the react plugin counts them: what stops them going in while they do.
+      const commits = use('react')?.commits;
+      let unreact: (() => void) | undefined;
       /** What the next page carries on from, kept as it changes: a page that's going has no time to say it then. */
       let over = false;
       const save = () =>
         // Not once it's ended, as its last events go: the next page would carry on with one that's over.
-        over || carry({ id, startedAt, seq, clips, mic: take !== undefined });
+        over || carry({ id, startedAt, seq, clips, mic: take !== undefined, react: unreact !== undefined });
       const unsubscribe = marks?.subscribe(mark);
 
       // One part at a time, each with its place. A part that didn't arrive goes again with the next, before it.
@@ -310,6 +339,34 @@ export default defineClientPlugin<never, never, Recorder>({
         // On, as the page before left it: a browser that was let use the mic gives it again without asking.
         if (from?.mic === true) toggle();
 
+        const react =
+          commits === undefined
+            ? undefined
+            : toolButton(ATOM, "Record React's commits: what rendered, how long it took, and why", 'P', () =>
+                reactOn(unreact === undefined),
+              );
+        react?.classList.add('react');
+        const reactOn = (on: boolean) => {
+          if (commits === undefined || react === undefined || on === (unreact !== undefined)) return;
+          if (on) {
+            rrweb.record.addCustomEvent(REACT, { on: true });
+            unreact = commits((commit) => rrweb.record.addCustomEvent(REACT, commit));
+          } else {
+            // What's waiting goes first, then where it stops.
+            unreact?.();
+            unreact = undefined;
+            rrweb.record.addCustomEvent(REACT, { on: false });
+          }
+          react.setAttribute('aria-pressed', String(on));
+          react.title = on ? "Stop recording React's commits" : "Record React's commits: what rendered, how long it took, and why";
+          react.setAttribute('aria-label', react.title);
+          wantReact(on);
+          save();
+        };
+        react?.setAttribute('aria-pressed', 'false');
+        // As the page before left it, or a new one as the last was left.
+        if (from?.react ?? reactWanted()) reactOn(true);
+
         // The page is going, for another or for good, with no time to wait for anything: what's sent of the mic's
         // take is its clip, the next page is told where things stand, and the last events go as the page does.
         const leave = () => {
@@ -327,6 +384,9 @@ export default defineClientPlugin<never, never, Recorder>({
         addEventListener('pagehide', leave);
 
         const end = async (kept: boolean) => {
+          // What's waiting of React's commits goes in before the end, and the next recording starts as this one ends.
+          unreact?.();
+          unreact = undefined;
           rrweb.record.addCustomEvent(END, {});
           stopRecording?.();
           unsubscribe?.();
@@ -357,7 +417,7 @@ export default defineClientPlugin<never, never, Recorder>({
         // Record's key again: it's Stop while one is going.
         const stop = toolButton(STOP, 'Stop', 'R', () => void end(true));
         const discard = toolButton(DISCARD, 'Discard', 'Shift+R', () => void end(false));
-        going.replaceChildren(live, ...(mic ? [mic, wave] : []), stop, discard);
+        going.replaceChildren(live, ...(mic ? [mic, wave] : []), ...(react ? [react] : []), stop, discard);
         // The panel stays while it goes: its controls are what ends it.
         const unkeep = tools.keep();
         start.hidden = true;
