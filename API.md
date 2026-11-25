@@ -152,7 +152,7 @@ circled. It still names an element, the marked one under the point or the neares
 network, which put the page's console and its requests in a recording, and, where the project has React,
 [React state](#react-state). Each takes its options under its name, and `false` leaves it out
 (`deicticRecommended({ logs: false, react: false })`). Other plugins, your own included, go beside it:
-`plugins: [...deicticRecommended(), notes()]`. It was `recommended()`, which still works. Each plugin is also its own import (`deictic/tasks`, `deictic/screenshots`…),
+`plugins: [...deicticRecommended(), notes()]`. It was `recommended()`. Each plugin is also its own import (`deictic/tasks`, `deictic/screenshots`…),
 to pick them one by one.
 
 What a project keeps (the history, shots, recordings, voice notes) is in `.deictic/`, which ignores itself in git.
@@ -340,10 +340,17 @@ deicticRecommended({ react: false }); // none
 | `components` | `4`     | How many components, out from the one that wrote the element                  |
 | `mask`       | none    | More names whose values are blanked, as `network`'s `mask`                    |
 | `names`      | `true`  | Whether hooks are named from the source and its map, fetched as DevTools does |
+| `renders`    | `true`  | Whether each component's renders are counted, timed and explained             |
 
 Values are your page's, so they're masked as requests are: a value whose name says it's a secret (`token`, `password`,
 `auth` and the like) is `***`. What JSON can't hold says what it was, in brackets (`[function onClick]`, `[<Button>]`,
 `[circular]`), and what's deep or long is cut, saying so. Effects are left out.
+
+Each component also says how it rendered, as DevTools' profiler would: how many times, how many in the 10 seconds
+before the task (a loop, a burst on each keystroke), how long ago, how long the last render took (`lastMs`, with what
+it rendered, and `selfMs`, its own part), and why (`mounted`, `props changed: chosen`, `state changed`, `context
+changed`, `its parent rendered`). React tells them to DevTools' hook, which React Refresh installs in development, so
+they're counted from when the page started deictic, not from its first render.
 
 ## Tailwind
 

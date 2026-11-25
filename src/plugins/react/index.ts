@@ -3,7 +3,8 @@
  * `react.json`. The component that wrote the element and the ones that wrote it in turn, each with its props, and
  * its state: a class's, or a function's hooks, named as the code names them where the source says (`count`, not
  * `State`). Read with bippy (an optional peer, imported as a task first asks for it) in development only, as React
- * keeps who wrote an element only there. No tab, and nothing in the page of its own: the tasks plugin asks it, and
+ * keeps who wrote an element only there. Each says how often it rendered, how long that took and why, as DevTools'
+ * profiler would, counted from React's commits. No tab, and nothing in the page of its own: the tasks plugin asks it, and
  * sends what it answers beside the element's HTML, while the panel's HTML snapshot box is ticked.
  *
  * Values are what the page holds, so they're masked as the network plugin's are, by their names (`token`,
@@ -21,6 +22,11 @@ export interface ReactOptions {
    * DevTools does): true by default. Without, each is its kind alone, `State` or `Memo`, in the order they're called.
    */
   names?: boolean;
+  /**
+   * Whether each component's renders are counted, timed and explained, from React's commits as DevTools' hook hears
+   * them: true by default. That hook is React Refresh's, in development; without one there's nothing to count.
+   */
+  renders?: boolean;
 }
 
 /** What JSON holds of a value: anything it can't hold says what it was, in brackets (`[function onClick]`). */
@@ -36,6 +42,21 @@ export interface Hook {
   hooks?: Hook[];
 }
 
+/** A component's renders, counted from when the page started deictic, not from its first. */
+export interface Renders {
+  count: number;
+  /** In the 10 seconds before the task: a loop, or a burst on each keystroke. */
+  recent: number;
+  /** How long ago it last rendered, in milliseconds. */
+  lastAgo: number;
+  /** How long its last render took, with what it rendered, in milliseconds: where React times them. */
+  lastMs?: number;
+  /** Its own part of it. */
+  selfMs?: number;
+  /** Why it last rendered: `mounted`, `props changed: chosen`, `state changed`, `context changed`, `its parent rendered`. */
+  why: string;
+}
+
 /** A component that wrote the element, or wrote one that did. */
 export interface Component {
   name: string;
@@ -48,6 +69,7 @@ export interface Component {
   state?: Value;
   /** A function component's hooks, in the order it calls them, effects left out. */
   hooks?: Hook[];
+  renders?: Renders;
   /** Why what's missing is. */
   problem?: string;
 }

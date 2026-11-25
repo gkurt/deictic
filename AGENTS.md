@@ -346,12 +346,17 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   bippy (an optional peer, imported on first use: `getFiberHooks`, named by `parseHookNames` from the source map unless
   `names: false`), effects left out. Where no renderer reached DevTools' hook, the page's React (`react`, an optional
   peer, so the build never bundles a copy of its own) gives bippy its dispatcher. `serialize.ts` makes the values JSON:
-  what JSON can't hold in brackets, cut by `LIMITS`, masked by name as `network/mask.ts`'s `sensitive`.
+  what JSON can't hold in brackets, cut by `LIMITS`, masked by name as `network/mask.ts`'s `sensitive`. `renders.ts`
+  counts renders (`renders: false` doesn't): `countRenders()`, from `setup`, wraps the page's DevTools hook's
+  `onCommitFiberRoot` (React Refresh's in development; React calls whatever answers it, so late is fine, though what
+  rendered before isn't counted), and walks each commit for the components that rendered (`PerformedWork`, or mounted;
+  a subtree whose children React didn't clone is skipped), keeping per fiber pair a count, the times, React's
+  `actualDuration`/`selfBaseDuration` and `whyOf` (props by key, hooks' state but effects, context, else the parent).
   `test/react.test.ts`.
 - `src/plugins/recommended/`: `deicticRecommended(options)`, the preset the docs show: tasks, screenshots, annotations,
   recordings and voice, in their tools' order in the tool panel (tasks' is last there, in `capture`), then logs and network (not without recordings), then react where `installed(process.cwd(), 'react')` (init's
   `packagesFor` asks the project's root instead, its `package.json` too), each with its options under its name or left
-  out with `false`. Named for deictic, as configs import other presets' `recommended`; that name is a deprecated alias. Server
+  out with `false`. Named for deictic, as configs import other presets' `recommended`. Server
   halves only, like every factory. `deictic init` sets it up, and the README, homepage and skill lead with that, not a manual install. The README is short (what, why, how) and about tasks: no class editing (Tailwind) in it. `API.md` has the detail (bundlers, options, writing a plugin) and is published with the package; `CONTRIBUTING.md` is how to develop.
 - `src/plugins/tasks/`: adds a task about the element to a Vercel Board (`@vercel/board`, an optional
   peer, imported when first used). `index.ts` writes the task's text as what was typed and nothing else (`See the recording` and the like where

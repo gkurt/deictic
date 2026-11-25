@@ -9,6 +9,7 @@ import { componentOf, fiberOf, type Owner, ownerOf } from '#src/client/component
 import { defineClientPlugin } from '#src/index.ts';
 
 import type { Component, Hook, ReactOptions, Snapshot } from './index.ts';
+import { countRenders, type Fiber } from './renders.ts';
 import { serialize } from './serialize.ts';
 
 /** What a task asks of the plugin: the snapshot of the element's components, as the JSON it attaches. */
@@ -77,7 +78,9 @@ function placeOf(el: Element, owner: Owner): string | undefined {
 export default defineClientPlugin<never, never, Inspector>({
   name: 'react',
   setup: ({ options }) => {
-    const { components = 4, mask = [], names = true } = (options ?? {}) as ReactOptions;
+    const { components = 4, mask = [], names = true, renders = true } = (options ?? {}) as ReactOptions;
+    // From now, before any task: what rendered before the page started deictic goes uncounted.
+    const rendersOf = renders ? countRenders() : undefined;
     const value = (of: unknown) => serialize(of, mask);
 
     /** A hook as DevTools lists it: its kind (`State`, or a custom hook's name less `use`), what the code calls it, its value. */
@@ -117,6 +120,8 @@ export default defineClientPlugin<never, never, Inspector>({
           const component: Component = { name, ...(at === undefined ? {} : { at }) };
           const props = value(fiber.memoizedProps);
           if (props !== undefined) component.props = props;
+          const counted = rendersOf?.(fiber as unknown as Fiber);
+          if (counted !== undefined) component.renders = counted;
           // A class's state is its instance's; a function's is its hooks.
           if (fiber.stateNode !== null && typeof fiber.stateNode === 'object' && 'state' in fiber.stateNode) {
             const state = value(fiber.stateNode.state);
