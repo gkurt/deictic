@@ -85,7 +85,9 @@ program
 
 program
   .command('recording')
-  .description('a recording as a timeline, or the part of it asked for')
+  .description(
+    "a recording as a timeline: what the person did and what went wrong, with a count of the page's other requests, console lines and React commits; or the part of it asked for",
+  )
   .argument('<recording>', RECORDING)
   .option('--nth <n>', "a task's nth recording", '1')
   .option(
@@ -93,11 +95,12 @@ program
     'these kinds of line: console, request, react, page, click, input, scroll, resize, marks, voice (repeatable)',
     all,
   )
+  .option('--all', 'every line: every request, console line and React commit too')
   .option('--problems', 'errors, warnings, requests that failed and React commits slower than a frame')
   .option('--from <seconds>', 'from this far in')
   .option('--to <seconds>', 'to this far in')
-  .option('--around <seconds>', 'the 3 seconds either side of this')
-  .option('--grep <text>', 'lines with this in them, in any case')
+  .option('--around <seconds>', 'every line of the 3 seconds either side of this')
+  .option('--grep <text>', 'lines with this in them, in any case, of every line')
   .option('--full', "all of each line: where it was logged from, a request's headers and bodies, a React commit's components")
   .option('--json', 'as JSON')
   .action(async (ref: string, options) => (await import('./cli/recording.ts')).run(ref, options));

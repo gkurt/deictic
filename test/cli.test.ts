@@ -386,6 +386,17 @@ test("recording says React's commits where it had them on, a slow one a problem,
   const problems = deictic(p.root, 'recording', 'rec-2', '--problems');
   expect(problems.out).toContain('SearchResults');
   expect(problems.out).not.toContain('Toggle');
+  // Asked for nothing: the slow one, as a problem, and the rest counted, with what lists them.
+  const plain = deictic(p.root, 'recording', 'rec-2');
+  expect(plain.out).toContain('SearchResults');
+  expect(plain.out).not.toContain('Toggle');
+  expect(plain.out).not.toContain('commits recorded from here');
+  expect(plain.out).toContain('Not listed: 3 React lines (--only react); --all lists every line');
+  expect(deictic(p.root, 'recording', 'rec-2', '--all').out).toContain('Toggle (state changed)');
+  // A moment is every line of it.
+  expect(deictic(p.root, 'recording', 'rec-2', '--around', '1.5').out).toContain('Toggle (state changed)');
+  // And a script has every line.
+  expect(JSON.parse(deictic(p.root, 'recording', 'rec-2', '--json').out).timeline).toHaveLength(6);
   const full = deictic(p.root, 'recording', 'rec-2', '--only', 'react', '--full');
   expect(full.out).toContain('SearchResults · src/Search.tsx:20 · 36ms with what it rendered · props changed: query');
 });

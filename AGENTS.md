@@ -522,7 +522,9 @@ above it does, as a runner like `npx` sits between it and the shell and outlives
 watching; a board that goes away, as a restarted dev server's does, is waited for a minute and followed again from the
 last event's cursor, where `.deictic/board.json` says it now is (it follows from a cursor taken as it starts, so it never lists what's ready again); while it runs it's in `.deictic/watchers`, `watcherAt` in `tasks/watchers.ts`, beside what reads
 it); `task` (the task, who asked, who holds it, and the page's other open ones); `recording` (a timeline, or the part
-of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--full`); `frame` (PNGs through the
+of it asked for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--all`, `--full`; asked for nothing, what
+the person did and what went wrong, the requests, console lines and React commits that aren't problems counted at the
+end with what lists them (`QUIET`), as a dev server's page makes hundreds; `--json` has every line); `frame` (PNGs through the
 replay's `?t=`, with the project's Playwright); `voice` (speech times, with ffmpeg) and `transcribe` (Whisper through a
 pinned transformers.js, installed with the model by `--setup` into `~/.cache/deictic/transcribe`, outside the project;
 without it the command refuses and says what to ask the person, as the skill has the agent ask first). The recording's

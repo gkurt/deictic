@@ -264,7 +264,8 @@ The Task tab is for a new task. The ones there are, are in the drawer. In the ta
 
 deictic ships a skill that watches the channel and works each task as it arrives. What it runs is the package's own
 `deictic` command, so it reads tasks and recordings with the version that wrote them: `deictic watch`, `deictic task`,
-`deictic recording` (a timeline), `deictic frame` (a screenshot at any moment), `deictic voice` and
+`deictic recording` (a timeline of what the person did and what went wrong, the page's other requests, console lines
+and React commits counted, for the agent to ask for with `--only` or `--all`), `deictic frame` (a screenshot at any moment), `deictic voice` and
 `deictic transcribe`, and `deictic vb`, the board's CLI on the dev server's board (`npx deictic --help` lists them).
 Its watch ends once the channel has been quiet for 20 minutes, and the agent then stops and says so, so none watches
 for ever. `init` offers to add it; otherwise `npx skills add gkurt/deictic`.
@@ -358,8 +359,8 @@ It's off until you do, stays as you leave it, for the next recording too, and ca
 frame apart are one entry: how long they took, React's priority (`immediate` for a click or a key), and the
 components that rendered, the slowest first, each with its time, where its JSX is and why. Past ten entries a second
 only one slower than a frame names its components, so a page that animates doesn't fill the recording. The replay
-lists them beside the page under **React**, a slow one marked on the timeline; `deictic recording --only react` is
-the same in a terminal, `--full` with each component's line, and `--problems` has those slower than a frame.
+lists them beside the page under **React**, a slow one marked on the timeline; `deictic recording` lists the slow
+ones and counts the rest, `--only react` lists them all, `--full` with each component's line, and `--problems` has those slower than a frame.
 
 ## Tailwind
 

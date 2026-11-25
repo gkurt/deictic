@@ -3,7 +3,11 @@
  * in the source), scrolls, resizes, each change to the marks (what was drawn, where, and the notes' text), the voice
  * clips, the page's console and its requests where the project records them, React's commits where the recording had
  * them on, and the end. Or the part of it asked
- * for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, and `--full` for all of each line.
+ * for: `--only`, `--problems`, `--from`, `--to`, `--around`, `--grep`, `--all`, and `--full` for all of each line.
+ *
+ * Asked for nothing, it's what the person did and what went wrong: the page's requests, its console's lines and
+ * React's commits, which a dev server makes hundreds of, are left out where they're not a problem, and counted at
+ * the end with what lists them. An agent asks for them where the task needs them. `--json` has every line.
  */
 import { relative } from 'node:path';
 
@@ -97,6 +101,17 @@ interface Line {
   /** A React commit entry's components, one line each: under it with `--full`. */
   details?: string[];
 }
+
+/**
+ * The kinds left out of a timeline asked for nothing in particular, where a line of them isn't a problem: a dev
+ * server's page makes hundreds of requests (its modules, its hot updates), logs what its tools do, and commits
+ * React each frame it animates. Counted, with what lists them.
+ */
+const QUIET = [
+  { kind: 'request', noun: 'request' },
+  { kind: 'console', noun: 'console line' },
+  { kind: 'react', noun: 'React line' },
+];
 
 /** A commit past this took longer than a frame: a problem, as it's what makes a page stutter. */
 const FRAME = 16;
@@ -366,6 +381,7 @@ function shortener(page: string): (text: string) => string {
 export interface Options {
   nth: string;
   json?: boolean;
+  all?: boolean;
   only?: string[];
   problems?: boolean;
   from?: string;
@@ -396,6 +412,19 @@ export async function run(named: string, values: Options): Promise<void> {
   const grep = values.grep?.toLowerCase();
   // `console` is every level's lines, `click` a right or a double one too.
   const isKind = (kind: string, asked: string) => kind === asked || kind.startsWith(`${asked}.`) || kind.endsWith(`-${asked}`);
+  // Asked for nothing in particular: what the person did and what went wrong, the rest counted. A slice of time, a
+  // word or kinds asked for are every line of it.
+  const whole = values.all === true || only.length > 0 || from !== undefined || to !== undefined || grep !== undefined;
+  const left = new Map<string, { count: number; noun: string }>();
+  const listed = (e: Line) => {
+    if (whole || e.problem === true) return true;
+    const quiet = QUIET.find((q) => isKind(e.kind, q.kind));
+    if (quiet === undefined) return true;
+    const held = left.get(quiet.kind) ?? { count: 0, noun: quiet.noun };
+    held.count++;
+    left.set(quiet.kind, held);
+    return false;
+  };
   const shown = timeline.filter(
     (e) =>
       (only.length === 0 || only.some((asked) => isKind(e.kind, asked))) &&
@@ -404,6 +433,8 @@ export async function run(named: string, values: Options): Promise<void> {
       (to === undefined || e.t <= to) &&
       (grep === undefined || `${e.kind} ${e.text}`.toLowerCase().includes(grep)),
   );
+  // Not in `--json`, which is for a script, and has every line it was asked for.
+  const listing = values.json === true ? shown : shown.filter(listed);
 
   const colorScheme = kept.colorScheme ?? 'light';
   const startedAt = new Date(kept.startedAt ?? events[0]!.timestamp).toISOString();
@@ -416,10 +447,12 @@ export async function run(named: string, values: Options): Promise<void> {
   console.log(`viewport ${kept.viewport.width}×${kept.viewport.height}, ${colorScheme}, started ${startedAt}`);
   if (replay !== undefined) console.log(`replays at ${replay} (add ?t=<seconds> to open it paused there)`);
   if (shown.length < timeline.length) console.log(`${shown.length} of its ${timeline.length} lines, as asked`);
+  else if (listing.length < shown.length)
+    console.log(`${listing.length} of its ${timeline.length} lines: what the person did, and what went wrong`);
   console.log();
   const short = shortener(kept.page);
   const under = (line: string) => console.log(`${' '.repeat(22)}${short(line)}`);
-  for (const e of shown) {
+  for (const e of listing) {
     console.log(`${e.at.padStart(6)}  ${e.kind.padEnd(13)} ${short(e.text)}`);
     // Where a warning or an error came from, its nearest few places: all of them, and every line's, with `--full`.
     if (e.trace && (values.full === true || e.problem === true))
@@ -437,6 +470,11 @@ export async function run(named: string, values: Options): Promise<void> {
     if (r.responseBody !== undefined) under(`response body  ${r.responseBody}`);
   }
   if (shown.length === 0) console.log(timeline.length === 0 ? 'Nothing in it.' : 'No line of it is what was asked for.');
+  if (left.size > 0) {
+    const counted = [...left.entries()].map(([kind, { count, noun }]) => `${count} ${noun}${count === 1 ? '' : 's'} (--only ${kind})`);
+    console.log(`
+Not listed: ${counted.join(', ')}; --all lists every line, --around <seconds> every line of a moment.`);
+  }
   // Where something went wrong, how to get to it: what led up to it, and what the page looked like.
   const problems = timeline.filter((e) => e.problem === true).length;
   if (problems === 0 || shown.length < timeline.length) return;
