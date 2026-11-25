@@ -221,6 +221,9 @@ export default defineClientPlugin<Model, Op>({
     const unpin = over ? pinsIn(context).glance() : undefined;
 
     const shots = context.use('screenshots');
+    // The page as the press that opened the popup froze it, rendered meanwhile: a shot taken as it's sent may have
+    // missed a tooltip or a menu, which the popup's own pointer and focus close.
+    const frozen = shots?.frozen(context.element);
     const recorder = context.use('recordings');
     const back = context.resumed;
     // The server half's `html` option, which takes the button away; a page half with no options (a `standalone` server's) has it.
@@ -307,6 +310,7 @@ export default defineClientPlugin<Model, Op>({
       html: sendsHtml,
       ...(context.at === undefined ? {} : { at: context.at }),
       shoot: true,
+      ...(frozen === undefined ? {} : { frozen }),
       // Back from a recording on a page without the element: nothing of it to shoot or draw on here.
       here: context.element.isConnected,
       over,

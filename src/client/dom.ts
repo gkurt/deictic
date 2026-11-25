@@ -68,3 +68,17 @@ export function controlFor(within: ParentNode, e: KeyboardEvent, loose = false):
 
 /** The key held with a letter for a command, as the platform has it, by the name `aria-keyshortcuts` gives it. */
 export const MOD = typeof navigator !== 'undefined' && /Mac|iP(?:hone|ad)/.test(navigator.platform) ? 'Meta' : 'Control';
+
+/**
+ * What the page hears on `window` as the popup opens over it on an element (its `detail` a `PopupOpened`) and as
+ * it closes: for a page that moves on its own to hold still meanwhile, as deictic's site does. Not for one pinned.
+ */
+export const POPUP_OPENED = 'deictic:open';
+export const POPUP_CLOSED = 'deictic:close';
+
+export interface PopupOpened {
+  /** The element it's open on. */
+  element: Element;
+  /** The plugin whose tab it opened at. */
+  tab: string;
+}

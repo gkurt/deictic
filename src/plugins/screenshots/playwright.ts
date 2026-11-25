@@ -38,6 +38,16 @@ export interface Snapshot {
   clip?: Box;
   /** An SVG the viewport's size, drawn over the page: the annotations, where there are any. */
   overlay?: string;
+  /** The nodes in each interactive state as the shot was taken, which a copy of the DOM can't be in itself. */
+  states?: States;
+}
+
+/** The snapshot's nodes that matched each pseudo-class: what was hovered, focused, and around the focus. */
+export interface States {
+  hover?: number[];
+  focus?: number[];
+  focusVisible?: number[];
+  focusWithin?: number[];
 }
 
 const HOST = '<!doctype html><html><body style="margin:0"></body></html>';
@@ -101,7 +111,7 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
     await page.addScriptTag({ path: bundle() });
     // The shot, and the attribute that sizes each canvas's picture, which the page's code can't import.
     const given = { ...shot, size: CANVAS_SIZE };
-    const found = await page.evaluate(async ({ snapshot, scroll, overlay, element, size }) => {
+    const found = await page.evaluate(async ({ snapshot, scroll, overlay, element, size, states }) => {
       const { rebuildIntoSandboxedIframe, createCache, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb })
         .rrwebSnapshot;
       const mirror = createMirror();
@@ -120,6 +130,60 @@ export async function render(input: unknown, options: BrowserOptions): Promise<{
       const hidden = doc.createElement('style');
       hidden.textContent = 'noscript { display: none !important; }';
       doc.head.append(hidden);
+      // What was hovered and focused: a copy of the DOM is in no state, so each rule of those pseudo-classes is
+      // copied under a class of its own, and the nodes that were in it get the class. Nested rules and grouping ones
+      // (a Tailwind `hover:` class is `&:hover { @media (hover: hover) { … } }`) are copied whole.
+      if (states !== undefined) {
+        const pseudo: [string, string][] = [
+          [':focus-visible', 'deictic-focus-visible'],
+          [':focus-within', 'deictic-focus-within'],
+          [':focus', 'deictic-focus'],
+          [':hover', 'deictic-hover'],
+        ];
+        type Rules = { cssRules: CSSRuleList; insertRule: (rule: string, index: number) => number };
+        const copy = (into: Rules) => {
+          const list = into.cssRules;
+          for (let i = 0; i < list.length; i++) {
+            const rule = list[i] as CSSRule & Partial<Rules> & { selectorText?: string };
+            if (rule.cssRules !== undefined && rule.insertRule !== undefined) copy(rule as Rules);
+            const selector = rule.selectorText;
+            if (selector === undefined || !rule.cssText.startsWith(selector)) continue;
+            let stated = selector;
+            for (const [name, className] of pseudo) stated = stated.split(name).join(`.${className}`);
+            if (stated === selector) continue;
+            try {
+              into.insertRule(stated + rule.cssText.slice(selector.length), i + 1);
+              i++;
+            } catch {
+              // A selector this browser won't take back: that state goes unshown.
+            }
+          }
+        };
+        const roots: (Document | ShadowRoot)[] = [doc];
+        for (let i = 0; i < roots.length; i++)
+          for (const el of roots[i]!.querySelectorAll('*')) if (el.shadowRoot !== null) roots.push(el.shadowRoot);
+        for (const root of roots) {
+          for (const sheet of [...root.styleSheets, ...root.adoptedStyleSheets]) {
+            try {
+              copy(sheet);
+            } catch {
+              // Another origin's, which can't be read: rrweb inlines what it can.
+            }
+          }
+        }
+        const classes = {
+          hover: 'deictic-hover',
+          focus: 'deictic-focus',
+          focusVisible: 'deictic-focus-visible',
+          focusWithin: 'deictic-focus-within',
+        };
+        for (const [name, className] of Object.entries(classes)) {
+          for (const id of states[name as keyof typeof classes] ?? []) {
+            const node = mirror.getNode(id);
+            if (isElement(node)) node.classList.add(className);
+          }
+        }
+      }
       // The sandbox runs no scripts, and where scripts don't run, a canvas shows what's inside the canvas instead of
       // what was drawn on the canvas: so each canvas's picture goes inside the canvas, at the size the page laid the
       // canvas out at. rrweb's own drawing of the picture on the canvas never shows.

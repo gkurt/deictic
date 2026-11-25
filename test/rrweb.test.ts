@@ -10,6 +10,7 @@ import type * as Rrweb from 'rrweb-snapshot';
 
 import { CANVAS_SIZE, keepWebGLDrawing } from '#src/plugins/screenshots/canvas.ts';
 import { browserOf, render, type Snapshot } from '#src/plugins/screenshots/playwright.ts';
+import { statesOf } from '#src/plugins/screenshots/states.ts';
 
 const browser: Browser | undefined = await browserOf({}).catch(() => undefined);
 const bundle = createRequire(import.meta.url).resolve('rrweb-snapshot');
@@ -266,6 +267,75 @@ test.skipIf(browser === undefined)(
       { bytes: [...png], at: box! },
     );
     expect(blue).toEqual([false, true, true, false]);
+    await page.close();
+  },
+  30_000,
+);
+
+// Hovered and focused, which a copy of the DOM can't be: a plain `:hover`, a Tailwind v4 `hover:` class (nested, under
+// `@media (hover: hover)`), `:focus` and `:focus-within`.
+const states = Bun.serve({
+  port: 0,
+  fetch: () =>
+    new Response(
+      `<!doctype html><html><head><style>
+        body { margin: 0; }
+        #card { position: absolute; left: 0; top: 0; width: 200px; height: 100px; background: #000; }
+        #card:hover { background: #ff0000; }
+        .tw { width: 50px; height: 40px; background: #000; }
+        .tw { &:hover { @media (hover: hover) { background: #00ff00; } } }
+        #wrap { position: absolute; left: 0; top: 150px; padding: 10px; background: #000; }
+        #wrap:focus-within { background: #ffff00; }
+        #field { display: block; width: 100px; height: 40px; border: 0; outline: none; background: #000; }
+        #field:focus { background: #0000ff; }
+      </style></head><body>
+        <div id="card"><div class="tw"></div></div>
+        <div id="wrap"><input id="field"></div>
+      </body></html>`,
+      { headers: { 'content-type': 'text/html' } },
+    ),
+});
+afterAll(() => states.stop());
+
+test.skipIf(browser === undefined)(
+  'shows what was hovered and focused as it was',
+  async () => {
+    const page = await browser!.newPage({ viewport, deviceScaleFactor: 1 });
+    await page.goto(states.url.href);
+    await page.addScriptTag({ path: bundle });
+    // The page half's own function, as it runs there.
+    await page.addScriptTag({ content: `globalThis.statesOf = ${statesOf.toString()}` });
+    await page.focus('#field');
+    await page.mouse.move(20, 20);
+    const taken = await page.evaluate(() => {
+      const { snapshot, createMirror } = (globalThis as unknown as { rrwebSnapshot: typeof Rrweb }).rrwebSnapshot;
+      const mirror = createMirror();
+      const node = snapshot(document, { mirror, inlineStylesheet: true });
+      const read = (globalThis as unknown as { statesOf: typeof statesOf }).statesOf((el) => mirror.getId(el));
+      return { node: node!, read };
+    });
+    expect(Object.keys(taken.read).sort()).toEqual(['focus', 'focusVisible', 'focusWithin', 'hover']);
+    const shot: Snapshot = { snapshot: taken.node, url: states.url.href, viewport, scroll: { x: 0, y: 0 }, scale: 1 };
+    const colour = async (png: Uint8Array, x: number, y: number) =>
+      page.evaluate(
+        async ({ bytes, x, y }) => {
+          const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+          const ctx = new OffscreenCanvas(1, 1).getContext('2d')!;
+          ctx.drawImage(bitmap, -x, -y);
+          const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+          return [r! > 128, g! > 128, b! > 128].map(Number).join('');
+        },
+        { bytes: [...png], x, y },
+      );
+    // Without them, nothing's hovered or focused.
+    const { png: still } = await render(shot, {});
+    expect(await colour(still, 150, 50)).toBe('000');
+    // With them, as the page was.
+    const { png } = await render({ ...shot, states: taken.read }, {});
+    expect(await colour(png, 150, 50)).toBe('100');
+    expect(await colour(png, 20, 20)).toBe('010');
+    expect(await colour(png, 4, 154)).toBe('110');
+    expect(await colour(png, 40, 175)).toBe('001');
     await page.close();
   },
   30_000,

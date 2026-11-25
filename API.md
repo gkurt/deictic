@@ -297,6 +297,12 @@ screenshots({ renderer: dom() }); // drawn in the page with modern-screenshot: n
 `executablePath` names one. A shot has what a `<canvas>` shows, WebGL's included: `rrweb()` has a WebGL canvas keep
 its drawing buffer unless the page says otherwise.
 
+With `rrweb()`, a task's screenshot is the page as it was when you Alt-clicked, not as it is when you add the task: a
+tooltip, a hover card, a menu or a toast that the popup's pointer and focus close, or that time takes away, is still
+in it. The page is taken as the press goes down and rendered while you type. What's hovered and focused shows as it
+was (`:hover`, `:focus`, `:focus-visible`, `:focus-within`, Tailwind's `hover:` classes too), which a copy of the page
+otherwise loses. Another element attached later is shot as it's attached; `dom()` takes the page as the task goes.
+
 Masking follows [rrweb](https://github.com/rrweb-io/rrweb)'s names and defaults: `rr-block` blanks an element
 (`blockClass`, `blockSelector`), `rr-mask` masks its text (`maskTextClass`, `maskTextSelector`), and `maskAllInputs`
 masks every field. Passwords always are. Nothing of deictic's own UI is in a shot or a recording.
@@ -460,6 +466,9 @@ export default defineClientPlugin<Model, Op>({
   tasks do. Text edits without it are refused.
 - `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held, and
   answers what takes it away: tasks pins each task where its element is.
+- `pressed(context, element)` on the page half hears a shortcut's press on a marked element as it goes down, before
+  the page's own handlers and before the popup takes the pointer and the focus: screenshots keeps the page as it is
+  then. Keep it quick: the press waits on it.
 - `context.open(plugin, element, at?)` opens the popup on another element, or on a point in it (`at`, in CSS pixels
   from its top left, which the panel then gets as `context.at`). Not while the open one holds something `unsaved`:
   its button shakes, and it answers false.

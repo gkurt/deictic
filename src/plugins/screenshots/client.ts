@@ -6,7 +6,7 @@
  * Its tool in the tool panel takes the window as it is, with what's drawn on the page, and puts the shot in the
  * tray, for the next task.
  */
-import { toolButton } from '#src/client/dom.ts';
+import { POPUP_CLOSED, POPUP_OPENED, type PopupOpened, toolButton } from '#src/client/dom.ts';
 import { trayed } from '#src/client/drawer.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { Annotations } from '#src/plugins/annotations/index.ts';
@@ -29,6 +29,15 @@ export type PageCapture = (
   },
 ) => Promise<{ body: Blob | string; type: string; box: Box }>;
 
+/**
+ * What a renderer that can take the page at once makes of it, synchronously: as `PageCapture` answers, or nothing
+ * where it isn't ready (what it imports hasn't loaded). `prepare` loads it, once the page has started.
+ */
+export interface PageFreeze {
+  freeze: (element: Element, options: Parameters<PageCapture>[1]) => Awaited<ReturnType<PageCapture>> | undefined;
+  prepare: () => void;
+}
+
 /** Leaves out deictic's own UI: the overlay with its hover outline and any open panel. */
 export const notOurs = (node: Node) => !(node instanceof Element && node.localName === 'deictic-overlay');
 
@@ -39,6 +48,8 @@ export function boxOf(element: Element, area: NonNullable<CaptureOptions['area']
 }
 
 const BLANK = '#d4d4d8';
+/** How long after its press a popup may first ask for the shot it froze, in milliseconds: later, it's another's. */
+const ASKED = 60_000;
 /** A camera, on a 24-pixel grid. */
 const CAMERA = '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
 
@@ -70,11 +81,17 @@ export function mask(copy: Node, m: ResolvedMasking): void {
   }
 }
 
-export function screenshotsClient(capture: PageCapture) {
+export function screenshotsClient(capture: PageCapture, freezer?: PageFreeze) {
   return defineClientPlugin<never, never, Capture>({
     name: 'screenshots',
+    ...(freezer === undefined ? {} : { pressed: ({ use }, element) => use('screenshots')?.freeze(element) }),
     setup: ({ base, request, options, use, tools, tray, drawer, lightbox }) => {
       const { masking, renderer } = options as { masking: ResolvedMasking; renderer: unknown };
+      // Ready for a press, which can't wait for an import: once the page has started, while the browser is idle.
+      if (freezer !== undefined) {
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(freezer.prepare, { timeout: 5000 });
+        else setTimeout(freezer.prepare, 1000);
+      }
       // Asked at each shot: the annotations plugin may be set up after this one.
       const overlay = (area: Box) => {
         const marks: Annotations | undefined = use('annotations');
@@ -88,7 +105,30 @@ export function screenshotsClient(capture: PageCapture) {
         if (id === undefined) throw new Error(`screenshots: ${problem ?? res.statusText}`);
         return { id, url: url ?? `${base}__deictic/plugins/screenshots/shot/${id}`, box: drawn ?? box, size };
       };
+      // The last press's page, and its shot once it's asked for: the popup that press opened has it while it's open,
+      // whichever of its tabs asks. Not a popup opened on another element, nor one long after the press.
+      let last:
+        { element: Element; at: number; made: Awaited<ReturnType<PageCapture>>; size: Shot['size']; shot?: Promise<Shot> } | undefined;
+      window.addEventListener(POPUP_CLOSED, () => (last = undefined));
+      window.addEventListener(POPUP_OPENED, (e) => {
+        if (last !== undefined && (e as CustomEvent<PopupOpened>).detail.element !== last.element) last = undefined;
+      });
       const api: Capture = {
+        freeze: (element) => {
+          const { clientWidth: width, clientHeight: height } = document.documentElement;
+          const made = freezer?.freeze(element, { area: 'viewport', masking, renderer, overlay });
+          last = made === undefined ? undefined : { element, at: performance.now(), made, size: { width, height } };
+        },
+        frozen: (element) => {
+          if (last?.element !== element || (last.shot === undefined && performance.now() - last.at > ASKED)) return undefined;
+          const { made, size } = last;
+          if (last.shot === undefined) {
+            last.shot = add(made.body, made.type, { box: made.box, size });
+            // Asked for while the popup opens, and maybe never used: a failure is said where it's awaited.
+            last.shot.catch(() => {});
+          }
+          return last.shot;
+        },
         capture: async (element, { area = 'viewport' } = {}) => {
           const { body, type, box } = await capture(element, { area, masking, renderer, overlay });
           const { clientWidth, clientHeight } = document.documentElement;

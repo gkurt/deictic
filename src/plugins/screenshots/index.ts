@@ -48,6 +48,17 @@ export interface Capture {
   upload(png: Blob, of: Pick<Shot, 'box' | 'size'>): Promise<Shot>;
   /** A copy of an element with what a shot hides hidden in it too: for a plugin that sends its HTML somewhere. */
   masked(element: Element): Element;
+  /**
+   * Keeps what a shot of the page now needs, to render later: the overlay calls it (through the plugin's
+   * `pressed`) as a shortcut's press goes down, so a tooltip, a hover's styles or a focused menu are still there.
+   * Only a renderer that can take the page at once does (`rrweb()`, once it has loaded); the last press's is kept.
+   */
+  freeze(element: Element): void;
+  /**
+   * The shot of the page as the last press on `element` froze it, rendered on the first ask, or nothing where the
+   * last press was on another element or nothing was frozen: then `capture` takes the page as it is now.
+   */
+  frozen(element: Element): Promise<Shot> | undefined;
 }
 
 /** The server's half, for other plugins' server halves. */

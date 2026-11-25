@@ -26,7 +26,7 @@ import type { ClientContext, LightboxItem, Point, Target } from '#src/index.ts';
 // For `use()`'s types: the plugins may not be loaded, and nothing of them runs here.
 import type { Annotation, Annotations, Picture } from '#src/plugins/annotations/index.ts';
 import type { Recording } from '#src/plugins/recordings/index.ts';
-import type { Shot } from '#src/plugins/screenshots/index.ts';
+import type { Capture, Shot } from '#src/plugins/screenshots/index.ts';
 import type { Clip, Take } from '#src/plugins/voice/index.ts';
 
 import type { Marks, Op } from './index.ts';
@@ -213,6 +213,11 @@ export interface ComposerOptions {
   at?: Point;
   /** Whether a shot is taken as it's sent, while nothing else is attached and none was asked for or not: a task's. */
   shoot?: boolean;
+  /**
+   * The popup's own element as the press that opened it froze the page (`screenshots.frozen`): what a shot of it is,
+   * rather than the page as it is when it's sent, by which time a tooltip or a menu may have closed.
+   */
+  frozen?: Promise<Shot>;
   /** Whether this page has what's shot and drawn on: not for a task back from a recording on a page without it. */
   here?: boolean;
   /** Whether it's over the page, in the overlay's root: a press on the page picks an element, and attached ones are outlined. */
@@ -311,10 +316,20 @@ export function composerIn(context: ClientContext, options: ComposerOptions): Co
 
   const text = element('textarea', { placeholder: options.placeholder, rows: 1 });
   const chipsEl = element('div', { className: 'chips' });
-  const camera = toolButton(CAMERA, `Attach a screenshot, taken as it's sent`, undefined, () => {
-    wanted = !shooting();
-    showChips();
-  });
+  /** A shot of `of`: as the press froze it, where it's the popup's own element still first, else as the page is now. */
+  const shotOf = (s: Capture, of: Element) => {
+    const frozen = about[0]?.own === true && onPage(about[0]) === of ? options.frozen : undefined;
+    return frozen === undefined ? s.capture(of) : frozen.catch(() => s.capture(of));
+  };
+  const camera = toolButton(
+    CAMERA,
+    options.frozen === undefined ? `Attach a screenshot, taken as it's sent` : 'Attach a screenshot of the page as it was when you pressed',
+    undefined,
+    () => {
+      wanted = !shooting();
+      showChips();
+    },
+  );
   camera.hidden = shots === undefined || !here;
   const code = toolButton(CODE, 'Attach an HTML snapshot: the element as the page has it now, as a file', undefined, () => {
     withHtml = !withHtml;
@@ -543,7 +558,7 @@ export function composerIn(context: ClientContext, options: ComposerOptions): Co
     problem.textContent = '';
     try {
       if (old === undefined) doing.textContent = 'Capturing…';
-      const shot = old?.drawn?.shot ?? (await shots.capture(onPage(about[0]) ?? document.documentElement));
+      const shot = old?.drawn?.shot ?? (await shotOf(shots, onPage(about[0]) ?? document.documentElement));
       doing.textContent = '';
       const picture: Picture = { url: shot.url, ...shot.size };
       const marks = await notes.edit(picture, old?.drawn?.marks ?? [], { signal: aborts.signal });
@@ -678,7 +693,7 @@ export function composerIn(context: ClientContext, options: ComposerOptions): Co
     // Of the first element, which the shot then says the place of; of the page, with none on it.
     const first = onPage(about[0]);
     const of = first ?? document.documentElement;
-    const now = await shots.capture(of);
+    const now = await shotOf(shots, of);
     const where = first === undefined ? {} : { box: now.box };
     // The others as the page has them, moved by as much as the shot has the first off where the page has it.
     const live = of.getBoundingClientRect();

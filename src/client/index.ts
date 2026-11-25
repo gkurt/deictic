@@ -24,7 +24,7 @@ import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
 import { named, tell } from './component.ts';
-import { ATTRIBUTE, div, nameOf, reduced, sameAs, targetOf } from './dom.ts';
+import { ATTRIBUTE, div, nameOf, POPUP_CLOSED, POPUP_OPENED, type PopupOpened, reduced, sameAs, targetOf } from './dom.ts';
 import { drawerIn } from './drawer.ts';
 import { openLightbox } from './lightbox.ts';
 import { CLEAR, type Lighting, spotlight, spotOf } from './lighting.ts';
@@ -98,19 +98,8 @@ interface Started {
 
 let started: Started | undefined;
 
-/**
- * What the page hears on `window` as the popup opens over it on an element (its `detail` a `PopupOpened`) and as
- * it closes: for a page that moves on its own to hold still meanwhile, as deictic's site does. Not for one pinned.
- */
-export const POPUP_OPENED = 'deictic:open';
-export const POPUP_CLOSED = 'deictic:close';
-
-export interface PopupOpened {
-  /** The element it's open on. */
-  element: Element;
-  /** The plugin whose tab it opened at. */
-  tab: string;
-}
+// The events the page hears as the popup opens and closes: kept beside the mark, where a plugin's page half reads them.
+export { POPUP_CLOSED, POPUP_OPENED, type PopupOpened } from './dom.ts';
 
 /**
  * Opens the popup over the page on `element`, as deictic's own shortcut does: at `tab` (a plugin's name), or at the
@@ -430,6 +419,24 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   );
   let press = {};
   let opened: object | undefined;
+  // The page as it is under the press, for whoever keeps it (`pressed`): before the page's own handlers, which may
+  // close what was open, and before the popup takes the pointer and the focus.
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.composedPath().includes(host) || pressedBy(e) === undefined) return;
+      const hit = hitAt(e.clientX, e.clientY);
+      if (hit === undefined) return;
+      for (const { plugin } of given) {
+        try {
+          plugin.pressed?.(contextOf(plugin.name), hit.el);
+        } catch (e) {
+          report(failed(plugin.name, 'keep what the page showed as it was pressed', e));
+        }
+      }
+    },
+    true,
+  );
   // Alt-click on a link would otherwise download it, and on a field focus it.
   window.addEventListener(
     'mousedown',

@@ -49,7 +49,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   time; `kind`, `setup` for the project to fix or `bug` to report; the message with its fix; `details`): both contexts'
   `report(problem)` say one, and a server half's `problem(problem)` hears each. The parser is imported for its types only.
 - A `ClientPlugin` with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held, and answers
-  what takes it away.
+  what takes it away. One with `pressed(context, element)` (screenshots) hears a shortcut's press on a marked element
+  on `pointerdown`, in the capture phase: before the page's handlers, the popup, its pointer and its focus.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
@@ -229,7 +230,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   (`APART` from it, level with its top, as tall as the window lets it be), else below or above.
   The shown tab is marked by `.thumb`, a pill behind it, slid to the next. `openPopup(element, { tab })` opens it over the page as deictic's shortcut does, for a page's own gesture (the
   homepage demo's plain click). As it opens over the page and as it closes, the page hears `deictic:open`
-  (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab) and `deictic:close` (`POPUP_CLOSED`) on
+  (`POPUP_OPENED`, its `detail` a `PopupOpened`: the element and the tab; in `dom.ts`, for page halves) and `deictic:close` (`POPUP_CLOSED`) on
   `window`: the homepage demo holds its selection still between them. `popupIn(container, { tab, element })` shows the real popup pinned in a
   page (its own shadow root, `.panel.pinned`, no Esc, reopened when closed, the last tab left alone).
 - `src/plugins/tailwind/`: `index.ts`, the server half (where a class list sits: `spotOf`; in an `.astro` file a
@@ -264,7 +265,15 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   becomes the plugin's) and an optional `render`: `rrweb()` (default) and `dom()`. `client.ts` is
   `screenshotsClient(capture)`, the page half around a renderer's capture, which posts to `add` and answers the
   `Shot` with the element's `box`; nothing of deictic's is ever drawn. Its API has `masked(element)` too, a copy with
-  what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML. Its tool in the tool panel (S)
+  what a shot hides hidden (`mask`, in `client.ts`), for a plugin that sends HTML, and `freeze(element)` and
+  `frozen(element)`: a renderer that takes the page at once (`PageFreeze`, `screenshotsClient`'s second argument:
+  `rrweb()`, once rrweb-snapshot has loaded, which it does on idle as the page starts) is asked to on the shortcut's press
+  (`pressed`), the last press's kept until a popup on another element opens or the popup closes, and rendered on
+  the first `frozen` ask: the Task tab's composer (`ComposerOptions.frozen`) shoots the popup's own element with it,
+  and Draw draws on it. `states.ts` (self-contained, a test runs it in a browser) reads which snapshot nodes match
+  `:hover`, `:focus`, `:focus-visible` and `:focus-within` (`Snapshot.states`), and `playwright.ts` copies every
+  rule of those under a class (`deictic-hover`…, whole, so nested and `@media` ones too) and gives the nodes the
+  class. Its tool in the tool panel (S)
   takes the window, with the page's marks, into the tray; a problem is its tooltip. `dom.ts` draws in the page with
   `modern-screenshot`, masking the copy. `rrweb.ts` sends an `rrweb-snapshot` (masked by rrweb, the overlay cut
   out) with viewport, window, scroll and density, and which node the element is; `playwright.ts` answers the PNG and the element's

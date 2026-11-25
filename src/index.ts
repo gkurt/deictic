@@ -401,6 +401,12 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * plugin pins each task where its element is. Answers what takes it away.
    */
   pointing?(context: ClientContext): () => void;
+  /**
+   * A shortcut's press on a marked element, before the page hears it and before the popup opens: the page as the
+   * person saw it, a tooltip still open under the pointer, a menu still focused. Called as the press goes down, so
+   * it must be quick; the screenshots plugin keeps what a shot needs here, and renders it later.
+   */
+  pressed?(context: ClientContext, element: Element): void;
   /** Draws into `panel`, inside deictic's shadow root. Returns what to undo on the page when the panel closes. */
   mount?: (panel: HTMLElement, context: PanelContext<Model, Op>) => (() => void) | void;
 }
