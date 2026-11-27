@@ -457,6 +457,8 @@ input:focus, textarea:focus { outline: 1px solid var(--deictic-accent); }
 code { font: 12px ui-monospace, monospace; }
 /* Border-box, as the popup holds the body's height by its whole box while a tab reads. */
 .body { box-sizing: border-box; padding: 12px; overflow: auto; }
+/* What scrolls here keeps its scroll: at its end, the wheel doesn't go on to scroll the page under the popup. */
+.body, .drawer-sections, .drawer-view, textarea { overscroll-behavior: contain; }
 .status { padding: 0 12px 10px; font-size: 12px; color: var(--deictic-muted); }
 .status:empty { display: none; }
 .status.problem { color: var(--deictic-problem); }
