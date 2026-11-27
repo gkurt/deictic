@@ -231,6 +231,10 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     use: (other) => apis.get(other) as never,
     request: (route, init) => send(`${base}__deictic/plugins/${name}/${route}`, init),
     report: (problem) => report({ ...problem, plugin: name }),
+    edit: async ({ file, line, column }) => {
+      const res = await send(`${base}__deictic/open?${new URLSearchParams({ file, line: String(line), column: String(column) })}`);
+      if (!res.ok) throw new Error(await res.text());
+    },
     // Not from under something unsaved, which a press on the page wouldn't close either: its button shakes.
     open: (plugin, element, at) => panel?.guard() !== true && openAt(plugin, element, at),
     lightbox: (items, options) => openLightbox(root, items, options),

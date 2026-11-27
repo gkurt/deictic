@@ -283,6 +283,11 @@ export interface ClientContext {
   /** Says a problem of the plugin's own to the dev server, as the server half's `report` does: its `plugin` is this one. */
   report: (problem: Problem) => void;
   /**
+   * Opens a place in a file under the root in the editor, as the popup's own link opens the element's: through the
+   * dev server, or what answers in its place (`Standalone`). Rejects with why it couldn't.
+   */
+  edit: (place: Loc) => Promise<void>;
+  /**
    * Opens the popup on an element at a plugin's tab, as its shortcut would, or with `at` on a spot in it: the
    * popup is then beside the spot, which is what's lit, and the tab's context has it. An element rendered again
    * since stands in for one no longer on the page. False when there's no such tab or no such element any more, and

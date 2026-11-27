@@ -214,7 +214,7 @@ title, row)` is a section of a plugin's tray items, a row each that opens it and
   whose text already names it: set that for a shortcut, never write it into the title.
 - `src/client/index.ts`: the overlay, in one shadow root (`style.ts`). Runs each page half's `setup`
   first (a failing one is reported, `failed`, and the rest go on; so is one whose `mount` or `pointing` throws).
-  `context.report` posts to `problem`, with the plugin's name, and says it in the console. Each plugin with a `mount` is a tab in the popup.
+  `context.report` posts to `problem`, with the plugin's name, and says it in the console. `context.edit(place)` asks `open` through `send`, so it reaches a `standalone` server too. Each plugin with a `mount` is a tab in the popup.
   Lights the marked element under the pointer while a shortcut's keys are held (`lighting.ts`), shows the tool panel
   meanwhile (`tools.ts`; it lights the page the same way while a tool picks a spot; on a pin or
   the tool panel, which take the pointer, the light stays where it was), and opens the popup on

@@ -456,6 +456,8 @@ export default defineClientPlugin<Model, Op>({
 ```
 
 - `routes` adds routes to the dev server, which the page half reaches with `request(route)`.
+- `edit(place)` on the page half opens a place in a file under the root in the editor, as the popup's own link opens the
+  element's: a catalog entry, say. It goes through the dev server, or the `standalone` module where there's none.
 - `packages` names what it imports that the project installs itself (its optional peers): as the dev server starts,
   one that's missing is reported, with the command that installs it.
 - `context.report(problem)`, on either half, reports a problem of the plugin's own (a `Problem`: a `key` that's the
