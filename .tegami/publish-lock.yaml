@@ -1,29 +1,29 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A plugin's page half can put a tag of its own in the caption over what's pointed at, with tag(context, at)\n\nIt answers `{ text, color }` for the point under the pointer, or nothing, and the caption shows it after deictic's own tag: prosebook's names the string's catalog key there, in place of a label of its own that could cover the caption.\n"
-    filename: plugin-tags.md
+  - content: "---\npackages:\n  deictic:\n    type: patch\n---\n\n### Scrolling to the end of the popup, the drawer or a text field no longer scrolls the page under it\n"
+    filename: contained-scroll.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - plugin-tags.md
+      - contained-scroll.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
-  - id: npm:example-slop
-    updated: false
   - id: npm:example-next
     updated: false
-  - id: npm:example-rspack
-    updated: false
   - id: npm:example-bun
+    updated: false
+  - id: npm:example-slop
+    updated: false
+  - id: npm:example-rspack
     updated: false
   - id: npm:example-vite
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
-  - id: npm:example-slop
   - id: npm:example-next
-  - id: npm:example-rspack
   - id: npm:example-bun
+  - id: npm:example-slop
+  - id: npm:example-rspack
   - id: npm:example-vite
