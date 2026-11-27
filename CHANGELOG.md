@@ -1,3 +1,7 @@
+## deictic@0.12.1
+
+### Scrolling to the end of the popup, the drawer or a text field no longer scrolls the page under it
+
 ## deictic@0.12.0
 
 ### A plugin's page half can put a tag of its own in the caption over what's pointed at, with tag(context, at)
