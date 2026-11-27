@@ -1,3 +1,11 @@
+## deictic@0.10.0
+
+### A build given deictic more than once runs it once, with every instance's plugins and options merged; `defaults: true` is for a package that adds deictic with its own plugin, and gives way to the app's
+
+### A plugin's edits can make a file: one whose every edit is at its start is written new, and undo takes it away
+
+### A plugin's page half can open a place in the editor with `context.edit(place)`, through the dev server or a standalone page's server
+
 ## deictic@0.9.0
 
 ### `recommended()` is `deicticRecommended()`, so it doesn't clash with other presets' `recommended`
