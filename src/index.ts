@@ -397,6 +397,67 @@ export interface Tag {
   color?: string;
 }
 
+/**
+ * What a WebMCP tool does, which decides whether it's offered: `read` only reads the page (always offered, marked
+ * read-only), `page` makes something of the page's or the dev server's own (a shot, a recording, marks on the page;
+ * always offered), `write` changes the project's files or the board (offered only with `webmcp: { write: true }`).
+ */
+export type WebToolKind = 'read' | 'page' | 'write';
+
+/**
+ * A tool a plugin's page half offers the agent driving the browser, through WebMCP (`document.modelContext`), where
+ * `deictic({ webmcp: true })` asks for it and the browser has it.
+ */
+export interface WebTool {
+  /** Unique on the page: the plugin's name first, `tasks_add`. */
+  name: string;
+  /** What it does and answers, for the agent to choose it by. */
+  description: string;
+  kind: WebToolKind;
+  /** A JSON Schema of an object: what `execute` gets. None for a tool that takes nothing. */
+  inputSchema?: { type: 'object'; properties?: Record<string, unknown>; required?: readonly string[] };
+  /** Whether what it answers holds what the page's people wrote (a task's words), which an agent must not take as instructions. */
+  untrusted?: boolean;
+  /** Answers JSON, or throws why it can't, with the fix: the agent reads the message. */
+  execute: (input: Record<string, unknown>) => unknown;
+}
+
+/** What an element is, as a WebMCP tool answers it: enough for an agent to find it in the source and on the page. */
+export interface WebElement {
+  /** Its mark, `src/App.tsx:12:5`: what the tools take as `element`, with `nth` where `count` is more than one. */
+  place: string;
+  tag: string;
+  /** How it's told to a person: `<PlanCard> <li>`. */
+  named: string;
+  /** How many elements on the page come from its place, and which of them it is, from 1. */
+  count: number;
+  nth: number;
+  /**
+   * The source it rendered through, after its own place, nearest first: React's components that wrote it in
+   * development, `Field (src/Field.tsx:20)`, or else the marks around it, `src/Form.tsx:8`.
+   */
+  chain?: string[];
+  /** Its text, cut short. */
+  text?: string;
+  /** Where it is in the window, in CSS pixels. */
+  box: { x: number; y: number; width: number; height: number };
+}
+
+/** A page half's context for its WebMCP tools. */
+export interface WebContext extends ClientContext {
+  /**
+   * The marked element `element` names: a mark (`src/App.tsx:12:5`, with `nth` for one of several, from 1), or a CSS
+   * selector, whose nearest marked element around it it is. Throws what's wrong, for the agent.
+   */
+  find: (element: unknown, nth?: unknown) => Element;
+  /** An element as the tools answer it. */
+  describe: (element: Element) => WebElement;
+  /** The model this plugin's server half reads for an element, as its panel gets it. */
+  read: <Model>(element: Element) => Promise<Model>;
+  /** Applies an op of this plugin's on an element, as its panel does, and answers the model read again. */
+  apply: <Model>(element: Element, op: unknown) => Promise<Model>;
+}
+
 export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
   /** The server half's `name`. */
   name: string;
@@ -429,6 +490,11 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * it must be quick; the screenshots plugin keeps what a shot needs here, and renders it later.
    */
   pressed?(context: ClientContext, element: Element): void;
+  /**
+   * Its tools for an agent driving the browser, registered with WebMCP where `deictic({ webmcp })` asks for it and the
+   * browser has `document.modelContext`. Asked once, after every `setup`.
+   */
+  webmcp?(context: WebContext): WebTool[];
   /** Draws into `panel`, inside deictic's shadow root. Returns what to undo on the page when the panel closes. */
   mount?: (panel: HTMLElement, context: PanelContext<Model, Op>) => (() => void) | void;
 }

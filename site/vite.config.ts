@@ -24,7 +24,9 @@ export default defineConfig(({ command }) => ({
   // GitHub Pages serves it under the repository's name (`BASE=/deictic/`, set by the deploy workflow).
   base: process.env.BASE ?? '/',
   plugins: [
-    deictic(command === 'build' ? deployed : { plugins: [...deicticRecommended(), tailwind({ css: 'src/site.css' })] }),
+    deictic(
+      command === 'build' ? deployed : { plugins: [...deicticRecommended(), tailwind({ css: 'src/site.css' })], webmcp: { write: true } },
+    ),
     react({ compiler: true }),
     tailwindcss(),
     highlighted(),

@@ -67,6 +67,9 @@ deictic({
 });
 ```
 
+An agent that drives a browser with WebMCP, as agent-browser does, can use deictic in the page too, with
+`webmcp: true`: what you point at, where an element is written, your marks, React's state.
+
 [API.md](API.md) has the rest: your team's board, masking, every plugin's options, and writing a plugin of your own.
 
 ## Contributing

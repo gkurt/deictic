@@ -10,7 +10,7 @@
  * Its tool in the panel adds a task about a spot: picked, the next press on the page opens this tab on that point,
  * in the marked element under it or the nearest to it.
  */
-import { componentOf, fiberOf, ownerOf } from '#src/client/component.ts';
+import { chainOf } from '#src/client/component.ts';
 import { sameAs, toolButton } from '#src/client/dom.ts';
 import { defineClientPlugin, type Target } from '#src/index.ts';
 
@@ -19,6 +19,7 @@ import { drawerOf } from './drawer.ts';
 import type { Model, Op, TaskAdded } from './index.ts';
 import { pinsIn } from './pins.ts';
 import { storeOf } from './store.ts';
+import { webTools } from './webmcp.ts';
 import { whichOf } from './which.ts';
 
 const STYLE = `
@@ -91,57 +92,6 @@ function pathTo(inner: Element, outer: Element): string {
   return steps.join(' > ');
 }
 
-const parentOf = (el: Element): Element | undefined => {
-  if (el.parentElement !== null) return el.parentElement;
-  const root = el.getRootNode();
-  return root instanceof ShadowRoot ? root.host : undefined;
-};
-
-/** How many places a chain names after the element's own: who uses it, and who uses that. Further out is the app's shell. */
-const CHAIN = 3;
-
-/**
- * The source `el` rendered through, after its own place, nearest first: a shared component's own line is the same
- * wherever it's used, and the change is most often in what uses it, or in what uses that.
- *
- * With React in development, those are the components that wrote it, each the one whose JSX has the one before:
- * `Field (src/Field.tsx:20)`, its line the nearest element around `el` that the component wrote, or the name alone
- * for one with no element of its own around it (it wraps what it uses only in other components), which the marks
- * can't show at all. A layout component the element was only passed through isn't among them.
- *
- * Without (another framework, a production build) it's read off the marks around it, each a `file:line`: the
- * nearest element each next file wrote.
- */
-function chainOf(el: Element, file: string): NonNullable<Op['chain']> {
-  const found: NonNullable<Op['chain']> = [];
-  const wrote = ownerOf(fiberOf(el));
-  if (wrote !== undefined) {
-    for (let owner = ownerOf(wrote); owner !== undefined && found.length < CHAIN; owner = ownerOf(owner)) {
-      const name = componentOf(owner);
-      let place: string | undefined;
-      for (let at = parentOf(el); at !== undefined && place === undefined; at = parentOf(at)) {
-        const by = ownerOf(fiberOf(at));
-        // A component's fiber is one of two, by turns: an element may name either.
-        if (by === undefined || (by !== owner && by !== owner.alternate)) continue;
-        place = at.getAttribute('data-deictic')?.replace(/:\d+$/, '');
-      }
-      if (name !== undefined) found.push(place === undefined ? name : `${name} (${place})`);
-      else if (place !== undefined) found.push(place);
-    }
-    if (found.length > 0) return found;
-  }
-  let last = file;
-  for (let at = parentOf(el); at !== undefined && found.length < CHAIN; at = parentOf(at)) {
-    const mark = at.getAttribute('data-deictic');
-    if (mark === null) continue;
-    const from = mark.replace(/:\d+:\d+$/, '');
-    if (from === last) continue;
-    last = from;
-    found.push(mark.replace(/:\d+$/, ''));
-  }
-  return found;
-}
-
 /** What's sent of the element's HTML at most, in characters: the server attaches it as a file. */
 const HTML = 100_000;
 
@@ -208,6 +158,7 @@ export default defineClientPlugin<Model, Op>({
   },
   // What the page before this left the tab for: a recording, where it carries on here.
   resume: ({ use }) => use('recordings')?.going(),
+  webmcp: webTools,
   // The page's tasks, where they are, while it's pointed on.
   pointing: (context) => pinsIn(context).glance(),
   mount: (panel, context) => {

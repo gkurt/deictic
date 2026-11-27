@@ -82,11 +82,12 @@ deictic({
 });
 ```
 
-| Option     | What it is                                                                                   |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| `plugins`  | The plugins to load. None by default.                                                        |
-| `shortcut` | `{ modifiers, button }`: held to point, pressed to open. Alt and the left button by default. |
-| `defaults` | For a package that adds deictic with its own plugin: these options give way to the app's.    |
+| Option     | What it is                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `plugins`  | The plugins to load. None by default.                                                                                  |
+| `shortcut` | `{ modifiers, button }`: held to point, pressed to open. Alt and the left button by default.                           |
+| `defaults` | For a package that adds deictic with its own plugin: these options give way to the app's.                              |
+| `webmcp`   | The plugins' tools for an agent driving the browser ([WebMCP](#webmcp)): `true`, or `{ write: true }`. Off by default. |
 
 A build may have deictic more than once: the app's, and one a package adds with its own plugin, as prosebook's
 integrations add its copy inspector. They become one: every plugin, each name once, and every other option from the
@@ -430,6 +431,46 @@ The page hears these on `window`:
 
 `openPopup(element, { tab })`, from `deictic/client`, opens the popup from a gesture of your own.
 
+## WebMCP
+
+An agent that drives the browser (as [agent-browser](https://github.com/vercel-labs/agent-browser) does) can call
+deictic's tools in the page, through WebMCP: Chrome's `document.modelContext`, which agent-browser turns on in the
+Chrome it launches (elsewhere, an origin trial or `chrome://flags/#enable-webmcp-testing`). Turn them on:
+
+```ts
+deictic({ plugins: deicticRecommended(), webmcp: true }); // or { write: true }
+```
+
+`agent-browser webmcp list` shows them, and `agent-browser webmcp invoke deictic_locate '{"element":"h1"}'` calls one.
+A tool that takes an element takes its mark (`src/App.tsx:12:5`, as the tools answer it, with `nth` for one of
+several a place renders) or a CSS selector, which stands for the nearest marked element around what it matches.
+`true` offers those that read the page or make something of its own; those that change the project's files or the
+board need `{ write: true }`.
+
+| Tool                           | Plugin      | Writes | What it does                                                                          |
+| ------------------------------ | ----------- | ------ | ------------------------------------------------------------------------------------- |
+| `deictic_pointed`              | deictic     |        | What the person points at: the popup's element, or what they lit last with Alt held   |
+| `deictic_locate`               | deictic     |        | Where an element is written, the components it rendered through, how many alike       |
+| `deictic_find`                 | deictic     |        | The elements a file (and line, component or text) renders on the page                 |
+| `deictic_history`              | deictic     |        | The changes made from the page, to undo and redo                                      |
+| `deictic_undo`, `deictic_redo` | deictic     | yes    | A plugin's latest change on an element, taken back or made again                      |
+| `annotations_list`             | annotations |        | The marks the person drew, each with the element it's about                           |
+| `annotations_add`              | annotations |        | A box around an element, with a note: to show the person something                    |
+| `annotations_remove`           | annotations |        | Marks taken away, by ID, or all                                                       |
+| `react_state`                  | react       |        | What React's DevTools would show: props, state and hooks, renders and why             |
+| `screenshots_take`             | screenshots |        | A shot of the window (or an element), kept by the dev server: its ID and URL          |
+| `recordings_start`             | recordings  |        | Records the page, as Record does                                                      |
+| `recordings_stop`              | recordings  |        | Stops it: its ID, where it replays, and the `deictic recording` command that reads it |
+| `tasks_list`                   | tasks       |        | The channel's tasks, with their elements' places                                      |
+| `tasks_thread`                 | tasks       |        | A task's files and replies                                                            |
+| `tasks_add`                    | tasks       | yes    | A task about an element (or the page), as the Task tab adds one                       |
+| `tasks_reply`                  | tasks       | yes    | A reply on a task's thread                                                            |
+| `tailwind_classes`             | tailwind    |        | An element's class list as the source writes it                                       |
+| `tailwind_set`                 | tailwind    | yes    | Writes it, undoably                                                                   |
+
+Each answers JSON, or fails with what's wrong and the fix. Those that answer what people wrote (tasks, React's
+values) say so (`untrustedContentHint`).
+
 ## Writing a plugin
 
 A plugin has a server half, which runs beside the bundler, and a page half, which can draw a tab in the popup. Every
@@ -486,6 +527,11 @@ export default defineClientPlugin<Model, Op>({
 - `tag(context, at)` on the page half answers a tag of the plugin's own for what's under the pointer, at `at` in the
   window's pixels, or nothing: `{ text, color }`, drawn in the caption after deictic's, white on `color` (deictic's
   accent unset). prosebook's names the string's catalog key. It's asked on every move while pointing: keep it quick.
+- `webmcp(context)` on the page half answers its tools for an agent in the browser (`WebTool`s: `name`, `description`,
+  `kind`, `inputSchema`, `execute`), registered where `deictic({ webmcp })` asks for them. `kind` is `read`, `page`
+  (it makes something of the page's or the dev server's own) or `write` (files or the board: only with `write: true`).
+  The context's `find(element, nth)` is the element a tool's input names, `describe(element)` what it answers of one,
+  and `read(element)` and `apply(element, op)` the plugin's own, as its panel has them.
 - `pressed(context, element)` on the page half hears a shortcut's press on a marked element as it goes down, before
   the page's own handlers and before the popup takes the pointer and the focus: screenshots keeps the page as it is
   then. Keep it quick: the press waits on it.

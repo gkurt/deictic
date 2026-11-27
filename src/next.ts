@@ -71,10 +71,10 @@ export function withDeictic<C extends object>(
     const before = (resolved as { [GIVEN]?: DeicticNextOptions[] })[GIVEN];
     const given = [...(before ?? []), options];
     const merged = given.length === 1 ? options : merge(given);
-    const { plugins, shortcut } = prepare(merged);
+    const { plugins, shortcut, webmcp } = prepare(merged);
     const root = resolve(merged.root ?? process.cwd());
     const base = `${(resolved as { basePath?: string }).basePath ?? ''}/`;
-    const client = writeClient(root, plugins, base, shortcut);
+    const client = writeClient(root, plugins, base, shortcut, webmcp);
     loaded.set(root, plugins);
     // Wrapped already: the rules and the rewrite are there, and only the client and the plugins change.
     if (before !== undefined) return { ...resolved, [GIVEN]: given };

@@ -8,6 +8,7 @@
  */
 import { POPUP_CLOSED, POPUP_OPENED, type PopupOpened, toolButton } from '#src/client/dom.ts';
 import { trayed } from '#src/client/drawer.ts';
+import { ELEMENT } from '#src/client/webmcp.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { Annotations } from '#src/plugins/annotations/index.ts';
 
@@ -84,6 +85,36 @@ export function mask(copy: Node, m: ResolvedMasking): void {
 export function screenshotsClient(capture: PageCapture, freezer?: PageFreeze) {
   return defineClientPlugin<never, never, Capture>({
     name: 'screenshots',
+    webmcp: ({ use, find, describe, tray }) => [
+      {
+        name: 'screenshots_take',
+        kind: 'page',
+        description:
+          "A screenshot of the page as the person sees it, kept by the dev server (as deictic's own shots are, never drawn with deictic's overlay, but with the person's marks): of the window, with `box` where the element is in it where one is named, or of the element alone with `area: element`. Answers its ID and the URL of its PNG. `tray` puts it with what the person's next task attaches.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ...ELEMENT,
+            area: { type: 'string', enum: ['viewport', 'element'], description: '`viewport` by default.' },
+            tray: { type: 'boolean' },
+          },
+        },
+        execute: async (input) => {
+          const capture = use('screenshots');
+          if (capture === undefined) throw new Error('the screenshots plugin did not set up in the page');
+          const named = input.element === undefined ? undefined : find(input.element, input.nth);
+          const area = input.area === 'element' && named !== undefined ? 'element' : 'viewport';
+          const shot = await capture.capture(named ?? document.documentElement, { area });
+          if (input.tray === true) tray.add('screenshots', shot.id, shot);
+          return {
+            id: shot.id,
+            url: new URL(shot.url, location.href).href,
+            size: shot.size,
+            ...(named === undefined ? {} : { element: describe(named), box: shot.box }),
+          };
+        },
+      },
+    ],
     ...(freezer === undefined ? {} : { pressed: ({ use }, element) => use('screenshots')?.freeze(element) }),
     setup: ({ base, request, options, use, tools, tray, drawer, lightbox }) => {
       const { masking, renderer } = options as { masking: ResolvedMasking; renderer: unknown };

@@ -108,10 +108,10 @@ export class DeicticPlugin {
     applied.given.push(this.#options);
     this.#applied = applied;
     const merged = this.#merged();
-    const { plugins, shortcut } = prepare(merged);
+    const { plugins, shortcut, webmcp } = prepare(merged);
     this.#root = merged.root ?? compiler.context;
     const browser = forBrowser(compiler.options.target);
-    const client = browser ? writeClient(this.#root, plugins, merged.base ?? '/', shortcut) : undefined;
+    const client = browser ? writeClient(this.#root, plugins, merged.base ?? '/', shortcut, webmcp) : undefined;
     if (applied.first !== this) return;
     // webpack's and Rspack's `close()`, which their dev servers call as they stop.
     compiler.hooks.shutdown.tapPromise('deictic', async () => {

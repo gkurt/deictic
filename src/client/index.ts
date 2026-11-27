@@ -24,7 +24,7 @@ import { gestureOf, type Shortcut } from '#src/shortcut.ts';
 
 import { dropAway, keepAway, keptAway } from './away.ts';
 import { named, tell } from './component.ts';
-import { ATTRIBUTE, div, nameOf, POPUP_CLOSED, POPUP_OPENED, type PopupOpened, reduced, sameAs, targetOf } from './dom.ts';
+import { ATTRIBUTE, div, markedAround, nameOf, POPUP_CLOSED, POPUP_OPENED, type PopupOpened, reduced, sameAs, targetOf } from './dom.ts';
 import { drawerIn } from './drawer.ts';
 import { openLightbox } from './lightbox.ts';
 import { CLEAR, type Lighting, spotlight, spotOf } from './lighting.ts';
@@ -32,6 +32,7 @@ import { STYLE } from './style.ts';
 import { toolPanel } from './tools.ts';
 import { tooltips } from './tooltip.ts';
 import { tray } from './tray.ts';
+import { type Pointing, registerTools, type WebMcpOptions } from './webmcp.ts';
 
 // For a plugin's page half that records the mic, or shows a clip: the waveforms the lightbox draws.
 export { drawBars, liveWaveform, peaksOf, type Colors } from './waveform.ts';
@@ -46,6 +47,8 @@ export interface StartOptions {
   plugins: { plugin: ClientPlugin; shortcut?: Required<Shortcut>; options?: unknown }[];
   /** What answers the requests where there's no dev server to: a `standalone` build's. */
   server?: Standalone;
+  /** The plugins' tools for an agent driving the browser, through WebMCP, where the page has it (`webmcp.ts`). */
+  webmcp?: WebMcpOptions;
 }
 
 /** A request to the endpoints, by its URL: to the dev server, or to what stands in for it. */
@@ -70,17 +73,6 @@ const LAST = 'deictic:tab';
 /** How long a read may take, in milliseconds, before the popup says it's reading. */
 const SLOW = 200;
 const STARTED = Symbol.for('deictic');
-
-/** The nearest marked element around `el`, out through shadow roots to their hosts. */
-function markedAround(el: Element): Element | undefined {
-  for (let at: Element | undefined = el; at !== undefined;) {
-    const marked = at.closest(`[${ATTRIBUTE}]`);
-    if (marked !== null) return marked;
-    const root = at.getRootNode();
-    at = root instanceof ShadowRoot ? root.host : undefined;
-  }
-  return undefined;
-}
 
 function icon(path: string, width = 2): string {
   return `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
@@ -181,7 +173,7 @@ export function lightboxIn(container: Element, items: LightboxItem[], { at }: { 
 }
 
 /** Starts the overlay, once per page: the client module runs again when a module importing it is replaced. */
-export function start({ base, shortcut: own, plugins: given, server }: StartOptions): void {
+export function start({ base, shortcut: own, plugins: given, server, webmcp }: StartOptions): void {
   const page = globalThis as { [STARTED]?: true };
   if (page[STARTED] === true) return;
   page[STARTED] = true;
@@ -296,6 +288,9 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   let pointer: { x: number; y: number } | undefined;
   let frame = 0;
   let panel: ReturnType<typeof openPanel> | undefined;
+  // What the person points at: the popup's element while it's open, else what pointing lit last. For an agent's tool.
+  let popupOn: Pointing | undefined;
+  let litLast: Pointing | undefined;
 
   /** The plugins whose keys are held: several, where they share keys and differ by button. */
   const heldBy = (e: MouseEvent | KeyboardEvent) => plugins.filter((p) => p.gesture.held(e));
@@ -406,6 +401,7 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       { el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), target, names, count: sameAs(el).length, tags },
       glide,
     );
+    litLast = { element: el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), when: Date.now() };
   };
   const update = (e: MouseEvent | KeyboardEvent) => {
     held = heldBy(e);
@@ -485,6 +481,13 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
   const openTab = (tab: Tab, el: Element, target: Target, resumed?: Resumed, pointed?: Element, at?: Point) => {
     hide();
     panel?.close();
+    popupOn = {
+      element: el,
+      ...(pointed === undefined ? {} : { pointed }),
+      ...(at === undefined ? {} : { at }),
+      tab: tab.plugin.name,
+      when: Date.now(),
+    };
     panel = openPanel({
       base,
       send,
@@ -498,7 +501,10 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       ...(at === undefined ? {} : { at }),
       target,
       lighting,
-      onClose: () => (panel = undefined),
+      onClose: () => {
+        panel = undefined;
+        popupOn = undefined;
+      },
       ...(resumed === undefined ? {} : { resumed }),
       reopen: (again, element, kept) => {
         // Rendered again while away, or gone from the page, which moved on: the popup comes back all the same, on
@@ -545,6 +551,9 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
     return true;
   }
   for (const type of ['click', 'auxclick', 'contextmenu'] as const) window.addEventListener(type, pressed, true);
+  // After every `setup`, as a plugin's tools reach its API.
+  const pointing = () => popupOn ?? litLast;
+  if (webmcp !== undefined) registerTools({ base, send, plugins: given.map((g) => g.plugin), contextOf, pointing, report }, webmcp);
 }
 
 interface PanelOptions {

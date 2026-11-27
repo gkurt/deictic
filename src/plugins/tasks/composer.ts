@@ -115,7 +115,7 @@ function marksOf(list: readonly Annotation[]): Marks {
 }
 
 /** The page's annotations, where there are any. */
-function annotationsOf(marks: Annotations | undefined): Marks | undefined {
+export function annotationsOf(marks: Annotations | undefined): Marks | undefined {
   const list = marks?.list() ?? [];
   return list.length === 0 ? undefined : marksOf(list);
 }

@@ -91,8 +91,8 @@ export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
         const code = await Bun.file(args.path).text();
         // Written as the first module loads, once bunfig's every deictic has been made.
         if (client === undefined) {
-          const { plugins, shortcut } = merged();
-          client = writeClient(root, plugins, '/', shortcut);
+          const { plugins, shortcut, webmcp } = merged();
+          client = writeClient(root, plugins, '/', shortcut, webmcp);
         }
         const marked = mark(code, args.path, root, forBrowser(args) ? importOf(client, args.path) : '');
         if (marked === undefined) return undefined;

@@ -111,11 +111,61 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+/** A recording, for an agent: where it replays, and the command that reads it. */
+const toldOf = (recording: Recording) => ({
+  id: recording.id,
+  duration: recording.duration,
+  replay: new URL(recording.url, location.href).href,
+  // Through the project's runner: `npx`, `bunx`, `pnpm exec`.
+  read: `deictic recording ${recording.id}`,
+  ...(recording.voice === undefined ? {} : { voice: recording.voice.map((v) => v.id) }),
+});
+
 export default defineClientPlugin<never, never, Recorder>({
   name: 'recordings',
+  webmcp: ({ use }) => {
+    const recorder = () => {
+      const api = use('recordings');
+      if (api === undefined) throw new Error('the recordings plugin did not set up in the page');
+      return api;
+    };
+    return [
+      {
+        name: 'recordings_start',
+        kind: 'page',
+        description:
+          "Starts recording the page (rrweb: the DOM as it changes, the console and requests where those plugins are loaded), as deictic's Record does, until recordings_stop. A page load doesn't end it: it carries on in the next page of the site. One at a time.",
+        execute: async () => {
+          const going = recorder().record();
+          // Started, or why not (rrweb not installed): whichever comes first.
+          const started = new Promise<void>((r) => {
+            const check = () => (recorder().recording() ? r() : setTimeout(check, 50));
+            check();
+          });
+          await Promise.race([started, going.then(() => {})]);
+          return { recording: recorder().recording() };
+        },
+      },
+      {
+        name: 'recordings_stop',
+        kind: 'page',
+        description:
+          "Stops the recording going and keeps it (or drops it, with `discard`): answers its ID, where it replays, and the deictic command that reads it as a timeline (what happened, the console's errors, failed requests). Kept, it's with what the person's next task attaches too.",
+        inputSchema: { type: 'object', properties: { discard: { type: 'boolean' } } },
+        execute: async (input) => {
+          const going = recorder().stop(input.discard !== true);
+          if (going === undefined) throw new Error('no recording is going: start one with recordings_start');
+          const recording = await going;
+          return recording === undefined ? { kept: false } : { kept: true, ...toldOf(recording) };
+        },
+      },
+    ];
+  },
   setup: ({ base, root, options, use, request, report, tools, tray, drawer, lightbox }) => {
     const { masking, canvas } = options as { masking: ResolvedMasking; canvas?: false | { fps: number } };
     let running: Promise<Recording | undefined> | undefined;
+    // What ends the one going, as its Stop (kept) or Discard does: set once it's started.
+    let ending: ((kept: boolean) => Promise<void>) | undefined;
 
     // In the tool panel: Record, and in its place while one is going, what `record` puts there.
     const group = Object.assign(document.createElement('div'), { className: 'tool-group recorder' });
@@ -414,6 +464,7 @@ export default defineClientPlugin<never, never, Recorder>({
             fail(e);
           }
         };
+        ending = end;
         // Record's key again: it's Stop while one is going.
         const stop = toolButton(STOP, 'Stop', 'R', () => void end(true));
         const discard = toolButton(DISCARD, 'Discard', 'Shift+R', () => void end(false));
@@ -445,7 +496,10 @@ export default defineClientPlugin<never, never, Recorder>({
       start.classList.remove('problem');
       start.title = 'Record';
       const mine = record(from).finally(() => {
-        if (running === mine) running = undefined;
+        if (running === mine) {
+          running = undefined;
+          ending = undefined;
+        }
         start.disabled = false;
       });
       running = mine;
@@ -474,6 +528,16 @@ export default defineClientPlugin<never, never, Recorder>({
     return {
       recording: () => running !== undefined,
       going: () => running,
+      stop: (kept = true) => {
+        const going = running;
+        if (going === undefined) return undefined;
+        return (async () => {
+          // Asked before it's started: it ends as soon as it has.
+          while (ending === undefined && running === going) await new Promise((r) => setTimeout(r, 50));
+          await ending?.(kept);
+          return going;
+        })();
+      },
       record: async () => {
         if (running !== undefined) throw new Error('recordings: one is going already: stop it first');
         return run();

@@ -12,6 +12,17 @@ export function targetOf(el: Element): Target | undefined {
   return { loc: { file: match[1]!, line: Number(match[2]), column: Number(match[3]) }, tag: el.localName };
 }
 
+/** The nearest marked element around `el`, out through shadow roots to their hosts. */
+export function markedAround(el: Element): Element | undefined {
+  for (let at: Element | undefined = el; at !== undefined;) {
+    const marked = at.closest(`[${ATTRIBUTE}]`);
+    if (marked !== null) return marked;
+    const root = at.getRootNode();
+    at = root instanceof ShadowRoot ? root.host : undefined;
+  }
+  return undefined;
+}
+
 /** Every element on the page from the same place in the source as `el`. */
 export const sameAs = (el: Element) => [...document.querySelectorAll(`[${ATTRIBUTE}="${CSS.escape(el.getAttribute(ATTRIBUTE) ?? '')}"]`)];
 

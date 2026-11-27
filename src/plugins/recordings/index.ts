@@ -54,6 +54,11 @@ export interface Recorder {
   recording(): boolean;
   /** The one going, as `record` answers it: also one a page before this started, carried on here. */
   going(): Promise<Recording | undefined> | undefined;
+  /**
+   * Ends the one going, as its Stop does (or Discard, with `kept` false), and answers what `record` does: nothing
+   * where none is going.
+   */
+  stop(kept?: boolean): Promise<Recording | undefined> | undefined;
 }
 
 /** A plugin of rrweb's own, as its `record` takes them: what puts more than the page in a recording. */

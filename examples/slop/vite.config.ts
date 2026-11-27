@@ -8,6 +8,10 @@ import { defineConfig } from 'vite';
 // A page to unslop: everything deictic has, so a task can carry a shot, marks, a recording with its console and
 // network, or a voice note. Its own port, beside the site and the other examples.
 export default defineConfig({
-  plugins: [deictic({ plugins: [...deicticRecommended(), tailwind({ css: 'src/index.css' })] }), react(), tailwindcss()],
+  plugins: [
+    deictic({ plugins: [...deicticRecommended(), tailwind({ css: 'src/index.css' })], webmcp: { write: true } }),
+    react(),
+    tailwindcss(),
+  ],
   server: { port: 5184 },
 });

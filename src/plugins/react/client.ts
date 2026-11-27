@@ -5,7 +5,8 @@
 import type * as Main from 'bippy';
 import type * as Source from 'bippy/source';
 
-import { componentOf, fiberOf, type Owner, ownerOf } from '#src/client/component.ts';
+import { componentOf, fiberOf, type Owner, ownerOf, parentOf } from '#src/client/component.ts';
+import { ELEMENT } from '#src/client/webmcp.ts';
 import { defineClientPlugin } from '#src/index.ts';
 
 import type { Commit, Component, Hook, ReactOptions, Snapshot } from './index.ts';
@@ -63,12 +64,6 @@ const bippy = (): Promise<Bippy> =>
     return { ...main, ...source };
   })());
 
-const parentOf = (el: Element): Element | undefined => {
-  if (el.parentElement !== null) return el.parentElement;
-  const root = el.getRootNode();
-  return root instanceof ShadowRoot ? root.host : undefined;
-};
-
 /** `src/Plan.tsx:12`: where the nearest element around `el` that `owner` wrote is, which is in its JSX. */
 function placeOf(el: Element, owner: Owner): string | undefined {
   for (let at: Element | undefined = el; at !== undefined; at = parentOf(at)) {
@@ -83,6 +78,22 @@ function placeOf(el: Element, owner: Owner): string | undefined {
 
 export default defineClientPlugin<never, never, Inspector>({
   name: 'react',
+  webmcp: ({ use, find }) => [
+    {
+      name: 'react_state',
+      kind: 'read',
+      untrusted: true,
+      description:
+        "What React's DevTools would show of an element: the component that wrote it and the ones that wrote that, out, each with its props, its state or hooks (named as the code names them), and how often it rendered, how long that took and why. Values the page holds, masked by name (tokens, passwords) and cut where long. Null where React didn't render it in development.",
+      inputSchema: { type: 'object', properties: { ...ELEMENT }, required: ['element'] },
+      execute: async (input) => {
+        const inspector = use('react');
+        if (inspector === undefined) throw new Error('the react plugin did not set up in the page');
+        const json = await inspector.snapshot(find(input.element, input.nth));
+        return json === undefined ? { components: null } : (JSON.parse(json) as unknown);
+      },
+    },
+  ],
   setup: ({ options }) => {
     const { components = 4, mask = [], names = true, renders = true } = (options ?? {}) as ReactOptions;
     // From now, before any task: what rendered before the page started deictic goes uncounted.

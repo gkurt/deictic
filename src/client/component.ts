@@ -96,3 +96,55 @@ export function named(el: Element): Named {
 /** `<PlanCard>` for the only element of one, `<PlanCard> <li>` for one of several, `<li>` where no component is known. */
 export const tell = ({ tag, component, sole }: Named) =>
   component === undefined ? `<${tag}>` : sole ? `<${component}>` : `<${component}> <${tag}>`;
+
+/** The element around `el`, out through a shadow root to its host. */
+export const parentOf = (el: Element): Element | undefined => {
+  if (el.parentElement !== null) return el.parentElement;
+  const root = el.getRootNode();
+  return root instanceof ShadowRoot ? root.host : undefined;
+};
+
+/** How many places a chain names after the element's own: who uses it, and who uses that. Further out is the app's shell. */
+const CHAIN = 3;
+
+/**
+ * The source `el` rendered through, after its own place, nearest first: a shared component's own line is the same
+ * wherever it's used, and the change is most often in what uses it, or in what uses that.
+ *
+ * With React in development, those are the components that wrote it, each the one whose JSX has the one before:
+ * `Field (src/Field.tsx:20)`, its line the nearest element around `el` that the component wrote, or the name alone
+ * for one with no element of its own around it (it wraps what it uses only in other components), which the marks
+ * can't show at all. A layout component the element was only passed through isn't among them.
+ *
+ * Without (another framework, a production build) it's read off the marks around it, each a `file:line`: the
+ * nearest element each next file wrote.
+ */
+export function chainOf(el: Element, file: string): string[] {
+  const found: string[] = [];
+  const wrote = ownerOf(fiberOf(el));
+  if (wrote !== undefined) {
+    for (let owner = ownerOf(wrote); owner !== undefined && found.length < CHAIN; owner = ownerOf(owner)) {
+      const name = componentOf(owner);
+      let place: string | undefined;
+      for (let at = parentOf(el); at !== undefined && place === undefined; at = parentOf(at)) {
+        const by = ownerOf(fiberOf(at));
+        // A component's fiber is one of two, by turns: an element may name either.
+        if (by === undefined || (by !== owner && by !== owner.alternate)) continue;
+        place = at.getAttribute('data-deictic')?.replace(/:\d+$/, '');
+      }
+      if (name !== undefined) found.push(place === undefined ? name : `${name} (${place})`);
+      else if (place !== undefined) found.push(place);
+    }
+    if (found.length > 0) return found;
+  }
+  let last = file;
+  for (let at = parentOf(el); at !== undefined && found.length < CHAIN; at = parentOf(at)) {
+    const mark = at.getAttribute('data-deictic');
+    if (mark === null) continue;
+    const from = mark.replace(/:\d+:\d+$/, '');
+    if (from === last) continue;
+    last = from;
+    found.push(mark.replace(/:\d+$/, ''));
+  }
+  return found;
+}

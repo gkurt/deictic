@@ -44,7 +44,7 @@ const carriedBy = (plugin: { api?: unknown }) => (plugin.api as Partial<Carried>
 export function deictic(given: ViteOptions = {}): Plugin {
   const id = Symbol('deictic');
   let options = given;
-  let { plugins, shortcut } = prepare(given);
+  let { plugins, shortcut, webmcp } = prepare(given);
   let leading = true;
   let handle: Endpoints | undefined;
   let root = '';
@@ -65,7 +65,7 @@ export function deictic(given: ViteOptions = {}): Plugin {
       leading = all[0]?.id === id;
       if (!leading || all.length === 1) return;
       options = merge(all.map((c) => c.options));
-      ({ plugins, shortcut } = prepare(options));
+      ({ plugins, shortcut, webmcp } = prepare(options));
     },
     configureServer(server) {
       if (!leading) return;
@@ -86,7 +86,7 @@ export function deictic(given: ViteOptions = {}): Plugin {
       if (!leading || module !== CLIENT_ID) return undefined;
       // Only a build's page asks the module: the dev server is there to answer.
       const server = building && options.standalone !== undefined ? resolve(root, options.standalone).replaceAll('\\', '/') : undefined;
-      return clientModule(plugins, base, shortcut, server);
+      return clientModule(plugins, base, shortcut, { ...(server === undefined ? {} : { server }), webmcp });
     },
     transform: {
       // First of all, not only first of the `pre` plugins: the React Compiler (`react({ compiler: true })`) is

@@ -152,8 +152,19 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   older Astro. `test/astro.test.ts` covers it, with a real `astro dev`, deictic from `dist`.
 - `src/client/away.ts`: `keepAway`, `keptAway`, `dropAway`: a panel's `away` (tab, target, state) for the tab's next
   page. In IndexedDB, as the state may hold a `Blob`, under a key the tab's session storage has; gone after a day.
+- `src/client/webmcp.ts`: `registerTools`, the plugins' tools for an agent driving the browser, through WebMCP
+  (`document.modelContext.registerTool`, Chrome's: agent-browser turns it on and reads the tools over CDP, so no
+  polyfill), where `deictic({ webmcp })` asks (`StartOptions.webmcp`, after every `setup`) and the page has it. A
+  `WebTool` (`src/index.ts`) is `read` (`readOnlyHint`), `page` or `write` (only with `webmcp: { write: true }`;
+  `consequentialHint`); `untrusted` is `untrustedContentHint`; each answers plain JSON, and a thrown message is the
+  agent's. Unregistered by an `AbortSignal`. deictic's own: `deictic_pointed` (the popup's element, else what pointing
+  lit last), `deictic_locate`, `deictic_find`, `deictic_history`, `deictic_undo`/`redo`. A page half's `webmcp(context)`
+  answers its own (a `WebContext`: `find(element, nth)`, a mark or a selector's nearest marked element, `describe`,
+  and its plugin's `read` and `apply`): annotations', react's, screenshots', recordings' (`Recorder.stop`), tasks'
+  (`tasks/webmcp.ts`) and tailwind's. `test/webmcp.test.ts` runs them in Chromium on a stand-in `modelContext`. The
+  site and `examples/slop` turn them on, writes too.
 - `src/client/component.ts`: who wrote an element, where the page says: React's fibers in development (`fiberOf`,
-  `ownerOf`, `componentOf`, which tasks' `chainOf` reads too). `named(el)` is how an element is told to a person, a
+  `ownerOf`, `componentOf`; `chainOf`, the source it rendered through, which tasks and WebMCP's tools say). `named(el)` is how an element is told to a person, a
   `Named` (its tag, the component whose JSX has it, and whether it's the only element that component wrote: counted
   under the owner's fiber, to `LOOKED`), kept per element; `tell` writes it, `<Plan> <li>`, `<Badge>` or `<li>`. The
   caption, the popup's bar, a pin's card and tasks' element chips all say an element this way.

@@ -7,8 +7,9 @@
  * itself from `svg(area)`: one way to draw them, wherever a shot is rendered. `edit` draws on a picture
  * instead, a shot most often, with the same tools in a bar over everything, and `flatten` makes the PNG of it.
  */
-import { controlFor, MOD } from '#src/client/dom.ts';
-import { defineClientPlugin } from '#src/index.ts';
+import { controlFor, markedAround, MOD, targetOf } from '#src/client/dom.ts';
+import { ELEMENT } from '#src/client/webmcp.ts';
+import { defineClientPlugin, type WebContext, type WebTool } from '#src/index.ts';
 
 import { drawing, measurer } from './draw.ts';
 import type { Annotation, AnnotationEvent, Annotations, Area, Picture, Point, Shape } from './index.ts';
@@ -238,8 +239,107 @@ function marksOnPage(root: ShadowRoot, color: string, measure: Measure, key: str
   };
 }
 
+/** How far a box an agent draws around an element is off it, in CSS pixels. */
+const AROUND = 6;
+
+/** Where a mark points, in page coordinates: what it's most likely about. */
+function aimOf(shape: Shape): Point {
+  switch (shape.kind) {
+    case 'box':
+      return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+    case 'arrow':
+      return shape.to;
+    case 'note':
+      return shape.at;
+    case 'pen': {
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    }
+  }
+}
+
+/** The marks for an agent in the browser: what the person drew and wrote on the page, and its own to show them something. */
+function webTools(context: WebContext): WebTool[] {
+  const marks = () => {
+    const api = context.use('annotations');
+    if (api === undefined) throw new Error('the annotations plugin did not set up in the page');
+    return api;
+  };
+  return [
+    {
+      name: 'annotations_list',
+      kind: 'read',
+      description:
+        "The marks the person drew on the page with deictic's tools (boxes, arrows, pen strokes and notes), oldest first, in page coordinates (CSS pixels from the document's top left). Each has `about`, the marked element under where it points (a box's middle, an arrow's head, a note), where that's in the window now.",
+      execute: () => ({
+        marks: marks()
+          .list()
+          .map(({ id, color, shape }) => {
+            const aim = aimOf(shape);
+            const under = document.elementFromPoint(aim.x - scrollX, aim.y - scrollY);
+            const el = under === null ? undefined : markedAround(under);
+            return { id, color, ...shape, ...(el === undefined || targetOf(el) === undefined ? {} : { about: context.describe(el) }) };
+          }),
+      }),
+    },
+    {
+      name: 'annotations_add',
+      kind: 'page',
+      description:
+        'Draws a box around an element on the page, with a note above it where one is given, to show the person something: it stays until they clear it, and goes with their next task.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ...ELEMENT,
+          note: { type: 'string' },
+          color: { type: 'string', description: "A CSS color: the plugin's own by default." },
+        },
+        required: ['element'],
+      },
+      execute: (input) => {
+        const el = context.find(input.element, input.nth);
+        const r = el.getBoundingClientRect();
+        const color = typeof input.color === 'string' && CSS.supports('color', input.color) ? input.color : undefined;
+        const box = marks().add(
+          {
+            kind: 'box',
+            x: r.left + scrollX - AROUND,
+            y: r.top + scrollY - AROUND,
+            width: r.width + 2 * AROUND,
+            height: r.height + 2 * AROUND,
+          },
+          color,
+        );
+        const added = [box.id];
+        if (typeof input.note === 'string' && input.note.trim() !== '') {
+          const note = marks().add(
+            { kind: 'note', at: { x: r.left + scrollX, y: Math.max(0, r.top + scrollY - AROUND - 28) }, text: input.note.trim() },
+            color,
+          );
+          added.push(note.id);
+        }
+        return { added };
+      },
+    },
+    {
+      name: 'annotations_remove',
+      kind: 'page',
+      description: 'Removes marks from the page by their IDs, or every one with none given.',
+      inputSchema: { type: 'object', properties: { ids: { type: 'array', items: { type: 'string' } } } },
+      execute: (input) => {
+        const ids = Array.isArray(input.ids) ? input.ids.filter((id): id is string => typeof id === 'string') : undefined;
+        if (ids === undefined) marks().clear();
+        else for (const id of ids) marks().remove(id);
+        return { left: marks().list().length };
+      },
+    },
+  ];
+}
+
 export default defineClientPlugin<never, never, Annotations>({
   name: 'annotations',
+  webmcp: webTools,
   setup: ({ root, options, tools }) => {
     const color = (options as { color: string }).color;
     const measure = measurer();

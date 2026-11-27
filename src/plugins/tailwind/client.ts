@@ -15,6 +15,7 @@
  * page's that goes as the panel does. The completions and a chip's kind open in boxes of their own beside the popup
  * (in the overlay's root, placed each frame), so the popup keeps its size and nothing in it moves. Without Tailwind v4 the chips are plain and nothing completes.
  */
+import { ELEMENT } from '#src/client/webmcp.ts';
 import { defineClientPlugin } from '#src/index.ts';
 
 import type { Alternatives, ClassInfo, Model, Op } from './index.ts';
@@ -128,6 +129,32 @@ function face(into: HTMLElement, info: ClassInfo) {
 export default defineClientPlugin<Model, Op>({
   name: 'tailwind',
   label: 'Tailwind',
+  webmcp: ({ find, read, apply }) => [
+    {
+      name: 'tailwind_classes',
+      kind: 'read',
+      description:
+        "An element's class list as its source writes it: `classes`, `editable` where it's a string deictic can write, and a class helper's other arguments (`others`: the classes each adds at runtime and what they wait on, `editable` ones by their place there).",
+      inputSchema: { type: 'object', properties: { ...ELEMENT }, required: ['element'] },
+      execute: (input) => read<Model>(find(input.element, input.nth)),
+    },
+    {
+      name: 'tailwind_set',
+      kind: 'write',
+      description:
+        "Writes an element's class list in its source, as deictic's Tailwind tab does: the element's own, or with `at` one of the helper's other arguments (its place in `others`). The page updates as the bundler does; deictic_undo takes it back. Answers the classes read again.",
+      inputSchema: {
+        type: 'object',
+        properties: { ...ELEMENT, classes: { type: 'string' }, at: { type: 'integer', minimum: 0 } },
+        required: ['element', 'classes'],
+      },
+      execute: (input) => {
+        if (typeof input.classes !== 'string') throw new Error('give the whole class list: `classes`');
+        const op: Op = { classes: input.classes.trim().replace(/\s+/g, ' '), ...(typeof input.at === 'number' ? { at: input.at } : {}) };
+        return apply<Model>(find(input.element, input.nth), op);
+      },
+    },
+  ],
   mount(panel, context) {
     const style = document.createElement('style');
     style.textContent = STYLE;

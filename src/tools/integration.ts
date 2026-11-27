@@ -31,6 +31,19 @@ export interface DeicticOptions {
    * shortcut and its plugin of the same name is the one loaded.
    */
   defaults?: boolean;
+  /**
+   * Offers the plugins' tools to an agent driving the browser, through WebMCP (`document.modelContext`), where the
+   * browser has it: `true` for those that only read the page or make something of its own (a shot, a recording),
+   * `{ write: true }` for those that change the project's files or the board too. Off by default.
+   */
+  webmcp?: boolean | { write?: boolean };
+}
+
+/** What the page's overlay is started with, besides its plugins. */
+export interface ClientExtras {
+  /** A module of the page's that answers its requests where no dev server does: a `standalone` build's. */
+  server?: string;
+  webmcp?: DeicticOptions['webmcp'];
 }
 
 /**
@@ -61,18 +74,23 @@ export function merge<O extends DeicticOptions>(instances: readonly O[]): O {
 }
 
 /** The options with their defaults, checked now, so a wrong set stops the dev server as it starts, not the page. */
-export function prepare(options: DeicticOptions): { plugins: ServerPlugin[]; shortcut: Shortcut | false | undefined } {
+export function prepare(options: DeicticOptions): {
+  plugins: ServerPlugin[];
+  shortcut: Shortcut | false | undefined;
+  webmcp: DeicticOptions['webmcp'];
+} {
   const plugins = options.plugins ?? [];
   checkPlugins(plugins, options.shortcut);
-  return { plugins, shortcut: options.shortcut };
+  return { plugins, shortcut: options.shortcut, webmcp: options.webmcp };
 }
 
 /**
  * The client module: the overlay, started with deictic's own shortcut and each plugin that has a half
- * in the page, with its shortcut, checked; and with `server`, a module of the page's that answers its requests
- * where no dev server does.
+ * in the page, with its shortcut, checked; with `server`, a module of the page's that answers its requests
+ * where no dev server does; and with `webmcp`, the plugins' tools offered to an agent in the browser.
  */
-export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortcut | false, server?: string) => {
+export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortcut | false, { server, webmcp }: ClientExtras = {}) => {
+  const mcp = webmcp === undefined || webmcp === false ? '' : `, webmcp: ${JSON.stringify(webmcp === true ? {} : webmcp)}`;
   const [shortcut, ...shortcuts] = checkShortcuts([{ name: OWN, shortcut: ownShortcut(own) }, ...plugins]);
   const paged = plugins.flatMap((p, i) =>
     p.client === undefined ? [] : [{ client: p.client, rest: { shortcut: shortcuts[i], options: p.clientOptions } }],
@@ -82,7 +100,7 @@ export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortc
     ...paged.map((p, i) => `import p${i} from ${JSON.stringify(p.client)};`),
     ...(server === undefined ? [] : [`import server from ${JSON.stringify(server)};`]),
     // Its shortcut and options as JSON, where it has them: `JSON.stringify` leaves out what's undefined.
-    `start({ base: ${JSON.stringify(base)}, shortcut: ${JSON.stringify(shortcut) ?? 'undefined'}, plugins: [${paged.map((p, i) => `{ plugin: p${i}, ...${JSON.stringify(p.rest)} }`).join(', ')}]${server === undefined ? '' : ', server'} });`,
+    `start({ base: ${JSON.stringify(base)}, shortcut: ${JSON.stringify(shortcut) ?? 'undefined'}, plugins: [${paged.map((p, i) => `{ plugin: p${i}, ...${JSON.stringify(p.rest)} }`).join(', ')}]${server === undefined ? '' : ', server'}${mcp} });`,
   ].join('\n');
 };
 
@@ -91,8 +109,14 @@ export const clientModule = (plugins: ServerPlugin[], base: string, own?: Shortc
  * its path. Its imports are bare (`deictic/client`, each plugin's), found from the project as its own
  * are. Written only when it changed, so a watching bundler doesn't rebuild for nothing.
  */
-export function writeClient(root: string, plugins: ServerPlugin[], base: string, own?: Shortcut | false): string {
-  const code = `// Written by deictic as the dev server starts: it starts the overlay in the page.\n${clientModule(plugins, base, own)}\n`;
+export function writeClient(
+  root: string,
+  plugins: ServerPlugin[],
+  base: string,
+  own?: Shortcut | false,
+  webmcp?: DeicticOptions['webmcp'],
+): string {
+  const code = `// Written by deictic as the dev server starts: it starts the overlay in the page.\n${clientModule(plugins, base, own, { webmcp })}\n`;
   // Its own package: an ES module that runs for its effect. An app whose package.json says
   // `"sideEffects": false` would otherwise have webpack drop the import, which is only for its effect.
   const manifest = `${JSON.stringify({ private: true, type: 'module', sideEffects: true }, null, 2)}\n`;

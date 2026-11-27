@@ -23,7 +23,8 @@ what to do next: do it. Not set up (no `deictic` in `package.json`): ask the per
    change. The element is one place: they may mean its parent, a sibling, or every element its line renders.
 3. **Work it**: change the source, then look at the page at the task's viewport. The page is theirs (host, account,
    data): reach the same screen in the app as the project runs it, never use their session, and say what you
-   couldn't see.
+   couldn't see. Where your browser has WebMCP (agent-browser) and the project turns on `webmcp`, deictic's tools
+   are in the page (`agent-browser webmcp list`): `deictic_find` the task's place, `react_state`, `screenshots_take`.
 4. **Complete**: `vb tasks complete 68 "<what changed, where>"`, say it in a line, and back to the watch.
 
 Unsure what they mean: `vb reply 68 "<what you understood, and the question>"`, then `vb tasks block 68 "<why>"`; the
