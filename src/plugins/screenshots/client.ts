@@ -8,7 +8,7 @@
  */
 import { POPUP_CLOSED, POPUP_OPENED, type PopupOpened, toolButton } from '#src/client/dom.ts';
 import { trayed } from '#src/client/drawer.ts';
-import { ELEMENT } from '#src/client/webmcp.ts';
+import { ELEMENT, inView } from '#src/client/webmcp.ts';
 import { defineClientPlugin } from '#src/index.ts';
 import type { Annotations } from '#src/plugins/annotations/index.ts';
 
@@ -104,6 +104,7 @@ export function screenshotsClient(capture: PageCapture, freezer?: PageFreeze) {
           if (capture === undefined) throw new Error('the screenshots plugin did not set up in the page');
           const named = input.element === undefined ? undefined : find(input.element, input.nth);
           const area = input.area === 'element' && named !== undefined ? 'element' : 'viewport';
+          if (named !== undefined) inView(named);
           const shot = await capture.capture(named ?? document.documentElement, { area });
           if (input.tray === true) tray.add('screenshots', shot.id, shot);
           return {

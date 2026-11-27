@@ -5,7 +5,7 @@
  */
 import { chainOf } from '#src/client/component.ts';
 import { ATTRIBUTE, sameAs } from '#src/client/dom.ts';
-import { ELEMENT } from '#src/client/webmcp.ts';
+import { ELEMENT, inView } from '#src/client/webmcp.ts';
 import type { WebContext, WebTool } from '#src/index.ts';
 import type { Recording } from '#src/plugins/recordings/index.ts';
 
@@ -91,7 +91,9 @@ export function webTools(context: WebContext): WebTool[] {
                 .use('react')
                 ?.snapshot(el)
                 .catch(() => undefined);
-        const shot = input.screenshot === false || shots === undefined ? undefined : await shots.capture(el ?? document.documentElement);
+        const shooting = input.screenshot !== false && shots !== undefined;
+        if (shooting && el !== undefined) inView(el);
+        const shot = shooting ? await shots.capture(el ?? document.documentElement) : undefined;
         const wanted = Array.isArray(input.recordings) ? input.recordings.filter((r): r is string => typeof r === 'string') : [];
         const recordings = context.tray
           .list('recordings')

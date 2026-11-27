@@ -104,12 +104,25 @@ export function findElement(element: unknown, nth: unknown = 1): Element {
   return marked;
 }
 
+/**
+ * Scrolls `el` into the window where it isn't all there, at once: for a shot of it, which an agent asks for wherever
+ * the page has scrolled, where a person shoots what they see.
+ */
+export function inView(el: Element): void {
+  const r = el.getBoundingClientRect();
+  const { clientWidth: width, clientHeight: height } = document.documentElement;
+  if (r.top >= 0 && r.left >= 0 && r.bottom <= height && r.right <= width) return;
+  el.scrollIntoView({ block: r.height > height ? 'start' : 'center', inline: 'nearest', behavior: 'instant' });
+}
+
 export function describeElement(el: Element): WebElement {
   const target = targetOf(el);
   if (target === undefined) throw new Error(`the element has no ${ATTRIBUTE} mark`);
   const alike = sameAs(el);
   const chain = chainOf(el, target.loc.file);
-  const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, TEXT);
+  // As it reads on the page: `textContent` runs a block's words into the next one's.
+  const said = el instanceof HTMLElement ? el.innerText : el.textContent;
+  const text = (said ?? '').replace(/\s+/g, ' ').trim().slice(0, TEXT);
   const r = el.getBoundingClientRect();
   return {
     place: placeOf(target),
