@@ -76,7 +76,7 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   Must see the source as written, so integrations run it first. `lineStarts`, `position`, `offsetOf`.
 - `src/tools/source.ts`: `sourceAt`, a target's file parsed (a JSX module, or an `.astro` component, whose `program`
   is its frontmatter's) and its opening tag found by offset and tag, or else the only one of its tag on that line (the page may count columns in code a plugin changed before deictic's), or a `Refusal` saying what the line has; `resolveFile`, which refuses anything
-  outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text.
+  outside the root or under `node_modules`; `applyEdits`, the edits as each file's new text (a file that isn't there made where every edit to it is at 0, as a locale's first translation is).
 - `src/tools/packages.ts`: a plugin's `packages`, what it imports that the project installs (deictic's optional peers):
   `missingProblem(root, plugins)`, found from the root as the bundler finds them, which `endpoints` reports as it
   starts (`packages:<names>`, `setup`), with the install command; `packageManager(root)` (the `packageManager` field, the nearest lockfile, then the running

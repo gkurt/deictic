@@ -1,5 +1,8 @@
 import { expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
+import { definePlugin } from '#src/index.ts';
 import { tailwind } from '#src/plugins/tailwind/index.ts';
 import { endpoints, redirect } from '#src/tools/endpoints.ts';
 
@@ -103,4 +106,23 @@ test('opens a place in the editor, and answers nothing for other paths', async (
   const res = await handle(new Request(`${ORIGIN}/__deictic/open?file=src/App.tsx&line=1&column=26`));
   expect(res!.headers.get('location')).toContain(p.root);
   expect(await handle(new Request(`${ORIGIN}/src/App.tsx`))).toBeUndefined();
+});
+
+test('makes a file an edit at its start names, and takes it away again on undo', async () => {
+  const p = project({ 'src/App.tsx': 'export const App = () => <div>x</div>;\n' });
+  const notes = definePlugin<null, string>({ name: 'notes', apply: (_, __, text) => [{ file: 'notes/de.yaml', start: 0, end: 0, text }] });
+  const handle = endpoints({ root: p.root, plugins: [notes], open: () => new Response() });
+  const post = (route: string, body: unknown) =>
+    handle(
+      new Request(`${ORIGIN}/__deictic/${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: ORIGIN },
+        body: JSON.stringify(body),
+      }),
+    );
+  const target = p.target('src/App.tsx', 'div');
+  expect((await post('apply', { plugin: 'notes', target, op: 'hallo: Hallo\n' }))!.status).toBe(200);
+  expect(p.read('notes/de.yaml')).toBe('hallo: Hallo\n');
+  await post('undo', {});
+  expect(existsSync(join(p.root, 'notes/de.yaml'))).toBe(false);
 });

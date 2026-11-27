@@ -73,13 +73,16 @@ function astro(root: string, file: string, code: string): Parsed {
   return parsed;
 }
 
-/** Each file's text after its edits, which must not overlap. */
+/**
+ * Each file's text after its edits, which must not overlap. A file that isn't there is made where every edit to it is
+ * at its start (a locale's first translation, say); any other edit to one is refused.
+ */
 export function applyEdits(source: Source, edits: TextEdit[]): Map<string, string> {
   const byFile = Map.groupBy(edits, (e) => e.file ?? source.file);
   const out = new Map<string, string>();
   for (const [file, list] of byFile) {
     const sorted = list.toSorted((a, b) => b.start - a.start);
-    let code = file === source.file ? source.code : source.read(file);
+    let code = file === source.file ? source.code : textOf(source, file, list);
     let floor = Infinity;
     for (const edit of sorted) {
       if (edit.end > floor) throw new Error(`deictic: edits to ${file} overlap at ${edit.end}`);
@@ -89,4 +92,13 @@ export function applyEdits(source: Source, edits: TextEdit[]): Map<string, strin
     out.set(file, code);
   }
   return out;
+}
+
+function textOf(source: Source, file: string, edits: TextEdit[]): string {
+  try {
+    return source.read(file);
+  } catch (e) {
+    if (e instanceof Refusal && e.cause !== undefined && edits.every((edit) => edit.start === 0 && edit.end === 0)) return '';
+    throw e;
+  }
 }

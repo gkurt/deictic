@@ -467,6 +467,8 @@ export default defineClientPlugin<Model, Op>({
   screenshots and recordings.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.
 - Throw a `Refusal` for an op the plugin won't make. The panel shows its message.
+- An edit's `file` names another file under the root than the element's (a catalog's entry). One that isn't there is
+  made where every edit to it is at its start, `start: 0, end: 0`, and undo takes it away again.
 - `read` and `apply` get the element's source, or a `Refusal` saying why it isn't to be found (the file doesn't parse,
   or the page runs other code than the file has): throw it where the plugin needs the source, or go on without, as
   tasks do. Text edits without it are refused.
