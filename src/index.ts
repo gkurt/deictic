@@ -390,6 +390,13 @@ export interface Resumed {
   problem?: string;
 }
 
+/** A plugin's own tag in the caption over what's pointed at, after deictic's: prosebook's names the string's key. */
+export interface Tag {
+  text: string;
+  /** Its background, a CSS color: deictic's accent unset. Its text is white. */
+  color?: string;
+}
+
 export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
   /** The server half's `name`. */
   name: string;
@@ -411,6 +418,11 @@ export interface ClientPlugin<Model = unknown, Op = unknown, Api = unknown> {
    * plugin pins each task where its element is. Answers what takes it away.
    */
   pointing?(context: ClientContext): () => void;
+  /**
+   * Its tag in the caption for what's under the pointer, at `at` in the window's CSS pixels, or nothing. Asked on
+   * every move while pointing, so it must be quick.
+   */
+  tag?(context: ClientContext, at: Point): Tag | undefined;
   /**
    * A shortcut's press on a marked element, before the page hears it and before the popup opens: the page as the
    * person saw it, a tooltip still open under the pointer, a menu still focused. Called as the press goes down, so

@@ -49,7 +49,8 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   time; `kind`, `setup` for the project to fix or `bug` to report; the message with its fix; `details`): both contexts'
   `report(problem)` say one, and a server half's `problem(problem)` hears each. The parser is imported for its types only.
 - A `ClientPlugin` with `pointing(context)` (tasks) draws on the page while a shortcut's keys are held, and answers
-  what takes it away. One with `pressed(context, element)` (screenshots) hears a shortcut's press on a marked element
+  what takes it away. One with `tag(context, at)` (prosebook) answers a `Tag` for the pointer's point, asked in `show`
+  each frame and drawn in the caption after deictic's own (`lighting.ts`, `tags`), its failure reported. One with `pressed(context, element)` (screenshots) hears a shortcut's press on a marked element
   on `pointerdown`, in the capture phase: before the page's handlers, the popup, its pointer and its focus.
 - `src/shortcut.ts`: a `Shortcut` (`modifiers` held exactly, `button`), shared by both halves. deictic's
   own (`deictic({ shortcut })`, `MASTER` Alt by default, `false` for none) opens the popup at the tab

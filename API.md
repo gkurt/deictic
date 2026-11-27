@@ -483,6 +483,9 @@ export default defineClientPlugin<Model, Op>({
   tasks do. Text edits without it are refused.
 - `pointing(context)` on the page half draws what the plugin has on the page while a shortcut's keys are held, and
   answers what takes it away: tasks pins each task where its element is.
+- `tag(context, at)` on the page half answers a tag of the plugin's own for what's under the pointer, at `at` in the
+  window's pixels, or nothing: `{ text, color }`, drawn in the caption after deictic's, white on `color` (deictic's
+  accent unset). prosebook's names the string's catalog key. It's asked on every move while pointing: keep it quick.
 - `pressed(context, element)` on the page half hears a shortcut's press on a marked element as it goes down, before
   the page's own handlers and before the popup takes the pointer and the focus: screenshots keeps the page as it is
   then. Keep it quick: the press waits on it.

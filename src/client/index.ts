@@ -391,7 +391,21 @@ export function start({ base, shortcut: own, plugins: given, server }: StartOpti
       const name = plugin.label ?? plugin.name;
       return [shortcut.button === 'left' ? name : `${name} (${shortcut.button})`];
     });
-    lighting.point({ el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), target, names, count: sameAs(el).length }, glide);
+    const at = pointer!;
+    const tags = given.flatMap(({ plugin }) => {
+      if (plugin.tag === undefined) return [];
+      try {
+        const tag = plugin.tag(contextOf(plugin.name), at);
+        return tag === undefined ? [] : [tag];
+      } catch (e) {
+        report(failed(plugin.name, 'tag what was pointed at', e));
+        return [];
+      }
+    });
+    lighting.point(
+      { el, ...(hit?.pointed === undefined ? {} : { pointed: hit.pointed }), target, names, count: sameAs(el).length, tags },
+      glide,
+    );
   };
   const update = (e: MouseEvent | KeyboardEvent) => {
     held = heldBy(e);

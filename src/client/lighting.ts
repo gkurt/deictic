@@ -7,7 +7,7 @@
  * open the element stays lit, tied to the popup by a line that follows both. Nothing here takes the pointer, and
  * the page comes back to full light once the pointer has been out on it a moment.
  */
-import type { Point, Target } from '#src/index.ts';
+import type { Point, Tag, Target } from '#src/index.ts';
 
 import { named } from './component.ts';
 import { div, nameOf, place, reduced } from './dom.ts';
@@ -26,6 +26,8 @@ export interface Pointed {
   names: string[];
   /** How many elements on the page are from its place in the source. */
   count: number;
+  /** The plugins' own tags for what's under the pointer (`ClientPlugin.tag`), after deictic's. */
+  tags?: Tag[];
 }
 
 export interface Lighting {
@@ -133,7 +135,7 @@ export function spotlight(root: ShadowRoot): Lighting {
   const part = (className: string, text: string) => Object.assign(document.createElement('span'), { className, textContent: text });
 
   return {
-    point({ el, pointed, target, names, count }, glide = true) {
+    point({ el, pointed, target, names, count, tags = [] }, glide = true) {
       pointing = true;
       const box = el.getBoundingClientRect();
       const r = grown(box);
@@ -166,11 +168,17 @@ export function spotlight(root: ShadowRoot): Lighting {
         from: `${target.loc.file}:${target.loc.line}`,
         opens: names.join(' / '),
       };
-      const saying = JSON.stringify([texts, dim]);
+      const saying = JSON.stringify([texts, dim, tags]);
       if (saying !== said) {
         said = saying;
         caption.replaceChildren(
           part('tag', texts.tag),
+          ...tags.map(({ text, color }) => {
+            const own = part('tag', text);
+            if (color !== undefined) own.style.background = color;
+            own.style.color = '#fff';
+            return own;
+          }),
           ...(texts.inside === '' ? [] : [part('dim', texts.inside)]),
           part('', texts.from),
           ...dim.map((text) => part('dim', text)),
