@@ -1,3 +1,13 @@
+## deictic@0.11.0
+
+### A plugin's setup can leave something to run as the dev server closes, with context.onClose(callback)
+
+`setup` gets `onClose` on its context: undo there what it did beyond the plugin, a global it set or a watcher it started. Vite and webpack call it as their dev servers close; under Next and Bun the dev server ends with its process.
+
+### deictic/setup edits a bundler's config as deictic init does, for another tool's own setup
+
+`addToConfig(file, code, entry)` adds the entry's imports and its value to a list of the config's, first or last, or wraps the whole config, and answers nothing where it can't tell where.
+
 ## deictic@0.10.0
 
 ### A build given deictic more than once runs it once, with every instance's plugins and options merged; `defaults: true` is for a package that adds deictic with its own plugin, and gives way to the app's
