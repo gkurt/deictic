@@ -1,53 +1,37 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `recommended()` is `deicticRecommended()`, so it doesn't clash with other presets' `recommended`\n"
-    filename: deictic-recommended.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A build given deictic more than once runs it once, with every instance's plugins and options merged; `defaults: true` is for a package that adds deictic with its own plugin, and gives way to the app's\n"
+    filename: merged-instances.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### In a React project, a task attaches the props, state and hooks of the components that wrote its element as `react.json`\n\n`deicticRecommended()` adds `reactState()` (`deictic/react`, read with bippy) where React is installed, and `deictic init` installs bippy there.\n"
-    filename: react-state.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A plugin's edits can make a file: one whose every edit is at its start is written new, and undo takes it away\n"
+    filename: new-files.md
     v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A recording can have React's commits: press React (P) among its controls, and the replay and `deictic recording` list what rendered, how long it took and why\n"
-    filename: react-recordings.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A recording has eleven entries of React's commits a second at most: past ten, the rest of the second is one, with its slowest commit\n"
-    filename: react-rate.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `deictic recording` lists what the person did and what went wrong, and counts the page's other requests, console lines and React commits: `--only` or `--all` lists them\n"
-    filename: quiet-timeline.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### `react.json` says how each component rendered: how often, how recently, how long, and why\n"
-    filename: react-renders.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A task's screenshot is the page as it was when you Alt-clicked, with what was hovered and focused: a tooltip, a hover card or a menu the popup would close is still in it\n"
-    filename: frozen-shots.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A plugin's page half can open a place in the editor with `context.edit(place)`, through the dev server or a standalone page's server\n"
+    filename: edit-place.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - deictic-recommended.md
-      - react-state.md
-      - react-recordings.md
-      - react-rate.md
-      - quiet-timeline.md
-      - react-renders.md
-      - frozen-shots.md
+      - merged-instances.md
+      - new-files.md
+      - edit-place.md
     id: npm:deictic
     updated: true
   - id: npm:site
     updated: false
-  - id: npm:example-slop
-    updated: false
-  - id: npm:example-bun
-    updated: false
   - id: npm:example-vite
     updated: false
   - id: npm:example-rspack
     updated: false
+  - id: npm:example-bun
+    updated: false
   - id: npm:example-next
+    updated: false
+  - id: npm:example-slop
     updated: false
 npm:packages:
   - id: npm:deictic
   - id: npm:site
-  - id: npm:example-slop
-  - id: npm:example-bun
   - id: npm:example-vite
   - id: npm:example-rspack
+  - id: npm:example-bun
   - id: npm:example-next
+  - id: npm:example-slop
