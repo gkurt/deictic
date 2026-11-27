@@ -1,33 +1,29 @@
 core:changelogs:
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A plugin's setup can leave something to run as the dev server closes, with context.onClose(callback)\n\n`setup` gets `onClose` on its context: undo there what it did beyond the plugin, a global it set or a watcher it started. Vite and webpack call it as their dev servers close; under Next and Bun the dev server ends with its process.\n"
-    filename: plugin-close.md
-    v: 0.0.0
-  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### deictic/setup edits a bundler's config as deictic init does, for another tool's own setup\n\n`addToConfig(file, code, entry)` adds the entry's imports and its value to a list of the config's, first or last, or wraps the whole config, and answers nothing where it can't tell where.\n"
-    filename: setup-export.md
+  - content: "---\npackages:\n  deictic:\n    type: minor\n---\n\n### A plugin's page half can put a tag of its own in the caption over what's pointed at, with tag(context, at)\n\nIt answers `{ text, color }` for the point under the pointer, or nothing, and the caption shows it after deictic's own tag: prosebook's names the string's catalog key there, in place of a label of its own that could cover the caption.\n"
+    filename: plugin-tags.md
     v: 0.0.0
 core:packages:
   - changelogIds:
-      - plugin-close.md
-      - setup-export.md
+      - plugin-tags.md
     id: npm:deictic
     updated: true
-  - id: npm:example-bun
-    updated: false
   - id: npm:site
     updated: false
-  - id: npm:example-vite
-    updated: false
-  - id: npm:example-rspack
+  - id: npm:example-slop
     updated: false
   - id: npm:example-next
     updated: false
-  - id: npm:example-slop
+  - id: npm:example-rspack
+    updated: false
+  - id: npm:example-bun
+    updated: false
+  - id: npm:example-vite
     updated: false
 npm:packages:
   - id: npm:deictic
-  - id: npm:example-bun
   - id: npm:site
-  - id: npm:example-vite
-  - id: npm:example-rspack
-  - id: npm:example-next
   - id: npm:example-slop
+  - id: npm:example-next
+  - id: npm:example-rspack
+  - id: npm:example-bun
+  - id: npm:example-vite
