@@ -13,6 +13,7 @@ import { deictic as bun } from '#src/bun.ts';
 import { definePlugin } from '#src/index.ts';
 import loader, { type LoaderOptions } from '#src/loader.ts';
 import { withDeictic } from '#src/next.ts';
+import { merge } from '#src/tools/integration.ts';
 import { deictic as vite } from '#src/vite.ts';
 import { DeicticPlugin } from '#src/webpack.ts';
 
@@ -20,6 +21,16 @@ import { project } from './fixture.ts';
 
 const APP = 'export const App = () => <main className="p-4"><Card /></main>;\nconst Card = () => <p>Hi</p>;\n';
 const pin = definePlugin({ name: 'pin', client: 'pin/client', clientOptions: { colour: 'red' } });
+// What a package adds with deictic itself, beside the app's own: its pin gives way to the app's.
+const added = {
+  defaults: true,
+  plugins: [definePlugin({ name: 'copy', client: 'copy/client' }), definePlugin({ name: 'pin', client: 'their/pin' })],
+};
+const both = (client: string) => {
+  expect(client).toContain('import p0 from "pin/client";');
+  expect(client).toContain('import p1 from "copy/client";');
+  expect(client).not.toContain('their/pin');
+};
 
 type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void;
 
@@ -85,6 +96,23 @@ describe('webpack and Rspack', () => {
       const built = compilerFor(p.root, mode);
       new DeicticPlugin().apply(built);
       expect(built.options.module.rules).toEqual([]);
+    }
+  });
+
+  test('given twice, marks once, and its client and endpoints have both', async () => {
+    const p = project({ 'src/App.jsx': APP });
+    const compiler = compilerFor(p.root, 'development');
+    new DeicticPlugin(added).apply(compiler);
+    const app = new DeicticPlugin({ plugins: [pin] });
+    app.apply(compiler);
+    const rules = compiler.options.module.rules as Rule[];
+    expect(rules).toHaveLength(1);
+    both(readFileSync(rules[0]!.use[0]!.options.client!, 'utf8'));
+    const server = await served(app.middleware);
+    try {
+      expect((await fetch(`${server.url}/__deictic/history`)).status).toBe(200);
+    } finally {
+      server.close();
     }
   });
 
@@ -202,6 +230,18 @@ describe('Next', () => {
     expect(Object.fromEntries(launch.searchParams)).toEqual({ file: join(p.root, 'app/page.tsx'), line1: '1', column1: '30' });
   });
 
+  test('wrapped twice, has its rules and rewrite once, and its client has both', async () => {
+    const p = project({ 'app/page.tsx': APP });
+    const next = await withDeictic<Config>(withDeictic<Config>({}, { ...added, root: p.root }), { root: p.root, plugins: [pin] })(
+      'phase-development-server',
+      { defaultConfig: {} },
+    );
+    const rules = next.turbopack!.rules!['*.tsx'] as Rule[];
+    expect(rules).toHaveLength(2);
+    both(readFileSync(rules[0]!.loaders[0]!.options.client!, 'utf8'));
+    expect((await next.rewrites!()).beforeFiles).toHaveLength(1);
+  });
+
   test('leaves a build as it is, and the loader leaves dependencies and files outside the project alone', async () => {
     const config = { reactStrictMode: true };
     expect(await withDeictic(config)('phase-production-build', { defaultConfig: config })).toBe(config);
@@ -235,6 +275,16 @@ describe('Bun', () => {
     expect((await route(new Request('http://localhost:3000/__deictic/history'))).status).toBe(200);
   });
 
+  test('named twice in bunfig, marks once, and its client has both', async () => {
+    const p = project({ 'src/App.tsx': APP });
+    const theirs = bun({ ...added, root: p.root });
+    const app = bun({ root: p.root, plugins: [pin] });
+    const onLoad = setUp(theirs, {})!;
+    expect(setUp(app, {})).toBeUndefined();
+    await onLoad({ path: join(p.root, 'src/App.tsx'), side: 'client' });
+    both(readFileSync(join(p.root, '.deictic/client.js'), 'utf8'));
+  });
+
   test('does nothing in a build', () => {
     const p = project({ 'src/App.tsx': APP });
     expect(setUp(bun({ root: p.root }), { entrypoints: ['src/App.tsx'] })).toBeUndefined();
@@ -265,6 +315,34 @@ describe('Vite', () => {
       await server.close();
     }
   }, 30_000);
+});
+
+describe('Vite, given deictic twice', () => {
+  test('the first marks, with every plugin given in its client', async () => {
+    const p = project({ 'src/App.tsx': APP });
+    const server = await createVite({
+      root: p.root,
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, ws: false },
+      optimizeDeps: { noDiscovery: true, include: [] },
+      plugins: [vite(added), vite({ plugins: [pin] })],
+    });
+    try {
+      const code = (await server.transformRequest('/src/App.tsx'))!.code;
+      expect(code.match(/"data-deictic": "src\/App.tsx:1:26"/g)).toHaveLength(1);
+      expect(code.match(/__x00__deictic\/client/g)).toHaveLength(1);
+      const client = await server.environments.client.pluginContainer.load('\0deictic/client');
+      both(typeof client === 'string' ? client : String(client?.code));
+    } finally {
+      await server.close();
+    }
+  }, 30_000);
+
+  test('two that set the shortcut two ways are refused', () => {
+    expect(() => merge([{ shortcut: { modifiers: ['Alt'] } }, { shortcut: { modifiers: ['Shift'] } }])).toThrow(/shortcut set two ways/);
+    expect(merge([{ shortcut: false, defaults: true }, { shortcut: { modifiers: ['Shift'] } }]).shortcut).toEqual({ modifiers: ['Shift'] });
+  });
 });
 
 describe('Astro', () => {

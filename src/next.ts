@@ -14,6 +14,11 @@
  *
  * Both bundlers' rules are always set, as the config can't tell which will run: Next refuses a Turbopack
  * build whose config has a `webpack` key only where it has no `turbopack` one, and ours always does.
+ *
+ * A config may be wrapped more than once: by the app, and by a package that adds its own plugin (`defaults`), as
+ * `withProsebook` does. The config each returns carries the options it was given (`GIVEN`), so the next one out adds
+ * no rules of its own: it writes the client again with all of them merged (`merge`), and the endpoints, made at the
+ * first request, load them all.
  */
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -22,7 +27,7 @@ import { resolve } from 'node:path';
 import type { ServerPlugin } from './index.ts';
 import type { LoaderOptions } from './loader.ts';
 import { endpoints, nodeMiddleware, redirect } from './tools/endpoints.ts';
-import { beside, type DeicticOptions, prepare, writeClient } from './tools/integration.ts';
+import { beside, type DeicticOptions, merge, prepare, writeClient } from './tools/integration.ts';
 import { JSX } from './tools/locate.ts';
 
 export interface DeicticNextOptions extends DeicticOptions {
@@ -45,6 +50,10 @@ const GLOBS = ['*.tsx', '*.jsx', '*.js'];
 
 // Next loads its config more than once in a process: one endpoints server per project is enough.
 const serving = new Map<string, Promise<number>>();
+// Each project's plugins as its config last merged them, for its endpoints to load at their first request.
+const loaded = new Map<string, ServerPlugin[]>();
+/** On a config a `withDeictic` returned: the options of every one it went through. */
+const GIVEN = Symbol.for('deictic.given');
 
 /**
  * Wraps the Next config: `export default withDeictic({ ... }, { plugins: [tailwind()] })`. Takes the
@@ -55,18 +64,25 @@ export function withDeictic<C extends object>(
   options: DeicticNextOptions = {},
 ): (phase: string, context: { defaultConfig: C }) => Promise<C> {
   // Now, so a wrong set of plugins stops the dev server as it starts, rather than the page.
-  const { plugins, shortcut } = prepare(options);
+  prepare(options);
   return async (phase, context) => {
     const resolved = typeof next === 'function' ? await next(phase, context) : next;
     if (phase !== DEV) return resolved;
-    const root = resolve(options.root ?? process.cwd());
+    const before = (resolved as { [GIVEN]?: DeicticNextOptions[] })[GIVEN];
+    const given = [...(before ?? []), options];
+    const merged = given.length === 1 ? options : merge(given);
+    const { plugins, shortcut } = prepare(merged);
+    const root = resolve(merged.root ?? process.cwd());
     const base = `${(resolved as { basePath?: string }).basePath ?? ''}/`;
     const client = writeClient(root, plugins, base, shortcut);
+    loaded.set(root, plugins);
+    // Wrapped already: the rules and the rewrite are there, and only the client and the plugins change.
+    if (before !== undefined) return { ...resolved, [GIVEN]: given };
     const rules: [string, Rule][] = GLOBS.flatMap((glob) => [
       [glob, { condition: { all: ['browser', { not: 'foreign' }] }, loaders: [{ loader: loaderPath, options: { root, client } }] }],
       [glob, { condition: { all: [{ not: 'browser' }, { not: 'foreign' }] }, loaders: [{ loader: loaderPath, options: { root } }] }],
     ]);
-    return withRewrite(withWebpack(withRules(resolved, rules), root, client), await serve(root, plugins, base));
+    return { ...withRewrite(withWebpack(withRules(resolved, rules), root, client), await serve(root, base)), [GIVEN]: given };
   };
 }
 
@@ -102,20 +118,23 @@ function withRewrite<C extends object>(resolved: C, port: number): C {
 }
 
 /** Serves the endpoints on a free local port, for as long as the process lives. */
-function serve(root: string, plugins: ServerPlugin[], base: string): Promise<number> {
+function serve(root: string, base: string): Promise<number> {
   const running = serving.get(root);
   if (running !== undefined) return running;
-  const handle = endpoints({
-    root,
-    plugins,
-    // Rewritten from under the base, but served at the root of their own server.
-    base: '/',
-    open: (path, { line, column }) =>
-      redirect(`${base}__nextjs_launch-editor?${new URLSearchParams({ file: path, line1: String(line), column1: String(column) })}`),
-  });
-  const middleware = nodeMiddleware(handle);
+  let middleware: ReturnType<typeof nodeMiddleware> | undefined;
+  const made = () =>
+    (middleware ??= nodeMiddleware(
+      endpoints({
+        root,
+        plugins: loaded.get(root) ?? [],
+        // Rewritten from under the base, but served at the root of their own server.
+        base: '/',
+        open: (path, { line, column }) =>
+          redirect(`${base}__nextjs_launch-editor?${new URLSearchParams({ file: path, line1: String(line), column1: String(column) })}`),
+      }),
+    ));
   const server = createServer((req, res) =>
-    middleware(req, res, () => {
+    made()(req, res, () => {
       res.statusCode = 404;
       res.end();
     }),

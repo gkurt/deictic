@@ -82,6 +82,12 @@ deictic({
 | ---------- | -------------------------------------------------------------------------------------------- |
 | `plugins`  | The plugins to load. None by default.                                                        |
 | `shortcut` | `{ modifiers, button }`: held to point, pressed to open. Alt and the left button by default. |
+| `defaults` | For a package that adds deictic with its own plugin: these options give way to the app's.    |
+
+A build may have deictic more than once: the app's, and one a package adds with its own plugin, as prosebook's
+integrations add its copy inspector. They become one: every plugin, each name once, and every other option from the
+first that sets it. One given with `defaults: true` comes after the app's, so the app's shortcut and its own plugin
+of the same name win; two others that set an option two ways stop the dev server.
 
 The button is `'left'`, `'middle'` or `'right'`: `shortcut: { modifiers: ['Alt'], button: 'right' }` opens on Alt
 and a right-click, which the browser's own menu then doesn't answer. A plugin's own `shortcut` is the same, for its

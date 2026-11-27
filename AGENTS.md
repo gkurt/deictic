@@ -56,6 +56,13 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   used last; a plugin's (its factory's `shortcut` option, none by default) at its tab. `checkShortcuts`
   orders and checks them, deictic's first as `OWN`, refusing two alike: integrations call it as they
   start, so a wrong one fails the dev server. `gestureOf` is what the overlay tests events with.
+- `merge` (`src/tools/integration.ts`): a build given deictic more than once (the app's, and a package's that adds its
+  own plugin with `defaults: true`, as prosebook's integrations do) runs it once with every instance's options merged:
+  each plugin name once, the first given winning, `defaults` instances last; two others setting an option two ways throw.
+  Each integration finds its instances its own way: Vite's in `config.plugins` (each carries its options in `api.deictic`;
+  the first leads, the rest do nothing), webpack's per compiler (`appliedTo`: the first adds the rule and middleware, each
+  writes the client again), Next's on the config a `withDeictic` returns (`GIVEN`: the next one out adds no rules), Bun's
+  per process and root (`made`: the first set up marks; the client and the endpoints are made when first needed).
 - `src/tools/plugins.ts`: `checkPlugins(plugins, own)` (names lowercase and unique, `needs` loaded, a
   shortcut only with a `client`, shortcuts with deictic's own) as an integration starts; `setUp` runs every server `setup` at once and
   answers the shared context, whose `use` reads lazily: one that throws is reported (`setup:<name>`) and has no API, and

@@ -25,6 +25,39 @@ export interface DeicticOptions {
    * `false` for none, leaving only plugins' own shortcuts.
    */
   shortcut?: Shortcut | false;
+  /**
+   * For a package that adds its own plugin to the bundler with deictic (prosebook does): these options give way to
+   * those of any other deictic in the same build, which merges them in, so the app's own `deictic()` decides the
+   * shortcut and its plugin of the same name is the one loaded.
+   */
+  defaults?: boolean;
+}
+
+/**
+ * Every deictic one build was given, as one: the app's and those packages added (`defaults`). The plugins of all of
+ * them, each name once, the first given winning, those of an instance with `defaults` after the rest's; any other
+ * option from the first that sets it, the same way. Two that aren't `defaults` setting one differently is an error,
+ * as neither can be the one meant.
+ */
+export function merge<O extends DeicticOptions>(instances: readonly O[]): O {
+  const ordered = [...instances.filter((o) => o.defaults !== true), ...instances.filter((o) => o.defaults === true)];
+  const plugins = new Map<string, ServerPlugin>();
+  const merged: Record<string, unknown> = {};
+  const setBy: Record<string, O> = {};
+  for (const options of ordered) {
+    for (const plugin of options.plugins ?? []) if (!plugins.has(plugin.name)) plugins.set(plugin.name, plugin);
+    for (const [key, value] of Object.entries(options)) {
+      if (key === 'plugins' || key === 'defaults' || value === undefined) continue;
+      const first = setBy[key];
+      if (first === undefined) {
+        merged[key] = value;
+        setBy[key] = options;
+      } else if (first.defaults !== true && options.defaults !== true && JSON.stringify(merged[key]) !== JSON.stringify(value)) {
+        throw new Error(`deictic: the build has deictic twice, with ${key} set two ways: set it in one of them only`);
+      }
+    }
+  }
+  return { ...merged, plugins: [...plugins.values()] } as O;
 }
 
 /** The options with their defaults, checked now, so a wrong set stops the dev server as it starts, not the page. */

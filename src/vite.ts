@@ -7,13 +7,16 @@
  * line moves and frameworks that render their own HTML get it too. The endpoints are middleware on
  * Vite's server, and a place opens through Vite's own `/__open-in-editor`, so the editor is whichever
  * Vite already launches. A write reaches the page through Vite's usual update for the file.
+ *
+ * A build may have deictic more than once: the app's, and one a package added with its own plugin (`defaults`).
+ * The first in Vite's list does the work with all of their options merged (`merge`); the others do nothing.
  */
 import { resolve } from 'node:path';
 
 import type { Plugin } from 'vite';
 
 import { endpoints, nodeMiddleware, redirect } from './tools/endpoints.ts';
-import { clientModule, type DeicticOptions, mark, markAstro, prepare } from './tools/integration.ts';
+import { clientModule, type DeicticOptions, mark, markAstro, merge, prepare } from './tools/integration.ts';
 
 export { clientModule, type DeicticOptions };
 
@@ -31,23 +34,40 @@ export interface ViteOptions extends DeicticOptions {
 export const CLIENT = 'virtual:deictic/client';
 const CLIENT_ID = '\0deictic/client';
 
-export function deictic(options: ViteOptions = {}): Plugin {
-  const { plugins, shortcut } = prepare(options);
+/** What each deictic in Vite's list carries, for the first of them to find the others by. */
+interface Carried {
+  deictic: { options: ViteOptions; id: symbol };
+}
+
+const carriedBy = (plugin: { api?: unknown }) => (plugin.api as Partial<Carried> | undefined)?.deictic;
+
+export function deictic(given: ViteOptions = {}): Plugin {
+  const id = Symbol('deictic');
+  let options = given;
+  let { plugins, shortcut } = prepare(given);
+  let leading = true;
   let root = '';
   let base = '/';
   let building = false;
   return {
     name: 'deictic',
     enforce: 'pre',
-    apply: (_, { command }) => command === 'serve' || options.standalone !== undefined,
+    apply: (_, { command }) => command === 'serve' || given.standalone !== undefined,
+    api: { deictic: { options: given, id } } satisfies Carried,
     // The client is the app's to bundle as it changes, not a dependency to prebundle once.
     config: () => ({ optimizeDeps: { exclude: ['deictic'] } }),
     configResolved(config) {
       root = config.root;
       base = config.base;
       building = config.command === 'build';
+      const all = config.plugins.flatMap((p) => carriedBy(p) ?? []);
+      leading = all[0]?.id === id;
+      if (!leading || all.length === 1) return;
+      options = merge(all.map((c) => c.options));
+      ({ plugins, shortcut } = prepare(options));
     },
     configureServer(server) {
+      if (!leading) return;
       const handle = endpoints({
         root,
         plugins,
@@ -56,9 +76,9 @@ export function deictic(options: ViteOptions = {}): Plugin {
       });
       server.middlewares.use(nodeMiddleware(handle));
     },
-    resolveId: (id) => (id === CLIENT ? CLIENT_ID : undefined),
-    load(id) {
-      if (id !== CLIENT_ID) return undefined;
+    resolveId: (source) => (leading && source === CLIENT ? CLIENT_ID : undefined),
+    load(module) {
+      if (!leading || module !== CLIENT_ID) return undefined;
       // Only a build's page asks the module: the dev server is there to answer.
       const server = building && options.standalone !== undefined ? resolve(root, options.standalone).replaceAll('\\', '/') : undefined;
       return clientModule(plugins, base, shortcut, server);
@@ -67,10 +87,11 @@ export function deictic(options: ViteOptions = {}): Plugin {
       // First of all, not only first of the `pre` plugins: the React Compiler (`react({ compiler: true })`) is
       // `pre` too and compiles the JSX away, so after it there'd be no element to mark, wherever deictic is listed.
       order: 'pre',
-      handler(code, id) {
-        const [path = ''] = id.split('?');
+      handler(code, module) {
+        if (!leading) return undefined;
+        const [path = ''] = module.split('?');
         // An `.astro` component itself, not the styles and scripts Astro loads from it by a query.
-        if (path.endsWith('.astro')) return id === path ? markAstro(code, path, root) : undefined;
+        if (path.endsWith('.astro')) return module === path ? markAstro(code, path, root) : undefined;
         const browser = this.environment.config.consumer === 'client';
         return mark(code, path, root, browser ? `\nimport ${JSON.stringify(CLIENT)};\n` : '');
       },

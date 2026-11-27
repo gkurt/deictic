@@ -15,13 +15,18 @@
  *   // server.ts
  *   import tools from './deictic.ts';
  *   Bun.serve({ routes: { ...tools.routes, '/*': index }, development: true });
+ *
+ * bunfig may name deictic more than once: the app's, and a package's that adds its own plugin (`defaults`), as
+ * prosebook's does. Each made in the process for a root is kept (`made`), the first set up marks the modules, and
+ * the client and the endpoints, made when first needed, load all of their options merged (`merge`); any of them
+ * has the routes.
  */
 import { resolve } from 'node:path';
 
 import type { BunPlugin } from 'bun';
 
 import { endpoints } from './tools/endpoints.ts';
-import { type DeicticOptions, importOf, mark, prepare, writeClient } from './tools/integration.ts';
+import { type DeicticOptions, importOf, mark, merge, prepare, writeClient } from './tools/integration.ts';
 import { JSX } from './tools/locate.ts';
 
 export interface DeicticBunOptions extends DeicticOptions {
@@ -34,15 +39,28 @@ export type DeicticBunPlugin = BunPlugin & {
   routes: Record<string, (req: Request) => Promise<Response>>;
 };
 
+/** Every deictic made in the process, by its root: what it was given, whether one set up its marking, and its endpoints. */
+interface Made {
+  given: DeicticBunOptions[];
+  marking: boolean;
+  handle?: (req: Request) => Promise<Response | undefined>;
+}
+
+const made = new Map<string, Made>();
+
 export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
   // Now, so a wrong set of plugins stops the dev server as it starts, rather than the page.
-  const { plugins, shortcut } = prepare(options);
+  prepare(options);
   const root = resolve(options.root ?? process.cwd());
-  let handle: ((req: Request) => Promise<Response | undefined>) | undefined;
+  let all = made.get(root);
+  if (all === undefined) made.set(root, (all = { given: [], marking: false }));
+  all.given.push(options);
+  const shared = all;
+  const merged = () => prepare(shared.given.length === 1 ? shared.given[0]! : merge(shared.given));
   const route = async (req: Request) => {
-    handle ??= endpoints({
+    shared.handle ??= endpoints({
       root,
-      plugins,
+      plugins: merged().plugins,
       open: (path, { line, column }) => {
         try {
           Bun.openInEditor(path, { line, column });
@@ -54,7 +72,7 @@ export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
         }
       },
     });
-    return (await handle(req)) ?? new Response(null, { status: 404 });
+    return (await shared.handle(req)) ?? new Response(null, { status: 404 });
   };
 
   return {
@@ -62,14 +80,20 @@ export function deictic(options: DeicticBunOptions = {}): DeicticBunPlugin {
     routes: { '/__deictic/*': route },
     setup(build) {
       // A build names its entry points; the dev server's bundler doesn't.
-      if ('entrypoints' in build.config) return;
-      const client = writeClient(root, plugins, '/', shortcut);
+      if ('entrypoints' in build.config || shared.marking) return;
+      shared.marking = true;
+      let client: string | undefined;
       // Bun names the side it loads a module for (undocumented, and not in Bun's types); the dev server's is the browser's.
       const forBrowser = (args: object) => !('side' in args) || args.side === 'client';
       build.onLoad({ filter: JSX }, async (args) => {
         // A dependency's is left to Bun, unread.
         if (/[\\/]node_modules[\\/]/.test(args.path)) return undefined;
         const code = await Bun.file(args.path).text();
+        // Written as the first module loads, once bunfig's every deictic has been made.
+        if (client === undefined) {
+          const { plugins, shortcut } = merged();
+          client = writeClient(root, plugins, '/', shortcut);
+        }
         const marked = mark(code, args.path, root, forBrowser(args) ? importOf(client, args.path) : '');
         if (marked === undefined) return undefined;
         return { contents: marked.code, loader: args.path.endsWith('tsx') ? 'tsx' : 'jsx' };

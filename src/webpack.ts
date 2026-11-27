@@ -9,15 +9,17 @@
  * webpack-dev-server and Rspack's both read), and a place opens with `launch-editor`, as webpack has no
  * launcher of its own. Where the dev server is started by hand, or by Rsbuild, `middleware` is the
  * endpoints to mount there.
+ *
+ * A compiler may be given deictic more than once: the app's, and one a package applied with its own plugin
+ * (`defaults`). The first applied adds the rule and the middleware, and every one writes the client again with all
+ * of their options merged (`merge`), so the last applied writes it whole before the compiler runs.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import type { ServerPlugin } from './index.ts';
 import type { LoaderOptions } from './loader.ts';
-import type { Shortcut } from './shortcut.ts';
 import { openInEditor } from './tools/editor.ts';
 import { endpoints, nodeMiddleware } from './tools/endpoints.ts';
-import { beside, type DeicticOptions, prepare, writeClient } from './tools/integration.ts';
+import { beside, type DeicticOptions, merge, prepare, writeClient } from './tools/integration.ts';
 import { JSX } from './tools/locate.ts';
 
 export interface DeicticWebpackOptions extends DeicticOptions {
@@ -47,39 +49,69 @@ const loaderPath = beside(import.meta.url, 'loader');
 const forBrowser = (target: Compiler['options']['target']) =>
   target === undefined || [target].flat().some((t) => t !== false && !/^(async-)?node|^electron-main|^electron-preload/.test(t));
 
+/** Every deictic one compiler was given, and the first of them, which serves the endpoints. */
+interface Applied {
+  given: DeicticWebpackOptions[];
+  first: DeicticPlugin;
+}
+
+const appliedTo = new WeakMap<Compiler, Applied>();
+
 export class DeicticPlugin {
   readonly #options: DeicticWebpackOptions;
-  readonly #plugins: ServerPlugin[];
-  readonly #shortcut: Shortcut | false | undefined;
+  #applied: Applied | undefined;
   #middleware: Middleware | undefined;
   #root = '';
 
   constructor(options: DeicticWebpackOptions = {}) {
     this.#options = options;
     // Now, so a wrong set of plugins stops the dev server as it starts, rather than the page.
-    ({ plugins: this.#plugins, shortcut: this.#shortcut } = prepare(options));
+    prepare(options);
+  }
+
+  /** The options of every deictic the compiler was given, merged. */
+  #merged(): DeicticWebpackOptions {
+    const given = this.#applied?.given ?? [this.#options];
+    return given.length === 1 ? given[0]! : merge(given);
   }
 
   /** The endpoints as Node middleware, once the plugin is applied: for a dev server started by hand. */
   get middleware(): Middleware {
+    const applied = this.#applied;
+    if (applied === undefined) throw new Error('deictic: give the plugin to the compiler before mounting its middleware');
+    if (applied.first !== this) return applied.first.middleware;
     if (this.#middleware !== undefined) return this.#middleware;
-    if (this.#root === '') throw new Error('deictic: give the plugin to the compiler before mounting its middleware');
-    const root = this.#root;
-    const handle = endpoints({
-      root,
-      plugins: this.#plugins,
-      base: this.#options.base ?? '/',
-      open: (path, loc) => openInEditor(path, loc),
+    let handle: Middleware | undefined;
+    // Made at the first request, once every deictic of the compiler has been applied.
+    return (this.#middleware = (req, res, next) => {
+      if (handle === undefined) {
+        const merged = this.#merged();
+        handle = nodeMiddleware(
+          endpoints({
+            root: this.#root,
+            plugins: prepare(merged).plugins,
+            base: merged.base ?? '/',
+            open: (path, loc) => openInEditor(path, loc),
+          }),
+        );
+      }
+      handle(req, res, next);
     });
-    return (this.#middleware = nodeMiddleware(handle));
   }
 
   apply(compiler: Compiler): void {
     // Development only: a build without a mode is webpack's production one.
     if (compiler.options.mode !== 'development') return;
-    this.#root = this.#options.root ?? compiler.context;
+    let applied = appliedTo.get(compiler);
+    if (applied === undefined) appliedTo.set(compiler, (applied = { given: [], first: this }));
+    applied.given.push(this.#options);
+    this.#applied = applied;
+    const merged = this.#merged();
+    const { plugins, shortcut } = prepare(merged);
+    this.#root = merged.root ?? compiler.context;
     const browser = forBrowser(compiler.options.target);
-    const client = browser ? writeClient(this.#root, this.#plugins, this.#options.base ?? '/', this.#shortcut) : undefined;
+    const client = browser ? writeClient(this.#root, plugins, merged.base ?? '/', shortcut) : undefined;
+    if (applied.first !== this) return;
     const options: LoaderOptions = { root: this.#root, ...(client === undefined ? {} : { client }) };
     // First, and `pre`, so it sees the source as written whatever the app's own rules do.
     compiler.options.module.rules.unshift({
