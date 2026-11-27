@@ -32,9 +32,14 @@ export function checkPlugins(plugins: readonly ServerPlugin[], own?: Shortcut | 
  * op, never in `setup` itself. One that fails is reported and has no API: the others go on, so one of them
  * can tell of it (tasks, on the board).
  */
-export async function setUp(root: string, plugins: readonly ServerPlugin[], report: Report): Promise<ServerContext> {
+export async function setUp(
+  root: string,
+  plugins: readonly ServerPlugin[],
+  report: Report,
+  onClose: ServerContext['onClose'],
+): Promise<ServerContext> {
   const apis = new Map<string, unknown>();
-  const context: ServerContext = { root, use: (name) => apis.get(name) as never, report };
+  const context: ServerContext = { root, use: (name) => apis.get(name) as never, report, onClose };
   await Promise.all(
     plugins.map(async (p) => {
       if (p.setup === undefined) return;

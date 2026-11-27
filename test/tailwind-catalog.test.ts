@@ -83,7 +83,7 @@ test('a project without Tailwind answers nothing, and reports it once', async ()
   const p = project({ 'package.json': '{}' });
   const said: Problem[] = [];
   const { routes } = tailwind();
-  const context = { root: p.root, use: () => undefined, report: (problem: Problem) => said.push(problem) };
+  const context = { root: p.root, use: () => undefined, report: (problem: Problem) => said.push(problem), onClose: () => {} };
   const info = await routes!.info!(
     new Request('http://localhost/', { method: 'POST', body: JSON.stringify({ classes: ['flex'] }) }),
     context,

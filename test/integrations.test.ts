@@ -55,15 +55,23 @@ function load(options: LoaderOptions, resourcePath: string, source: string) {
 
 describe('webpack and Rspack', () => {
   type Rule = { test: RegExp; enforce: string; use: { loader: string; options: LoaderOptions }[] };
-  const compilerFor = (root: string, mode: string | undefined, target?: string) => ({
-    context: root,
-    options: { mode, target, module: { rules: [] as unknown[] }, devServer: undefined as never },
-  });
+  const compilerFor = (root: string, mode: string | undefined, target?: string) => {
+    const shutdown: (() => Promise<void>)[] = [];
+    return {
+      context: root,
+      hooks: { shutdown: { tapPromise: (_: string, run: () => Promise<void>) => void shutdown.push(run) } },
+      options: { mode, target, module: { rules: [] as unknown[] }, devServer: undefined as never },
+      // What webpack's `close()` runs.
+      close: () => Promise.all(shutdown.map((run) => run())),
+    };
+  };
 
   test('marks JSX first, imports the written client in the browser, and serves the endpoints in front', async () => {
     const p = project({ 'src/App.jsx': APP });
     const compiler = compilerFor(p.root, 'development');
-    new DeicticPlugin({ plugins: [pin] }).apply(compiler);
+    let closed = 0;
+    const closing = definePlugin({ name: 'closing', setup: ({ onClose }) => onClose(() => void closed++) });
+    new DeicticPlugin({ plugins: [pin, closing] }).apply(compiler);
     const [rule] = compiler.options.module.rules as Rule[];
     expect(rule!.enforce).toBe('pre');
     expect(rule!.test.test('src/App.tsx')).toBe(true);
@@ -81,6 +89,8 @@ describe('webpack and Rspack', () => {
     try {
       expect((await fetch(`${server.url}/__deictic/history`)).status).toBe(200);
       expect(await (await fetch(`${server.url}/somewhere`)).text()).toBe('not ours');
+      await compiler.close();
+      expect(closed).toBe(1);
     } finally {
       server.close();
     }
@@ -315,6 +325,22 @@ describe('Vite', () => {
       await server.close();
     }
   }, 30_000);
+
+  test("runs what the plugins' setups left for the close as the dev server closes", async () => {
+    const p = project({ 'src/App.tsx': APP });
+    let closed = 0;
+    const closing = definePlugin({ name: 'closing', setup: ({ onClose }) => onClose(() => void closed++) });
+    const server = await createVite({
+      root: p.root,
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, ws: false },
+      optimizeDeps: { noDiscovery: true, include: [] },
+      plugins: [vite({ plugins: [closing] })],
+    });
+    await server.close();
+    expect(closed).toBe(1);
+  });
 });
 
 describe('Vite, given deictic twice', () => {

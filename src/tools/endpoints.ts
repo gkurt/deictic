@@ -46,14 +46,20 @@ const scopeOf = (plugin: string, { file, line, column }: Loc): Scope => ({ plugi
 const scopeIn = ({ plugin, target }: Partial<Body>) =>
   plugin === undefined || target === undefined ? undefined : scopeOf(plugin, target.loc);
 
-/** Answers deictic's requests, and nothing for any other path. */
-export function endpoints({ root, plugins, base = '/', open, history = new History(root, { plugins }) }: EndpointOptions) {
+/** deictic's requests answered, and nothing for any other path; `close` runs what the plugins' setups left to run on close. */
+export interface Endpoints {
+  (req: Request): Promise<Response | undefined>;
+  close(): Promise<void>;
+}
+
+export function endpoints({ root, plugins, base = '/', open, history = new History(root, { plugins }) }: EndpointOptions): Endpoints {
   const byName = new Map(plugins.map((p) => [p.name, p]));
   const prefix = `${base}__deictic/`;
   // What goes wrong that nothing in the page caused: said, and handed to the plugins that hear of it once set up.
   const report = reporter(plugins, () => ready);
   // Started now, awaited by every request: a plugin's API is there before anything asks for it.
-  const ready = setUp(root, plugins, report);
+  const closing: (() => unknown)[] = [];
+  const ready = setUp(root, plugins, report, (callback) => void closing.push(callback));
   const gone = missingProblem(root, plugins);
   if (gone !== undefined) report(gone);
 
@@ -104,7 +110,7 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
     return next;
   };
 
-  return async (req: Request): Promise<Response | undefined> => {
+  const handle = async (req: Request): Promise<Response | undefined> => {
     const url = new URL(req.url);
     if (!url.pathname.startsWith(prefix)) return undefined;
     const route = url.pathname.slice(prefix.length);
@@ -162,6 +168,19 @@ export function endpoints({ root, plugins, base = '/', open, history = new Histo
       return Response.json({ problem: e instanceof Error ? (e.stack ?? e.message) : String(e) }, { status: 500 });
     }
   };
+  // Once, however many times the dev server says it closes (Vite, once per environment); the last set up, first.
+  let closed: Promise<void> | undefined;
+  const close = () =>
+    (closed ??= ready.then(async () => {
+      for (const callback of closing.toReversed()) {
+        try {
+          await callback();
+        } catch (e) {
+          console.error(`deictic: a plugin failed as the dev server closed: ${messageOf(e)}`);
+        }
+      }
+    }));
+  return Object.assign(handle, { close });
 }
 
 /** A redirect within the page's origin, to a launcher the dev server answers itself. */

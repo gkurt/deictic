@@ -218,6 +218,13 @@
         "default": "./dist/react/client.js"
       }
     },
+    "./setup": {
+      "deictic@dev": "./src/setup.ts",
+      "default": {
+        "types": "./dist/setup.d.ts",
+        "default": "./dist/setup.js"
+      }
+    },
     "./recommended": {
       "deictic@dev": "./src/plugins/recommended/index.ts",
       "default": {

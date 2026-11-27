@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 
 import type { Plugin } from 'vite';
 
-import { endpoints, nodeMiddleware, redirect } from './tools/endpoints.ts';
+import { type Endpoints, endpoints, nodeMiddleware, redirect } from './tools/endpoints.ts';
 import { clientModule, type DeicticOptions, mark, markAstro, merge, prepare } from './tools/integration.ts';
 
 export { clientModule, type DeicticOptions };
@@ -46,6 +46,7 @@ export function deictic(given: ViteOptions = {}): Plugin {
   let options = given;
   let { plugins, shortcut } = prepare(given);
   let leading = true;
+  let handle: Endpoints | undefined;
   let root = '';
   let base = '/';
   let building = false;
@@ -68,13 +69,17 @@ export function deictic(given: ViteOptions = {}): Plugin {
     },
     configureServer(server) {
       if (!leading) return;
-      const handle = endpoints({
+      handle = endpoints({
         root,
         plugins,
         base,
         open: (path, { line, column }) => redirect(`${base}__open-in-editor?${new URLSearchParams({ file: `${path}:${line}:${column}` })}`),
       });
       server.middlewares.use(nodeMiddleware(handle));
+    },
+    // Vite's dev server runs it as it closes, once per environment, and a build at its end, with no endpoints.
+    async closeBundle() {
+      await handle?.close();
     },
     resolveId: (source) => (leading && source === CLIENT ? CLIENT_ID : undefined),
     load(module) {

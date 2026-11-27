@@ -9,16 +9,13 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
-import MagicString from 'magic-string';
-import { type Expression, type ObjectExpression, parseSync, type Program } from 'oxc-parser';
-
 import { deicticRecommended } from '#src/plugins/recommended/index.ts';
+import { addToConfig } from '#src/setup.ts';
 
 import { installCommand, installed, packageManager, readJson, runnerOf } from '#src/tools/packages.ts';
 
 import { fail } from './board.ts';
 import { addToBunfig, addToServer, BY_HAND, MODULE, PLUGIN, serverOf } from './bun.ts';
-import { addFirst, addImports } from './edit.ts';
 
 export type Bundler = 'next' | 'astro' | 'vite' | 'rspack' | 'webpack' | 'bun';
 
@@ -120,122 +117,21 @@ export function packagesFor(bundler: Bundler | undefined, root: string): string[
   return ['deictic', ...plugins, ...(bundler === 'webpack' || bundler === 'rspack' ? ['launch-editor'] : [])];
 }
 
-type Node = Expression | ObjectExpression;
-
 /**
- * The object an expression comes to: through `defineConfig(…)`, `(…)`, `satisfies`, a function's return and a top-level
- * `const`. Not through another call: in `mergeConfig(base, {…})` or webpack-merge's `merge(common, {…})` the first
- * argument is a base the project may build with too, and the plugin isn't the base's.
+ * The config with deictic added, or nothing where it can't tell where: first in its list (`plugins`, `integrations`),
+ * since a plugin before it that changes a module (both `pre` under Vite) leaves the page's marks pointing at its code,
+ * not the file, or the config wrapped (Next's).
  */
-function objectOf(node: Node | null | undefined, program: Program, depth = 0): ObjectExpression | undefined {
-  if (node == null || depth > 8) return undefined;
-  const next = (n: Node | null | undefined) => objectOf(n, program, depth + 1);
-  if (node.type === 'ObjectExpression') return node;
-  if (node.type === 'ParenthesizedExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
-    return next(node.expression);
-  if (node.type === 'CallExpression') {
-    const { callee } = node;
-    const named = (callee.type === 'Identifier' ? callee : callee.type === 'MemberExpression' ? callee.property : undefined) as
-      { type: string; name?: string } | undefined;
-    const [first] = node.arguments;
-    if (named?.name !== 'defineConfig' || first === undefined || first.type === 'SpreadElement') return undefined;
-    return next(first);
-  }
-  if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
-    const body = node.body;
-    if (body === null) return undefined;
-    if (body.type !== 'BlockStatement') return next(body);
-    const returned = body.body.findLast((s) => s.type === 'ReturnStatement');
-    return returned?.type === 'ReturnStatement' ? next(returned.argument) : undefined;
-  }
-  if (node.type !== 'Identifier') return undefined;
-  for (const statement of program.body) {
-    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-    if (declaration?.type !== 'VariableDeclaration') continue;
-    const found = declaration.declarations.find((d) => d.id.type === 'Identifier' && d.id.name === node.name);
-    if (found !== undefined) return next(found.init);
-  }
-  return undefined;
-}
-
-/** The config's exported value: `export default …` or `module.exports = …`, and whether it's CommonJS. */
-function exportedOf(program: Program): { value: Expression; commonjs: boolean } | undefined {
-  for (const statement of program.body) {
-    if (statement.type === 'ExportDefaultDeclaration') {
-      const value = statement.declaration;
-      return value.type.endsWith('Declaration') && value.type !== 'FunctionDeclaration'
-        ? undefined
-        : { value: value as Expression, commonjs: false };
-    }
-    if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'AssignmentExpression') continue;
-    const { left, right } = statement.expression;
-    const exports =
-      left.type === 'MemberExpression' &&
-      left.object.type === 'Identifier' &&
-      left.object.name === 'module' &&
-      left.property.type === 'Identifier' &&
-      left.property.name === 'exports';
-    if (exports) return { value: right, commonjs: true };
-  }
-  return undefined;
-}
-
-/**
- * The config with deictic added, or nothing where it can't tell where: deictic's import beside the config's, and its
- * plugin first in the list (`plugins`, `integrations`), as its marks count lines and columns in the code it's given, or the config wrapped (Next's). Written in the config's quotes,
- * semicolons and line endings.
- */
-export function addToConfig(bundler: Exclude<Bundler, 'bun'>, file: string, code: string): string | undefined {
+export function addDeictic(bundler: Exclude<Bundler, 'bun'>, file: string, code: string): string | undefined {
   const setup = SETUPS[bundler];
-  const { program, errors } = parseSync(file, code, { preserveParens: false });
-  if (errors.length > 0) return undefined;
-  const exported = exportedOf(program);
-  if (exported === undefined) return undefined;
-  const out = new MagicString(code);
-
-  if (setup.wrap) {
-    out.appendLeft(exported.value.start, `${setup.name}(`);
-    out.appendRight(exported.value.end, `, ${setup.value})`);
-  } else {
-    const object = objectOf(exported.value, program);
-    if (object === undefined || !addTo(out, code, object, setup.list!, setup.value)) return undefined;
-  }
-
-  const lines: [string, string][] = [
-    ['{ deicticRecommended }', 'deictic/recommended'],
-    [`{ ${setup.name} }`, setup.from],
-  ];
-  addImports(out, program, code, lines, exported.commonjs);
-  return out.toString();
-}
-
-/**
- * Adds `value` first in the object's array `list`, or the list with it, as the object is laid out. False where `list`
- * isn't an array. First, since a plugin before deictic's that changes a module (both `pre` under Vite) leaves the
- * page's marks pointing at its code, not the file.
- */
-function addTo(out: MagicString, code: string, object: ObjectExpression, list: string, value: string): boolean {
-  const property = object.properties.find(
-    (p) =>
-      p.type === 'Property' &&
-      !p.computed &&
-      ((p.key.type === 'Identifier' && p.key.name === list) || (p.key.type === 'Literal' && p.key.value === list)),
-  );
-  if (property !== undefined) {
-    if (property.type !== 'Property') return false;
-    let array = property.value;
-    while (array.type === 'TSAsExpression' || array.type === 'TSSatisfiesExpression') array = array.expression;
-    if (array.type !== 'ArrayExpression') return false;
-    const first = array.elements.find((e) => e !== null);
-    if (first == null) {
-      out.appendLeft(array.start + 1, value);
-      return true;
-    }
-    addFirst(out, code, array.start, first, value);
-    return true;
-  }
-  addFirst(out, code, object.start, object.properties[0], `${list}: [${value}]`);
-  return true;
+  return addToConfig(file, code, {
+    imports: [
+      ['{ deicticRecommended }', 'deictic/recommended'],
+      [`{ ${setup.name} }`, setup.from],
+    ],
+    value: setup.value,
+    ...(setup.wrap ? { wrap: setup.name } : { list: setup.list! }),
+  });
 }
 
 export interface InitOptions {
@@ -314,7 +210,7 @@ function configure(root: string, bundler: Bundler | undefined, dryRun: boolean, 
     log(`deictic: ${name} has it already`);
     return;
   }
-  const added = addToConfig(bundler, file, code);
+  const added = addDeictic(bundler, file, code);
   if (added === undefined) {
     log(`deictic: couldn't tell where it goes in ${name}: add it yourself:\n\n${imports}\n${setup.snippet}\n`);
     return;

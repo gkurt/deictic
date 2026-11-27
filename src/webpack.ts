@@ -18,7 +18,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { LoaderOptions } from './loader.ts';
 import { openInEditor } from './tools/editor.ts';
-import { endpoints, nodeMiddleware } from './tools/endpoints.ts';
+import { type Endpoints, endpoints, nodeMiddleware } from './tools/endpoints.ts';
 import { beside, type DeicticOptions, merge, prepare, writeClient } from './tools/integration.ts';
 import { JSX } from './tools/locate.ts';
 
@@ -35,6 +35,7 @@ type Middlewares = ({ name: string; middleware: Middleware } | Middleware)[];
 /** What the plugin reads and sets of a webpack or Rspack compiler. */
 interface Compiler {
   context: string;
+  hooks: { shutdown: { tapPromise: (name: string, run: () => Promise<void>) => void } };
   options: {
     mode?: string;
     target?: string | string[] | false;
@@ -61,6 +62,7 @@ export class DeicticPlugin {
   readonly #options: DeicticWebpackOptions;
   #applied: Applied | undefined;
   #middleware: Middleware | undefined;
+  #endpoints: Endpoints | undefined;
   #root = '';
 
   constructor(options: DeicticWebpackOptions = {}) {
@@ -86,14 +88,13 @@ export class DeicticPlugin {
     return (this.#middleware = (req, res, next) => {
       if (handle === undefined) {
         const merged = this.#merged();
-        handle = nodeMiddleware(
-          endpoints({
-            root: this.#root,
-            plugins: prepare(merged).plugins,
-            base: merged.base ?? '/',
-            open: (path, loc) => openInEditor(path, loc),
-          }),
-        );
+        this.#endpoints = endpoints({
+          root: this.#root,
+          plugins: prepare(merged).plugins,
+          base: merged.base ?? '/',
+          open: (path, loc) => openInEditor(path, loc),
+        });
+        handle = nodeMiddleware(this.#endpoints);
       }
       handle(req, res, next);
     });
@@ -112,6 +113,10 @@ export class DeicticPlugin {
     const browser = forBrowser(compiler.options.target);
     const client = browser ? writeClient(this.#root, plugins, merged.base ?? '/', shortcut) : undefined;
     if (applied.first !== this) return;
+    // webpack's and Rspack's `close()`, which their dev servers call as they stop.
+    compiler.hooks.shutdown.tapPromise('deictic', async () => {
+      await this.#endpoints?.close();
+    });
     const options: LoaderOptions = { root: this.#root, ...(client === undefined ? {} : { client }) };
     // First, and `pre`, so it sees the source as written whatever the app's own rules do.
     compiler.options.module.rules.unshift({

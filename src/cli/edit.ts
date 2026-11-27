@@ -54,3 +54,17 @@ export function addFirst(out: MagicString, code: string, open: number, first: { 
   const multiline = code.slice(open, first.start).includes('\n');
   out.appendLeft(first.start, multiline ? `${text},${eol}${indentAt(code, first.start)}` : `${text}, `);
 }
+
+/** Appends `text` after the array's last element, before its `]` at `close`, as the array is laid out (a trailing comma kept). */
+export function addLast(out: MagicString, code: string, last: { end: number }, close: number, text: string): void {
+  const between = code.slice(last.end, close);
+  const comma = between.indexOf(',');
+  const eol = eolOf(code);
+  const indent = indentAt(code, last.end);
+  if (!between.includes('\n')) {
+    out.appendLeft(last.end, `, ${text}`);
+    return;
+  }
+  if (comma === -1) out.appendLeft(last.end, `,${eol}${indent}${text}`);
+  else out.appendLeft(last.end + comma + 1, `${eol}${indent}${text},`);
+}

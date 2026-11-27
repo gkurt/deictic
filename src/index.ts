@@ -129,6 +129,11 @@ export interface ServerContext {
   use: <Name extends string>(name: Name) => ApiOf<ServerApis, Name> | undefined;
   /** Says a problem of the plugin's own, as deictic says its own: in the dev server's output, and to each plugin's `problem`. */
   report: (problem: Problem) => void;
+  /**
+   * Runs `callback` as the dev server closes, to undo what `setup` did beyond the plugin itself: a global it set, a
+   * watcher or a server it started. Under Vite and webpack; a dev server that only ends with its process runs none.
+   */
+  onClose: (callback: () => Maybe<void>) => void;
 }
 
 /**

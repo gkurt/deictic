@@ -126,3 +126,12 @@ test('makes a file an edit at its start names, and takes it away again on undo',
   await post('undo', {});
   expect(existsSync(join(p.root, 'notes/de.yaml'))).toBe(false);
 });
+
+test("runs what the plugins' setups left for the close, the last set up first, once", async () => {
+  const p = project({ 'src/App.tsx': 'export const App = () => <div>x</div>;\n' });
+  const ran: string[] = [];
+  const closing = (name: string) => definePlugin({ name, setup: ({ onClose }) => onClose(() => void ran.push(name)) });
+  const handle = endpoints({ root: p.root, plugins: [closing('first'), closing('second')], open: () => new Response() });
+  await Promise.all([handle.close(), handle.close()]);
+  expect(ran).toEqual(['second', 'first']);
+});

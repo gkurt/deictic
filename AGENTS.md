@@ -66,7 +66,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
 - `src/tools/plugins.ts`: `checkPlugins(plugins, own)` (names lowercase and unique, `needs` loaded, a
   shortcut only with a `client`, shortcuts with deictic's own) as an integration starts; `setUp` runs every server `setup` at once and
   answers the shared context, whose `use` reads lazily: one that throws is reported (`setup:<name>`) and has no API, and
-  the rest go on.
+  the rest go on. Its `onClose` keeps callbacks for the endpoints' `close`, which runs them once, the last set up first:
+  Vite's `closeBundle` (once per environment in dev, and at a build's end, with no endpoints) and webpack's `shutdown`
+  hook call it; Next and Bun have no close but the process's.
 - `src/tools/problems.ts`: `reporter(plugins, ready)`, what `report` is: a problem said once per key in the dev server's
   output and handed to each plugin's `problem` once they're set up (its own failure only said, never reported, so a
   board that's down can't loop); `problemIn`, one the page sent, checked and cut short.
@@ -86,8 +88,9 @@ must stay small and dependency-free, and the tools, which run beside the bundler
   (below): installs `deictic` and the recommended plugins' `packages` (and `launch-editor` for webpack
   and Rspack) the project lacks, as its own dev dependencies, since deictic's imports, the page's bundle and the skill
   all look in the project; `bundlerOf` from the dependencies, and Bun only where a module of the project's calls
-  `Bun.serve` and imports an HTML file (`serverOf`), as Bun may run Vite or Next.js, or no page at all; `addToConfig`
-  adds deictic first in Vite's or Astro's list or webpack's and Rspack's `plugins` (a plugin before it that changes a
+  `Bun.serve` and imports an HTML file (`serverOf`), as Bun may run Vite or Next.js, or no page at all; `addDeictic`
+  adds deictic, through `src/setup.ts`'s `addToConfig` (`deictic/setup`, which prosebook's `init` uses too, adding its own
+  `last`), first in Vite's or Astro's list or webpack's and Rspack's `plugins` (a plugin before it that changes a
   module would have the marks count in its code), or wraps Next's export, with oxc and
   `magic-string` (through `defineConfig`, never another call, as a merge's first argument is a base, a function, a
   `const`, `satisfies`; ESM or CommonJS), and nothing where it can't tell, where it prints the snippet. `cli/bun.ts`

@@ -23,6 +23,10 @@ it adds, and what to add by hand where it can't (a config it can't read). Every 
 and runs in the dev server only. deictic goes first among the plugins: one before it that changes a module would have
 the page point at that plugin's code, not the file.
 
+`deictic/setup` is how `init` edits a config, for another tool's own setup: `addToConfig(file, code, entry)` adds
+`entry.imports` after the config's and `entry.value` to its `list`, first or, with `last`, after the rest, or passes the
+whole config to `wrap`. It answers nothing where it can't tell where, so the tool can print its snippet instead.
+
 ```ts
 // Vite, and anything on it (React Router, TanStack Start…): vite.config.ts
 import { deictic } from 'deictic/vite';
@@ -467,6 +471,9 @@ export default defineClientPlugin<Model, Op>({
   with anything but a `Refusal` are reported for it.
 - `setup` answers an API for other plugins, which reach it with `context.use(name)`. That's how tasks attaches
   screenshots and recordings.
+- `context.onClose(callback)`, from `setup`, runs `callback` as the dev server closes: undo there what `setup` did beyond
+  the plugin, a global it set or a watcher it started. Vite and webpack close their servers; under Next and Bun the dev
+  server ends with its process, and nothing runs.
 - A change that isn't to a file answers `{ done: record }`, and the plugin's `undo` and `redo` get the record back.
 - Throw a `Refusal` for an op the plugin won't make. The panel shows its message.
 - An edit's `file` names another file under the root than the element's (a catalog's entry). One that isn't there is
